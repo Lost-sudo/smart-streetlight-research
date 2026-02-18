@@ -1,0 +1,7 @@
+__pycache__
+.env
+*.log
+.idea/
+app/**/__pycache__/
+alembic.ini
+alembic/**/__pycache__/
