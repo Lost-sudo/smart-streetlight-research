@@ -24,8 +24,10 @@ class AuthController:
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
 
-        access_token = self.auth_service.create_access_token(data={"sub": user.username})
-        return {"access_token": access_token, "token_type": "bearer"}
+        access_token = self.auth_service.create_access_token(user)
+        refresh_token, expires_at = self.auth_service.create_refresh_token(user)
+        self.auth_service.save_refresh_token(refresh_token, user.id)
+        return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
     def get_current_user(self, token: str) -> UserRead:
         user = self.auth_service.get_current_user(token)

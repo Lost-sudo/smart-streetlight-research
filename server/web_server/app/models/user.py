@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 from enum import Enum as PyEnum
 from datetime import datetime
@@ -17,5 +18,6 @@ class User(Base):
     role = Column(Enum(UserRole), nullable=False, default=UserRole.viewer)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    refresh_tokens = relationship("RefreshTokens", back_populates="user", cascade="all, delete-orphan")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
