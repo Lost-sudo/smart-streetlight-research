@@ -11,7 +11,7 @@ class UserRole(str, Enum):
 class UserCreate(BaseModel):
     username: str
     password: str
-    role: UserRole
+    role: Optional[UserRole] = None
 
 class UserRead(BaseModel):
     id: int
@@ -20,7 +20,7 @@ class UserRead(BaseModel):
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
