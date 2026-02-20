@@ -40,6 +40,7 @@ class AuthService:
         payload = {
             "sub": user.username,
             "user_id": user.id,
+            "role": user.role,
             "type": "access_token",
             "exp": expire
         }
@@ -58,6 +59,7 @@ class AuthService:
         payload = {
             "sub": user.username,
             "user_id": user.id,
+            "role": user.role,
             "type": "refresh_token",
             "exp": expires_at
         }
