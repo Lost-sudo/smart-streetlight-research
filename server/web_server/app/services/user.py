@@ -88,10 +88,10 @@ class AuthService:
                 algorithms=settings.REFRESH_ALGORITHM
             )
         except JWTError:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
         if payload.get("type") != "refresh_token":
-            raise HTTPException(status_code=401, detail="Invalid token type")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
 
         user_id = payload.get("user_id")
 
@@ -105,10 +105,10 @@ class AuthService:
                 break
 
         if not matched_token:
-            raise HTTPException(status_code=401, detail="Token not recognized")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token not recognized")
 
         if matched_token.expires_at < datetime.now():
-            raise HTTPException(status_code=401, detail="Token is expired")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is expired")
 
         self.refresh_repo.revoke(matched_token.token)
 

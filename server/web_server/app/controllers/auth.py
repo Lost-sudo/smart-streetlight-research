@@ -1,8 +1,7 @@
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Response
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserRead
 from app.schemas.auth import TokenResponse
-from app.models.user import User
 from app.services.user import AuthService
 
 class AuthController:
@@ -13,7 +12,7 @@ class AuthController:
         new_user = self.auth_service.create_user(user)
         return UserRead.model_validate(new_user, from_attributes=True)
 
-    def login(self, username: str, password: str) -> UserRead:
+    def login(self, response: Response, username: str, password: str) -> UserRead:
         user = self.auth_service.authenticate_user(username, password)
 
         if not user:
@@ -22,9 +21,18 @@ class AuthController:
         access_token = self.auth_service.create_access_token(user)
         refresh_token, expires_at = self.auth_service.create_refresh_token(user)
         self.auth_service.save_refresh_token(refresh_token, user.id, expires_at)
+
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            max_age=86400,
+        )
+
         return TokenResponse(
             access_token=access_token,
-            refresh_token=refresh_token,
             token_type="bearer"
         )
 
