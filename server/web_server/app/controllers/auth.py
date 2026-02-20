@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status, Response
+from fastapi import HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserRead
 from app.schemas.auth import TokenResponse
@@ -12,7 +12,7 @@ class AuthController:
         new_user = self.auth_service.create_user(user)
         return UserRead.model_validate(new_user, from_attributes=True)
 
-    def login(self, response: Response, username: str, password: str) -> UserRead:
+    def login(self, response: Response, username: str, password: str) -> TokenResponse:
         user = self.auth_service.authenticate_user(username, password)
 
         if not user:
@@ -35,6 +35,18 @@ class AuthController:
             access_token=access_token,
             token_type="bearer"
         )
+
+    def logout(self, request: Request, response: Response):
+        refresh_token = request.cookies.get("refresh_token")
+
+        if not refresh_token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing")
+
+        self.auth_service.logout(refresh_token)
+
+        response.delete_cookie("refresh_token", httponly=True, secure=True, samesite="strict")
+
+        return {"message": "Logout successful"}
 
     def get_current_user(self, token: str) -> UserRead:
         user = self.auth_service.get_current_user(token)

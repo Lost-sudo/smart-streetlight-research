@@ -25,6 +25,10 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
 def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
     return RefreshTokenController(db).refresh(request, response)
 
+@router.post("/logout")
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    return AuthController(db).logout(request, response)
+
 @router.get("/me", response_model=UserRead)
 def read_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     return AuthController(db).get_current_user(token)

@@ -1,3 +1,4 @@
+from app.schemas.auth import TokenServiceResponse
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -80,7 +81,7 @@ class AuthService:
         )
 
     
-    def refresh_access_token(self, refresh_token: str):
+    def refresh_access_token(self, refresh_token: str) -> TokenServiceResponse:
         try:
             payload = jwt.decode(
                 refresh_token,
@@ -119,13 +120,13 @@ class AuthService:
 
         self.save_refresh_token(new_refresh_token, user.id, expires_at=expires_at)
 
-        return {
-            "access_token": new_access_token,
-            "refresh_token": new_refresh_token,
-            "token_type": "bearer"
-        }
+        return TokenServiceResponse(
+            access_token=new_access_token,
+            refresh_token=new_refresh_token,
+            token_type="bearer"
+        )
 
-    def create_user(self, user: UserCreate) -> UserRead:
+    def create_user(self, user: UserCreate) -> User:
         if self.__get_user(user.username):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
         hashed_password = self.__hash_password(user.password)
@@ -137,7 +138,7 @@ class AuthService:
 
         return self.user_repo.create(user=new_user)
         
-    def authenticate_user(self, username: str, password: str):
+    def authenticate_user(self, username: str, password: str) -> User:
         user = self.user_repo.get_by_username(username)
 
         if not user or not self.__verify_password(password, user.hashed_password):
@@ -145,22 +146,48 @@ class AuthService:
 
         return user
 
-    def get_current_user(self, token: str) -> User:
+    def logout(self, refresh_token: str):
+        try:
+            payload = jwt.decode(refresh_token, settings.REFRESH_SECRET_KEY, algorithms=[settings.REFRESH_ALGORITHM])
+        except:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+        user_id = payload.get("user_id")
+
+        db_tokens = self.refresh_repo.get_all_active_by_user(user_id)
+
+        for db_token in db_tokens:
+            if self.__verify_token(refresh_token, db_token.token):
+                self.refresh_repo.revoke(db_token.token)
+                return
+
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token not recognized")
+
+    def get_current_user(self, token: str):
+
         credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-            username: str = payload.get("sub")
-            if username is None:
+            payload = jwt.decode(
+                token,
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM]
+            )
+
+            user_id: int = payload.get("user_id")
+
+            if user_id is None:
                 raise credentials_exception
+
         except JWTError:
             raise credentials_exception
 
-        user = self.user_repo.get_by_username(username)
+        user = self.user_repo.get_by_id(user_id)
+
         if user is None:
             raise credentials_exception
 
