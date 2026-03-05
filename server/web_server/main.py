@@ -14,3 +14,7 @@ app.include_router(auth_router)
 @app.get("/")
 def root():
     return {"message": "Welcome to Web-Based Smart Streetlight Automation and Predictive Maintenance System!"}
+
+@app.get("/health")
+def health():
+    return {"message": "OK"}
