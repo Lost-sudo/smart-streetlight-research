@@ -29,6 +29,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { cn } from "@/lib/utils";
 import { Zap, Activity, Sun, Power, RefreshCcw } from "lucide-react";
 
 // Mock data for the charts
@@ -47,6 +48,8 @@ const nodes = [
   { id: "3", name: "Node 3 - East Blvd", status: "Bulb Fault" },
   { id: "4", name: "Node 4 - South Park", status: "Normal" },
 ];
+
+import { RoleGate } from "@/components/auth/role-gate";
 
 export default function MonitoringPage() {
   const [selectedNode, setSelectedNode] = useState("1");
@@ -86,51 +89,53 @@ export default function MonitoringPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-4">
-        {/* Node Control Card */}
-        <Card className="md:col-span-1 border-none shadow-md bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Relay Control</CardTitle>
-            <CardDescription>Manual override for {currentNode?.name}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl gap-4">
-              <div className={`p-4 rounded-full transition-all duration-500 bg-zinc-200 dark:bg-zinc-800 ${relayOn ? "shadow-[0_0_20px_rgba(234,179,8,0.3)] ring-4 ring-yellow-500/20" : ""}`}>
-                <Power className={`h-12 w-12 transition-colors duration-500 ${relayOn ? "text-yellow-500" : "text-zinc-400"}`} />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch 
-                  id="relay-mode" 
-                  checked={relayOn} 
-                  onCheckedChange={setRelayOn} 
-                />
-                <Label htmlFor="relay-mode" className="font-bold text-lg">
-                  {relayOn ? "ON" : "OFF"}
-                </Label>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Operating Status</span>
-                <Badge variant={currentNode?.status === "Normal" ? "default" : "destructive"}>
-                  {currentNode?.status}
-                </Badge>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Gateway Strength</span>
-                <div className="flex gap-0.5">
-                  <div className="h-3 w-1 bg-green-500 rounded-full" />
-                  <div className="h-3 w-1 bg-green-500 rounded-full" />
-                  <div className="h-3 w-1 bg-green-500 rounded-full" />
-                  <div className="h-3 w-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+        {/* Node Control Card - Role Restricted */}
+        <RoleGate allowedRoles={["ADMIN", "OPERATOR"]}>
+          <Card className="md:col-span-1 border-none shadow-md bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Relay Control</CardTitle>
+              <CardDescription>Manual override for {currentNode?.name}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl gap-4">
+                <div className={`p-4 rounded-full transition-all duration-500 bg-zinc-200 dark:bg-zinc-800 ${relayOn ? "shadow-[0_0_20px_rgba(234,179,8,0.3)] ring-4 ring-yellow-500/20" : ""}`}>
+                  <Power className={`h-12 w-12 transition-colors duration-500 ${relayOn ? "text-yellow-500" : "text-zinc-400"}`} />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    id="relay-mode" 
+                    checked={relayOn} 
+                    onCheckedChange={setRelayOn} 
+                  />
+                  <Label htmlFor="relay-mode" className="font-bold text-lg">
+                    {relayOn ? "ON" : "OFF"}
+                  </Label>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+              
+              <div className="space-y-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Operating Status</span>
+                  <Badge variant={currentNode?.status === "Normal" ? "default" : "destructive"}>
+                    {currentNode?.status}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Gateway Strength</span>
+                  <div className="flex gap-0.5">
+                    <div className="h-3 w-1 bg-green-500 rounded-full" />
+                    <div className="h-3 w-1 bg-green-500 rounded-full" />
+                    <div className="h-3 w-1 bg-green-500 rounded-full" />
+                    <div className="h-3 w-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </RoleGate>
 
         {/* Real-time Charts Section */}
-        <div className="md:col-span-3 space-y-6">
+        <div className={cn("space-y-6", (relayOn ? "md:col-span-3" : "md:col-span-4"))}>
           <div className="grid gap-6 md:grid-cols-2">
             {/* Voltage Chart */}
             <Card className="border-none shadow-md bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm overflow-hidden">

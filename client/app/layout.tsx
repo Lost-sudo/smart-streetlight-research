@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "Real-time monitoring and predictive maintenance system for smart streetlights.",
 };
 
+import { AuthProvider } from "@/providers/auth-provider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,7 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}
       >
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

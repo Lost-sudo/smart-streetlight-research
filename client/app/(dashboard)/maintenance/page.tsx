@@ -30,8 +30,17 @@ import {
   CheckCircle2, 
   Clock, 
   History as HistoryIcon,
-  Info
+  Info,
+  UserPlus
 } from "lucide-react";
+import { RoleGate } from "@/components/auth/role-gate";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface MaintenanceTask {
   id: string;
@@ -42,7 +51,14 @@ interface MaintenanceTask {
   suggestedAction: string;
   explanation: string;
   status: "Pending" | "In Progress" | "Resolved";
+  assignedTo?: string;
 }
+
+const technicians = [
+  { id: "t1", name: "John Doe", specialty: "Electrical" },
+  { id: "t2", name: "Jane Smith", specialty: "Hardware" },
+  { id: "t3", name: "Alice Brown", specialty: "Networking" },
+];
 
 const initialTasks: MaintenanceTask[] = [
   {
@@ -64,6 +80,7 @@ const initialTasks: MaintenanceTask[] = [
     suggestedAction: "Replace LED Module",
     explanation: "Standard voltage but near-zero current draw during active period.",
     status: "In Progress",
+    assignedTo: "Jane Smith",
   },
   {
     id: "3",
@@ -86,6 +103,30 @@ const priorityColors = {
 export default function MaintenancePage() {
   const [tasks, setTasks] = useState(initialTasks);
   const [search, setSearch] = useState("");
+  const [selectedTech, setSelectedTech] = useState<string>("");
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'info'} | null>(null);
+
+  const showNotification = (message: string, type: 'success' | 'info' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleAssign = (taskId: string) => {
+    if (!selectedTech) return;
+    
+    setTasks(prev => prev.map(task => 
+      task.id === taskId 
+        ? { ...task, assignedTo: selectedTech, status: "In Progress" } 
+        : task
+    ));
+    showNotification(`Technician ${selectedTech} assigned successfully!`, 'info');
+    setSelectedTech("");
+  };
+
+  const handleLogRepair = (taskId: string) => {
+    setTasks(prev => prev.filter(task => task.id !== taskId));
+    showNotification("Repair logged and alert closed successfully!", 'success');
+  };
 
   const filteredTasks = tasks.filter(task => 
     task.node.toLowerCase().includes(search.toLowerCase()) || 
@@ -93,7 +134,19 @@ export default function MaintenancePage() {
   );
 
   return (
-    <div className="flex-1 space-y-8 p-8 pt-6">
+    <div className="flex-1 space-y-8 p-8 pt-6 relative">
+      {/* Success/Info Notification Popover */}
+      {notification && (
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-300 ${
+          notification.type === 'success' 
+            ? 'bg-emerald-500/90 text-white border-emerald-400/50' 
+            : 'bg-blue-600/90 text-white border-blue-400/50'
+        }`}>
+          {notification.type === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <Info className="h-5 w-5" />}
+          <span className="font-bold tracking-tight">{notification.message}</span>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Maintenance Pipeline</h2>
@@ -122,7 +175,7 @@ export default function MaintenancePage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Pending Repairs</p>
-              <h3 className="text-2xl font-bold">3</h3>
+              <h3 className="text-2xl font-bold">{tasks.filter(t => t.status === "Pending").length}</h3>
             </div>
          </div>
          <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-6 flex items-center gap-4">
@@ -131,7 +184,7 @@ export default function MaintenancePage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Active Work</p>
-              <h3 className="text-2xl font-bold">1</h3>
+              <h3 className="text-2xl font-bold">{tasks.filter(t => t.status === "In Progress").length}</h3>
             </div>
          </div>
          <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-6 flex items-center gap-4">
@@ -152,7 +205,7 @@ export default function MaintenancePage() {
               <TableHead className="font-bold">Node</TableHead>
               <TableHead className="font-bold">Fault Type</TableHead>
               <TableHead className="font-bold">Priority</TableHead>
-              <TableHead className="font-bold">Date Detected</TableHead>
+              <TableHead className="font-bold">Assigned To</TableHead>
               <TableHead className="text-right font-bold w-[120px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -172,7 +225,16 @@ export default function MaintenancePage() {
                       {task.priority}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{task.dateDetected}</TableCell>
+                  <TableCell>
+                    {task.assignedTo ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-sm font-medium">{task.assignedTo}</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground italic">Unassigned</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     <Dialog>
                       <DialogTrigger asChild>
@@ -210,20 +272,60 @@ export default function MaintenancePage() {
                               <p className="text-sm font-medium">{task.suggestedAction}</p>
                             </div>
 
-                            <div className="space-y-2">
-                              <Label htmlFor="repair-log" className="text-sm font-bold">Repair Log Input</Label>
-                              <Textarea 
-                                id="repair-log" 
-                                placeholder="Describe the steps taken for repair..." 
-                                className="min-h-[100px] bg-card border-none shadow-inner"
-                              />
-                            </div>
+                            {/* Assign Technician Section (Admin/Operator only) */}
+                            <RoleGate allowedRoles={["ADMIN", "OPERATOR"]}>
+                              <div className="space-y-3 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-700">
+                                <Label className="text-sm font-bold flex items-center gap-2">
+                                  <UserPlus className="h-4 w-4 text-primary" />
+                                  Assign Technician
+                                </Label>
+                                <div className="flex gap-2">
+                                  <Select 
+                                    value={selectedTech} 
+                                    onValueChange={setSelectedTech}
+                                  >
+                                    <SelectTrigger className="flex-1 bg-white dark:bg-zinc-900 border-none">
+                                      <SelectValue placeholder={task.assignedTo || "Select personnel..."} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {technicians.map(tech => (
+                                        <SelectItem key={tech.id} value={tech.name}>
+                                          {tech.name} ({tech.specialty})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Button 
+                                    disabled={!selectedTech} 
+                                    onClick={() => handleAssign(task.id)}
+                                    size="sm"
+                                    className="rounded-lg shadow-md"
+                                  >
+                                    Assign
+                                  </Button>
+                                </div>
+                              </div>
+                            </RoleGate>
+
+                            {/* Technician Specific Inputs */}
+                            <RoleGate allowedRoles={["ADMIN", "TECHNICIAN"]}>
+                              <div className="space-y-2">
+                                <Label htmlFor="repair-log" className="text-sm font-bold">Repair Log Input</Label>
+                                <Textarea 
+                                  id="repair-log" 
+                                  placeholder="Describe the steps taken for repair..." 
+                                  className="min-h-[100px] bg-card border-none shadow-inner"
+                                />
+                              </div>
+                            </RoleGate>
                           </div>
                         </div>
 
                         <DialogFooter className="gap-2 sm:gap-0">
-                          <Button variant="outline" className="flex-1 sm:flex-none">Close</Button>
-                          <Button className="flex-1 sm:flex-none">Log Repair & Close Alert</Button>
+                          <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => (document.querySelector('[data-state="open"]') as HTMLElement)?.click()}>Close</Button>
+                          <RoleGate allowedRoles={["ADMIN", "TECHNICIAN"]}>
+                            <Button className="flex-1 sm:flex-none" onClick={() => handleLogRepair(task.id)}>Log Repair & Close Alert</Button>
+                          </RoleGate>
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>

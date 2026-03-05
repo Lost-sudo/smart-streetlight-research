@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar";
+import { RouteProtected } from "@/components/auth/route-protected";
 
 export default function DashboardLayout({
   children,
@@ -6,11 +7,13 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar className="hidden md:flex w-64 flex-col" />
-      <main className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-zinc-950/50">
-        {children}
-      </main>
-    </div>
+    <RouteProtected>
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar className="hidden md:flex w-64 flex-col" />
+        <main className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-zinc-950/50">
+          {children}
+        </main>
+      </div>
+    </RouteProtected>
   );
 }

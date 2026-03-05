@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,21 +13,28 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Zap, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/providers/auth-provider";
+import { Role } from "@/types/auth";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<Role>("ADMIN");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate login delay
-    setTimeout(() => {
-      setIsLoading(false);
-      router.push("/");
-    }, 1500);
+    // Use the central login function
+    login(selectedRole);
   };
 
   return (
@@ -52,11 +58,25 @@ export default function LoginPage() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">System Access</CardTitle>
             <CardDescription className="text-center">
-              Enter your credentials to manage the streetlight network
+              Select a role and enter credentials (demo mode)
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleLogin}>
             <CardContent className="grid gap-6">
+              <div className="grid gap-2">
+                <Label htmlFor="role">Login As (Demo)</Label>
+                <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as Role)}>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN">Administrator</SelectItem>
+                    <SelectItem value="OPERATOR">Operator</SelectItem>
+                    <SelectItem value="TECHNICIAN">Technician</SelectItem>
+                    <SelectItem value="VIEWER">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
@@ -65,6 +85,7 @@ export default function LoginPage() {
                     id="email" 
                     type="email" 
                     placeholder="name@lgu.gov.ph" 
+                    defaultValue={`${selectedRole.toLowerCase()}@smartlight.io`}
                     className="pl-10 h-11"
                     required 
                   />
@@ -73,9 +94,6 @@ export default function LoginPage() {
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
-                  <Button variant="link" className="px-0 font-normal text-xs text-muted-foreground">
-                    Forgot password?
-                  </Button>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -83,6 +101,7 @@ export default function LoginPage() {
                     id="password" 
                     type={showPassword ? "text" : "password"} 
                     className="pl-10 pr-10 h-11"
+                    defaultValue="demo123"
                     required 
                   />
                   <Button
