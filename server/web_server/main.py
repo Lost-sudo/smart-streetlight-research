@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.routes.auth import router as auth_router
+from app.routes.streetlight import router as streetlight_router
 
 app = FastAPI(
     title="Web-Based Smart Streetlight Automation and Predictive Maintenance System",
@@ -9,6 +10,7 @@ app = FastAPI(
 
 # Register routes from controllers
 app.include_router(auth_router)
+app.include_router(streetlight_router)
 
 
 @app.get("/")

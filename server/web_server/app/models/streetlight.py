@@ -1,7 +1,30 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Enum
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Enum, ForeignKey
 from sqlalchemy.orm import relationship
-from .database import Base
+from app.core.database import Base
 from datetime import datetime
+from enum import Enum as PyEnum
+
+class StreetlightStatus(str, PyEnum):
+    active = "active"
+    inactive = "inactive"
+    faulty = "faulty"
+    maintenance = "maintenance"
+
+class AlertSeverity(str, PyEnum):
+    low = "low",
+    medium = "medium"
+    high = "high"
+    critical = "critical"
+
+class MaintenanceStatus(str, PyEnum):
+    pending = "pending"
+    in_progress = "in_progess"
+    completed = "completed"
+
+class UrgencyLevel(str,  PyEnum):
+    low = "low"
+    medium = "medium"
+    high = "high"
 
 class Streetlight(Base):
     __tablename__ = "streetlights"
@@ -11,7 +34,7 @@ class Streetlight(Base):
     longitude = Column(Float)
     model_info = Column(String)
     installation_date = Column(DateTime)
-    status = Column(Enum("active", "inactive", "faulty", "maintenance"))
+    status = Column(Enum(StreetlightStatus, name="streetlight_status_enum"))
     is_on = Column(Boolean, default=False)
     dimming_level = Column(Integer, default=100)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -38,7 +61,7 @@ class Alert(Base):
     id = Column(Integer, primary_key=True, index=True)
     streetlight_id = Column(Integer, ForeignKey("streetlights.id"))
     type = Column(String)
-    severity = Column(Enum("low", "medium", "high", "critical"))
+    severity = Column(Enum(AlertSeverity, name="alert_severity_enum"))
     message = Column(String)
     is_resolved = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -54,7 +77,7 @@ class MaintenanceLog(Base):
     parts_replaced = Column(String)
     scheduled_date = Column(DateTime)
     completion_date = Column(DateTime)
-    status = Column(Enum("pending", "in_progress", "completed"))
+    status = Column(Enum(MaintenanceStatus, name="maintenance_status_enum"))
     
     streetlight = relationship("Streetlight", back_populates="maintenance_logs")
     technician = relationship("User", back_populates="maintenance_logs")
@@ -65,7 +88,7 @@ class PredictiveMaintenance(Base):
     streetlight_id = Column(Integer, ForeignKey("streetlights.id"), unique=True)
     failure_probability = Column(Float)
     predicted_failure_date = Column(DateTime)
-    urgency_level = Column(Enum("low", "medium", "high"))
+    urgency_level = Column(Enum(UrgencyLevel, name="urgency_level_enum"))
     last_updated = Column(DateTime, default=datetime.utcnow)
     
     streetlight = relationship("Streetlight", back_populates="predictive_maintenance")
