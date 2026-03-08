@@ -2,7 +2,7 @@ from fastapi import HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserRead
 from app.schemas.auth import TokenResponse
-from app.services.user import AuthService
+from app.services.auth import AuthService
 
 class AuthController:
     def __init__(self, db: Session):

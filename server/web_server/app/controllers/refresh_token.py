@@ -2,7 +2,7 @@ from app.schemas.auth import TokenResponse
 from fastapi import HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 
-from app.services.user import AuthService
+from app.services.auth import AuthService
 
 class RefreshTokenController:
     def __init__(self, db: Session):

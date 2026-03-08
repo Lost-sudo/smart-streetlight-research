@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: "u123",
       name: "System Admin",
       email: "admin@smartlight.io",
-      role: "VIEWER"
+      role: "ADMIN"
     };
   });
 
