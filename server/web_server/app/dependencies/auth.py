@@ -1,6 +1,7 @@
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer
+from fastapi import HTTPException, status
 
 from app.core.database import get_db
 from app.services.auth import AuthService
@@ -13,4 +14,9 @@ def get_current_user(
 ):
     auth_service = AuthService(db)
 
-    return auth_service.get_current_user(token)
+    user = auth_service.get_current_user(token)
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    return user
