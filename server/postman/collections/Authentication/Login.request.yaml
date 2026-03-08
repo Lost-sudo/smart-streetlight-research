@@ -1,0 +1,10 @@
+$kind: http-request
+name: Login
+url: http://127.0.0.1:8000/auth/login
+method: POST
+body:
+  type: urlencoded
+  content:
+    username: lost123
+    password: lostsudo123
+order: 2507433726139677

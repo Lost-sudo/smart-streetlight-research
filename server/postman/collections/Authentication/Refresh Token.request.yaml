@@ -1,0 +1,10 @@
+$kind: http-request
+name: Refresh Token
+url: http://127.0.0.1:8000/auth/refresh
+method: GET
+auth:
+  credentials:
+    - key: token
+      value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsb3N0MTIzIiwidXNlcl9pZCI6MSwicm9sZSI6InZpZXdlciIsInR5cGUiOiJhY2Nlc3NfdG9rZW4iLCJleHAiOjE3NzMwNTA5NzV9.dERltQ3cHRf5rhNSaiFOCGoGDncSCSNwBWMtec6fb5Q
+  type: bearer
+order: 3701369819733357

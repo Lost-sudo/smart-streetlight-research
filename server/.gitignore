@@ -5,3 +5,5 @@ __pycache__
 alembic.ini
 alembic/
 alembic/versions
+
+.postman

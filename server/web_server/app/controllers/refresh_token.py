@@ -20,16 +20,14 @@ class RefreshTokenController:
 
         response.set_cookie(
             key="refresh_token",
-            value=tokens["refresh_token"],
+            value=tokens.refresh_token,
             httponly=True,
             secure=True,
             samesite="strict",
             max_age=3600,
         )
 
-        tokens.pop("refresh_token")
-
         return TokenResponse(
-            access_token=tokens["access_token"],
-            token_type=tokens["token_type"],
+            access_token=tokens.access_token,
+            token_type=tokens.token_type,
         )
