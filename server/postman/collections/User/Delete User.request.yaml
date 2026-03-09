@@ -1,0 +1,9 @@
+$kind: http-request
+name: Delete User
+url: http://127.0.0.1:8000/user/2
+method: DELETE
+auth:
+  type: bearer
+  credentials:
+    token: "{{access_token}}"
+order: 3789949366087120
