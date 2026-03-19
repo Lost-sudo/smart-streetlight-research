@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.routes.auth import router as auth_router
 from app.routes.streetlight import router as streetlight_router
 from app.routes.user import router as user_router
+import uvicorn
 
 app = FastAPI(
     title="Web-Based Smart Streetlight Automation and Predictive Maintenance System",
@@ -21,3 +22,6 @@ def root():
 @app.get("/health")
 def health():
     return {"message": "OK"}
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="localhost", port=8000, reload=True)
