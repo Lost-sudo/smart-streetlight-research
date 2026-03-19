@@ -1,9 +1,0 @@
-$kind: http-request
-name: New Request
-url: http://127.0.0.1:8000/user/username/lost22
-method: GET
-auth:
-  type: bearer
-  credentials:
-    token: "{{access_token}}"
-order: 4353013701937212

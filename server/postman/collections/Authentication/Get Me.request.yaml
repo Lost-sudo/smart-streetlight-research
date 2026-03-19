@@ -1,9 +1,0 @@
-$kind: http-request
-name: Get Me
-url: http://127.0.0.1:8000/auth/me
-method: GET
-auth:
-  credentials:
-    token: "{{access_token}}"
-  type: bearer
-order: 3625812703903644

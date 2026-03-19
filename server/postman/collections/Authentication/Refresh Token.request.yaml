@@ -1,9 +1,0 @@
-$kind: http-request
-name: Refresh Token
-url: http://127.0.0.1:8000/auth/refresh
-method: POST
-auth:
-  credentials:
-    token: "{{access_token}}"
-  type: bearer
-order: 3701369819733357
