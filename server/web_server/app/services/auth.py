@@ -32,8 +32,8 @@ class AuthService:
     def __get_user(self, username: str):
         return self.user_repo.get_by_username(username)
 
-    def create_access_token(self, user: User):
-        expire = datetime.now() + timedelta(
+    def create_access_token(self, user: User, refresh_token_id: int):
+        expire = datetime.utcnow() + timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
@@ -42,6 +42,7 @@ class AuthService:
             "user_id": user.id,
             "role": user.role,
             "type": "access_token",
+            "session_id": refresh_token_id,
             "exp": expire
         }
 
@@ -76,7 +77,7 @@ class AuthService:
     def save_refresh_token(self, token: str, user_id: int, expires_at: datetime):
         hashed_token = self.__hash_token(token)
 
-        self.refresh_repo.create(
+        return self.refresh_repo.create(
             user_id=user_id,
             token=hashed_token,
             expires_at=expires_at
@@ -88,7 +89,7 @@ class AuthService:
             payload = jwt.decode(
                 refresh_token,
                 settings.REFRESH_SECRET_KEY,
-                algorithms=settings.REFRESH_ALGORITHM
+                algorithms=[settings.REFRESH_ALGORITHM]
             )
         except JWTError:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
@@ -110,17 +111,16 @@ class AuthService:
         if not matched_token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token not recognized")
 
-        if matched_token.expires_at < datetime.now():
+        if matched_token.expires_at < datetime.utcnow():
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is expired")
 
         self.refresh_repo.revoke(matched_token.token)
 
         user = matched_token.user
 
-        new_access_token = self.create_access_token(user)
         new_refresh_token, expires_at = self.create_refresh_token(user)
-
-        self.save_refresh_token(new_refresh_token, user.id, expires_at=expires_at)
+        db_refresh_token = self.save_refresh_token(new_refresh_token, user.id, expires_at=expires_at)
+        new_access_token = self.create_access_token(user, db_refresh_token.id)
 
         return TokenServiceResponse(
             access_token=new_access_token,
@@ -181,11 +181,17 @@ class AuthService:
             )
 
             user_id: int = payload.get("user_id")
+            session_id: int = payload.get("session_id")
 
-            if user_id is None:
+            if user_id is None or session_id is None:
                 raise credentials_exception
 
         except JWTError:
+            raise credentials_exception
+
+        # Check if the session (refresh token) is still valid
+        db_session = self.refresh_repo.get_by_id(session_id)
+        if not db_session or db_session.is_revoked or db_session.expires_at < datetime.utcnow():
             raise credentials_exception
 
         user = self.user_repo.get_by_id(user_id)

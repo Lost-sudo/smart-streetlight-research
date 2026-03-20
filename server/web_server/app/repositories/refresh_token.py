@@ -23,6 +23,11 @@ class RefreshTokenRepository:
             RefreshToken.token == refresh_token
         ).first()
 
+    def get_by_id(self, token_id: int):
+        return self.db.query(RefreshToken).filter(
+            RefreshToken.id == token_id
+        ).first()
+
     def get_all_active_by_user(self, user_id):
         return self.db.query(RefreshToken).filter(
             RefreshToken.user_id == user_id,

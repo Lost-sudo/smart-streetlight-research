@@ -18,9 +18,9 @@ class AuthController:
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
 
-        access_token = self.auth_service.create_access_token(user)
         refresh_token, expires_at = self.auth_service.create_refresh_token(user)
-        self.auth_service.save_refresh_token(refresh_token, user.id, expires_at)
+        db_refresh_token = self.auth_service.save_refresh_token(refresh_token, user.id, expires_at)
+        access_token = self.auth_service.create_access_token(user, db_refresh_token.id)
 
         response.set_cookie(
             key="refresh_token",
