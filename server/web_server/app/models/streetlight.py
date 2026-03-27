@@ -34,7 +34,7 @@ class Streetlight(Base):
     longitude = Column(Float)
     model_info = Column(String)
     installation_date = Column(DateTime)
-    status = Column(Enum(StreetlightStatus, name="streetlight_status_enum", default=StreetlightStatus.inactive))
+    status = Column(Enum(StreetlightStatus, name="streetlight_status_enum"), nullable=False, default=StreetlightStatus.inactive, server_default=StreetlightStatus.inactive.value)
     is_on = Column(Boolean, default=False)
     dimming_level = Column(Integer, default=100)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -52,6 +52,7 @@ class StreetlightLog(Base):
     current = Column(Float)
     power_consumption = Column(Float)
     light_intensity = Column(Float)
+    is_on = Column(Boolean, default=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     
     streetlight = relationship("Streetlight", back_populates="logs")
