@@ -1,69 +1,49 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
-import { User, Role } from "@/types/auth";
+import React, { createContext, useContext } from "react";
 import { useRouter } from "next/navigation";
+import { useAppSelector, useAppDispatch } from "@/lib/redux/hooks";
+import { selectCurrentUser, selectAuthLoading, logOut } from "@/lib/redux/slices/authSlice";
+import { useLoginMutation, useLogoutMutation } from "@/lib/redux/api/authApi";
+import { User, LoginInput } from "@/types/auth";
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (role: Role) => void;
+  login: (data: LoginInput) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    // Try to get from localStorage first
-    if (typeof window !== "undefined") {
-      const savedUser = localStorage.getItem("smartlight_user");
-      if (savedUser) {
-        try {
-          return JSON.parse(savedUser);
-        } catch (e) {
-          console.error("Failed to parse user session", e);
-          localStorage.removeItem("smartlight_user");
-        }
-      }
-    }
-    
-    // Default fallback user for development
-    return {
-      id: "u123",
-      name: "System Admin",
-      email: "admin@smartlight.io",
-      role: "ADMIN"
-    };
-  });
-
-  const [isLoading, setIsLoading] = useState(false);
+  const user = useAppSelector(selectCurrentUser);
+  const isLoading = useAppSelector(selectAuthLoading);
+  const dispatch = useAppDispatch();
   const router = useRouter();
+  const [loginTrigger] = useLoginMutation();
+  const [logoutTrigger] = useLogoutMutation();
 
-  const login = (role: Role) => {
-    setIsLoading(true);
-    
-    // Mock user based on role
-    const mockUser: User = {
-      id: "u123",
-      name: `Demo ${role.charAt(0) + role.slice(1).toLowerCase()}`,
-      email: `${role.toLowerCase()}@smartlight.io`,
-      role: role,
-    };
-    
-    setUser(mockUser);
-    localStorage.setItem("smartlight_user", JSON.stringify(mockUser));
-    
-    setTimeout(() => {
-      setIsLoading(false);
+  const login = async (data: LoginInput) => {
+    try {
+      await loginTrigger(data).unwrap();
       router.push("/");
-    }, 800);
+    } catch (err) {
+      console.error("Login failed", err);
+      throw err;
+    }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("smartlight_user");
-    router.push("/login");
+
+  const logout = async () => {
+    try {
+      await logoutTrigger().unwrap();
+      router.push("/login");
+    } catch (err) {
+      console.error("Logout failed", err);
+      dispatch(logOut()); // Force logout anyway
+      router.push("/login");
+    }
   };
 
   return (
