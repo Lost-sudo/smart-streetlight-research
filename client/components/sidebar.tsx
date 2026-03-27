@@ -32,43 +32,43 @@ const sidebarItems: SidebarItem[] = [
     title: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
-    allowedRoles: ["ADMIN", "OPERATOR", "TECHNICIAN", "VIEWER"],
+    allowedRoles: ["admin", "operator", "technician", "viewer"],
   },
   {
     title: "Node Monitoring",
     href: "/monitoring",
     icon: Lightbulb,
-    allowedRoles: ["ADMIN", "OPERATOR", "TECHNICIAN"],
+    allowedRoles: ["admin", "operator", "technician"],
   },
   {
     title: "Predictive Analytics",
     href: "/analytics",
     icon: LineChart,
-    allowedRoles: ["ADMIN", "OPERATOR"],
+    allowedRoles: ["admin", "operator"],
   },
   {
     title: "Maintenance",
     href: "/maintenance",
     icon: Wrench,
-    allowedRoles: ["ADMIN", "OPERATOR", "TECHNICIAN"],
+    allowedRoles: ["admin", "operator", "technician"],
   },
   {
     title: "Reports",
     href: "/reports",
     icon: FileBarChart,
-    allowedRoles: ["ADMIN", "OPERATOR", "VIEWER"],
+    allowedRoles: ["admin", "operator", "viewer"],
   },
   {
     title: "User Management",
     href: "/users",
     icon: Users,
-    allowedRoles: ["ADMIN"],
+    allowedRoles: ["admin"],
   },
   {
     title: "Settings",
     href: "/settings",
     icon: Settings,
-    allowedRoles: ["ADMIN", "OPERATOR", "TECHNICIAN"],
+    allowedRoles: ["admin", "operator", "technician"],
   },
 ];
 
@@ -120,7 +120,7 @@ export function Sidebar({ className }: React.HTMLAttributes<HTMLDivElement>) {
             <UserIcon className="h-5 w-5 text-primary" />
           </div>
           <div className="flex flex-col min-w-0">
-            <p className="text-sm font-semibold truncate">{user?.name || "Guest"}</p>
+            <p className="text-sm font-semibold truncate">{user?.username || "Guest"}</p>
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
               {user?.role || "No Role"}
             </p>

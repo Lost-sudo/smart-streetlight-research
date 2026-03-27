@@ -1,14 +1,41 @@
-export type Role = "ADMIN" | "OPERATOR" | "TECHNICIAN" | "VIEWER";
+import { z } from "zod";
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-}
+export const RoleSchema = z.enum(["admin", "operator", "technician", "viewer"]);
+export type Role = z.infer<typeof RoleSchema>;
+
+export const UserSchema = z.object({
+  id: z.number(),
+  username: z.string(),
+  role: RoleSchema,
+  is_active: z.boolean(),
+  created_at: z.string(),
+});
+export type User = z.infer<typeof UserSchema>;
+
+export const UserCreateSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: RoleSchema,
+});
+export type UserCreate = z.infer<typeof UserCreateSchema>;
+
+
+export const AuthResponseSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string(),
+  token_type: z.string(),
+  user: UserSchema,
+});
+export type AuthResponse = z.infer<typeof AuthResponseSchema>;
+
+export const LoginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+export type LoginInput = z.infer<typeof LoginSchema>;
 
 export const ROLE_PERMISSIONS = {
-  ADMIN: [
+  admin: [
     "dashboard",
     "monitoring",
     "analytics",
@@ -17,7 +44,7 @@ export const ROLE_PERMISSIONS = {
     "users",
     "settings",
   ],
-  OPERATOR: [
+  operator: [
     "dashboard",
     "monitoring",
     "analytics",
@@ -25,6 +52,7 @@ export const ROLE_PERMISSIONS = {
     "reports",
     "settings",
   ],
-  TECHNICIAN: ["dashboard", "monitoring", "maintenance", "settings"],
-  VIEWER: ["dashboard", "reports"],
+  technician: ["dashboard", "monitoring", "maintenance", "settings"],
+  viewer: ["dashboard", "reports"],
 } as const;
+

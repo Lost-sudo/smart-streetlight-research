@@ -33,7 +33,8 @@ class AuthController:
 
         return TokenResponse(
             access_token=access_token,
-            token_type="bearer"
+            token_type="bearer",
+            user=UserRead.model_validate(user, from_attributes=True)
         )
 
     def logout(self, request: Request, response: Response):

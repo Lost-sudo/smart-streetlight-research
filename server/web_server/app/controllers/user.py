@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.services.user import UserService
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from fastapi import HTTPException, status
+from typing import List
 
 class UserController:
     def __init__(self, db: Session):
@@ -31,6 +32,20 @@ class UserController:
 
         return UserRead.model_validate(user, from_attributes=True)
 
+    def create_user(self, user_data: UserCreate) -> UserRead:
+        if self.user_service.get_by_username(user_data.username):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
+        
+        user = self.user_service.create_user(user_data)
+        return UserRead.model_validate(user, from_attributes=True)
+
+    def update_user(self, user_id: int, user_data: UserUpdate) -> UserRead:
+        user = self.user_service.update_user(user_id, user_data)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        
+        return UserRead.model_validate(user, from_attributes=True)
+
     def delete_user(self, user_id: int) -> bool:
         user = self.user_service.get_by_id(user_id)
 
@@ -39,3 +54,4 @@ class UserController:
 
         self.user_service.delete(user_id)
         return True
+

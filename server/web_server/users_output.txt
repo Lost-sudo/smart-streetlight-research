@@ -1,0 +1,4 @@
+Found 3 users:
+ID: 1, Username: lost123, Role: UserRole.admin
+ID: 3, Username: lost22, Role: UserRole.viewer
+ID: 4, Username: New  User, Role: UserRole.viewer

@@ -1,16 +1,15 @@
 from app.schemas.auth import TokenServiceResponse
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.core.security import hash_password, verify_password
 from app.models.user import User
+
 from app.repositories.user import UserRepository
 from app.repositories.refresh_token import RefreshTokenRepository
 from app.schemas.user import UserCreate, UserRead
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class AuthService:
     def __init__(self, db: Session):
@@ -18,16 +17,18 @@ class AuthService:
         self.refresh_repo = RefreshTokenRepository(db)
 
     def __hash_password(self, password: str):
-        return pwd_context.hash(password)
+        return hash_password(password)
 
     def __verify_password(self, plain_password: str, hashed_password: str):
-        return pwd_context.verify(plain_password, hashed_password)
+        return verify_password(plain_password, hashed_password)
 
     def __hash_token(self, token: str):
-        return pwd_context.hash(token)
+        return hash_password(token)
 
     def __verify_token(self, plain_token: str, hashed_token: str):
-        return pwd_context.verify(plain_token, hashed_token)
+        return verify_password(plain_token, hashed_token)
+
+
 
     def __get_user(self, username: str):
         return self.user_repo.get_by_username(username)
@@ -128,6 +129,7 @@ class AuthService:
             token_type="bearer"
         )
 
+
     def create_user(self, user: UserCreate) -> User:
         if self.__get_user(user.username):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
@@ -165,6 +167,23 @@ class AuthService:
 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token not recognized")
 
+    def logout(self, refresh_token: str):
+        try:
+            payload = jwt.decode(refresh_token, settings.REFRESH_SECRET_KEY, algorithms=[settings.REFRESH_ALGORITHM])
+        except:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+        user_id = payload.get("user_id")
+
+        db_tokens = self.refresh_repo.get_all_active_by_user(user_id)
+
+        for db_token in db_tokens:
+            if self.__verify_token(refresh_token, db_token.token):
+                self.refresh_repo.revoke(db_token.token)
+                return
+
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token not recognized")
+
     def get_current_user(self, token: str):
 
         credentials_exception = HTTPException(
@@ -181,17 +200,11 @@ class AuthService:
             )
 
             user_id: int = payload.get("user_id")
-            session_id: int = payload.get("session_id")
 
-            if user_id is None or session_id is None:
+            if user_id is None:
                 raise credentials_exception
 
         except JWTError:
-            raise credentials_exception
-
-        # Check if the session (refresh token) is still valid
-        db_session = self.refresh_repo.get_by_id(session_id)
-        if not db_session or db_session.is_revoked or db_session.expires_at < datetime.utcnow():
             raise credentials_exception
 
         user = self.user_repo.get_by_id(user_id)

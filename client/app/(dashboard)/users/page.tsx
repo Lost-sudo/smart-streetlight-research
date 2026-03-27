@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Table,
   TableBody,
@@ -35,82 +37,74 @@ import {
   Search, 
   MoreVertical, 
   Shield, 
-  User, 
+  User as UserIcon, 
   Wrench, 
   Eye, 
-  Mail, 
   Trash2, 
-  Edit2,
   Lock,
-  History as HistoryIcon
+  History as HistoryIcon,
+  Loader2,
+  AlertCircle,
+  type LucideIcon
 } from "lucide-react";
+import { 
+  useGetUsersQuery, 
+  useCreateUserMutation, 
+  useDeleteUserMutation
+} from "@/lib/redux/api/userApi";
+import { UserCreate, UserCreateSchema, Role } from "@/types/auth";
 
-interface UserAccount {
-  id: string;
-  name: string;
-  email: string;
-  role: "Admin" | "Operator" | "Technician" | "Viewer";
-  status: "Active" | "Inactive";
-  lastActive: string;
-}
-
-const initialUsers: UserAccount[] = [
-  {
-    id: "1",
-    name: "John Patrick",
-    email: "admin@lgu.gov.ph",
-    role: "Admin",
-    status: "Active",
-    lastActive: "Now",
-  },
-  {
-    id: "2",
-    name: "Maria Santos",
-    email: "maria.operator@lgu.gov.ph",
-    role: "Operator",
-    status: "Active",
-    lastActive: "2 hours ago",
-  },
-  {
-    id: "3",
-    name: "Engr. Reyes",
-    email: "reyes.tech@service.ph",
-    role: "Technician",
-    status: "Active",
-    lastActive: "1 day ago",
-  },
-  {
-    id: "4",
-    name: "City Auditor",
-    email: "auditor@lgu.gov.ph",
-    role: "Viewer",
-    status: "Inactive",
-    lastActive: "5 days ago",
-  },
-];
-
-const roleIcons = {
-  Admin: Shield,
-  Operator: User,
-  Technician: Wrench,
-  Viewer: Eye,
+const roleIcons: Record<Role, LucideIcon> = {
+  admin: Shield,
+  operator: UserIcon,
+  technician: Wrench,
+  viewer: Eye,
 };
 
-const roleColors = {
-  Admin: "text-purple-500 bg-purple-500/10 border-purple-500/20",
-  Operator: "text-blue-500 bg-blue-500/10 border-blue-500/20",
-  Technician: "text-orange-500 bg-orange-500/10 border-orange-500/20",
-  Viewer: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+const roleColors: Record<Role, string> = {
+  admin: "text-purple-500 bg-purple-500/10 border-purple-500/20",
+  operator: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+  technician: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+  viewer: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
 };
+
+import { EditUserDialog } from "@/components/users/EditUserDialog";
 
 export default function UserManagementPage() {
-  const [users, setUsers] = useState(initialUsers);
+  const { data: users = [], isLoading: isFetching } = useGetUsersQuery();
+  const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
+  const [deleteUser] = useDeleteUserMutation();
+  
   const [search, setSearch] = useState("");
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<UserCreate>({
+    resolver: zodResolver(UserCreateSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      role: "viewer",
+    },
+  });
+
+  const onAddUserSubmit = async (data: UserCreate) => {
+    try {
+      await createUser(data).unwrap();
+      setIsAddUserOpen(false);
+      reset();
+    } catch (err) {
+      console.error("Failed to create user", err);
+    }
+  };
+
   const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(search.toLowerCase()) || 
-    user.email.toLowerCase().includes(search.toLowerCase())
+    user.username.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -121,7 +115,10 @@ export default function UserManagementPage() {
           <p className="text-muted-foreground italic">Admin-only privilege for roles and system access.</p>
         </div>
         
-        <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+        <Dialog open={isAddUserOpen} onOpenChange={(open) => {
+          setIsAddUserOpen(open);
+          if (!open) reset();
+        }}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-95">
               <UserPlus className="mr-2 h-4 w-4" />
@@ -129,47 +126,77 @@ export default function UserManagementPage() {
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px] border-none shadow-2xl backdrop-blur-xl">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                 <UserPlus className="h-6 w-6 text-primary" />
-                 Create New Account
-              </DialogTitle>
-              <DialogDescription className="text-base">
-                Assign a role and grant access to the SmartLight network.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-6 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name" className="font-bold">Full Name</Label>
-                <Input id="name" placeholder="Juan Dela Cruz" className="bg-card border-none shadow-inner" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email" className="font-bold">Email Address</Label>
-                <div className="relative">
-                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                   <Input id="email" placeholder="juan@lgu.gov.ph" className="pl-10 bg-card border-none shadow-inner" />
+            <form onSubmit={handleSubmit(onAddUserSubmit)}>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                   <UserPlus className="h-6 w-6 text-primary" />
+                   Create New Account
+                </DialogTitle>
+                <DialogDescription className="text-base">
+                  Assign a role and grant access to the SmartLight network.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-6 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="username" className="font-bold">Username</Label>
+                  <Input 
+                    id="username" 
+                    {...register("username")}
+                    placeholder="juandlc" 
+                    className={`bg-card border-none shadow-inner ${errors.username ? "ring-2 ring-destructive" : ""}`} 
+                  />
+                  {errors.username && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.username.message}
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="password" title="Password must be at least 6 characters" className="font-bold">Password</Label>
+                  <div className="relative">
+                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                     <Input 
+                      id="password" 
+                      type="password"
+                      {...register("password")}
+                      placeholder="••••••••" 
+                      className={`pl-10 bg-card border-none shadow-inner ${errors.password ? "ring-2 ring-destructive" : ""}`} 
+                     />
+                  </div>
+                  {errors.password && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.password.message}
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="role" className="font-bold">System Role</Label>
+                  <Select onValueChange={(v) => setValue("role", v as Role)} defaultValue="viewer">
+                    <SelectTrigger className="bg-card border-none shadow-inner">
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin (Full Access)</SelectItem>
+                      <SelectItem value="operator">Operator (Monitor & Control)</SelectItem>
+                      <SelectItem value="technician">Technician (Maintenance)</SelectItem>
+                      <SelectItem value="viewer">Viewer (Read Only)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="role" className="font-bold">System Role</Label>
-                <Select defaultValue="Viewer">
-                  <SelectTrigger className="bg-card border-none shadow-inner">
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Admin">Admin (Full Access)</SelectItem>
-                    <SelectItem value="Operator">Operator (Monitor \u0026 Control)</SelectItem>
-                    <SelectItem value="Technician">Technician (Maintenance)</SelectItem>
-                    <SelectItem value="Viewer">Viewer (Read Only)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter className="mt-4">
-              <Button onClick={() => setIsAddUserOpen(false)} className="w-full h-11 text-base font-semibold">
-                Register User
-              </Button>
-            </DialogFooter>
+              <DialogFooter className="mt-4">
+                <Button type="submit" disabled={isCreating} className="w-full h-11 text-base font-semibold">
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Registering...
+                    </>
+                  ) : "Register User"}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -181,7 +208,7 @@ export default function UserManagementPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Admin Accounts</p>
-              <h3 className="text-2xl font-bold">1</h3>
+              <h3 className="text-2xl font-bold">{users.filter(u => u.role === "admin").length}</h3>
             </div>
          </div>
          <div className="bg-card/50 border border-border/50 rounded-2xl p-6 flex items-center gap-4">
@@ -189,8 +216,8 @@ export default function UserManagementPage() {
               <Users className="h-6 w-6 text-blue-500" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Active Sessions</p>
-              <h3 className="text-2xl font-bold">2</h3>
+              <p className="text-sm font-medium text-muted-foreground">Active Users</p>
+              <h3 className="text-2xl font-bold">{users.filter(u => u.is_active).length}</h3>
             </div>
          </div>
          <div className="bg-card/50 border border-border/50 rounded-2xl p-6 flex items-center gap-4">
@@ -198,8 +225,8 @@ export default function UserManagementPage() {
               <Lock className="h-6 w-6 text-emerald-500" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Security Logs</p>
-              <h3 className="text-2xl font-bold">100% OK</h3>
+              <p className="text-sm font-medium text-muted-foreground">Security Status</p>
+              <h3 className="text-2xl font-bold">Encrypted</h3>
             </div>
          </div>
          <div className="bg-card/50 border border-border/50 rounded-2xl p-6 flex items-center gap-4">
@@ -208,7 +235,7 @@ export default function UserManagementPage() {
             </div>
             <div>
                <p className="text-sm font-medium text-muted-foreground">Total Registry</p>
-               <h3 className="text-2xl font-bold">4 Users</h3>
+               <h3 className="text-2xl font-bold">{users.length} Users</h3>
             </div>
          </div>
       </div>
@@ -218,9 +245,9 @@ export default function UserManagementPage() {
            <h3 className="font-bold text-lg">System Access Registry</h3>
            <div className="relative w-full md:w-[320px]">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input 
-                 placeholder="Search by name or email..." 
-                 className="pl-9 bg-card border-none shadow-sm"
+              <input 
+                 placeholder="Search by username..." 
+                 className="flex h-10 w-full rounded-md border-none bg-card px-9 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                  value={search}
                  onChange={(e) => setSearch(e.target.value)}
               />
@@ -229,46 +256,58 @@ export default function UserManagementPage() {
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="font-bold">Personnel</TableHead>
+              <TableHead className="font-bold">Username</TableHead>
               <TableHead className="font-bold">System Role</TableHead>
               <TableHead className="font-bold">Account Status</TableHead>
-              <TableHead className="font-bold">Last Activity</TableHead>
+              <TableHead className="font-bold">Created At</TableHead>
               <TableHead className="text-right font-bold w-[150px]">Management</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredUsers.length > 0 ? (
+            {isFetching ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <span className="text-muted-foreground">Loading users...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredUsers.length > 0 ? (
               filteredUsers.map((user) => {
                 const RoleIcon = roleIcons[user.role];
                 return (
                   <TableRow key={user.id} className="group transition-colors hover:bg-muted/30">
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-bold text-foreground">{user.name}</span>
-                        <span className="text-xs text-muted-foreground font-medium">{user.email}</span>
+                        <span className="font-bold text-foreground capitalize">{user.username}</span>
+                        <span className="text-xs text-muted-foreground font-medium">#{user.id}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full font-semibold ${roleColors[user.role]}`}>
+                      <Badge variant="outline" className={`flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full font-semibold capitalize ${roleColors[user.role]}`}>
                         <RoleIcon className="h-3 w-3" />
                         {user.role}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full animate-pulse ${user.status === "Active" ? "bg-emerald-500" : "bg-zinc-400"}`} />
-                        <span className="text-sm font-medium">{user.status}</span>
+                        <div className={`h-2 w-2 rounded-full ${user.is_active ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
+                        <span className="text-sm font-medium">{user.is_active ? "Active" : "Inactive"}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm font-medium">
-                      {user.lastActive}
+                      {new Date(user.created_at).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-all">
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-all">
+                        <EditUserDialog user={user} />
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-all"
+                          onClick={() => deleteUser(user.id)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8">

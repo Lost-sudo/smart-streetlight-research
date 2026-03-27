@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,30 +14,39 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Zap, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
+import { Zap, Mail, Lock, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
-import { Role } from "@/types/auth";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { LoginSchema, LoginInput } from "@/types/auth";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<Role>("ADMIN");
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginInput>({
+    resolver: zodResolver(LoginSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (data: LoginInput) => {
     setIsLoading(true);
     
-    // Use the central login function
-    login(selectedRole);
+    try {
+      await login(data);
+    } catch (err) {
+      console.error("Login component error", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-slate-50 dark:bg-zinc-950 overflow-hidden">
@@ -58,38 +69,30 @@ export default function LoginPage() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">System Access</CardTitle>
             <CardDescription className="text-center">
-              Select a role and enter credentials (demo mode)
+              Enter your credentials to access the system
             </CardDescription>
           </CardHeader>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleSubmit(onSubmit)}>
             <CardContent className="grid gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="role">Login As (Demo)</Label>
-                <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as Role)}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ADMIN">Administrator</SelectItem>
-                    <SelectItem value="OPERATOR">Operator</SelectItem>
-                    <SelectItem value="TECHNICIAN">Technician</SelectItem>
-                    <SelectItem value="VIEWER">Viewer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Username</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="name@lgu.gov.ph" 
-                    defaultValue={`${selectedRole.toLowerCase()}@smartlight.io`}
-                    className="pl-10 h-11"
-                    required 
+                  <Input
+                    id="username" 
+                    {...register("username")}
+                    type="text" 
+                    placeholder="Username" 
+                    className={`pl-10 h-11 ${errors.username ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   />
+
                 </div>
+                {errors.username && (
+                  <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {errors.username.message}
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
@@ -99,10 +102,9 @@ export default function LoginPage() {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input 
                     id="password" 
+                    {...register("password")}
                     type={showPassword ? "text" : "password"} 
-                    className="pl-10 pr-10 h-11"
-                    defaultValue="demo123"
-                    required 
+                    className={`pl-10 pr-10 h-11 ${errors.password ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   />
                   <Button
                     type="button"
@@ -118,6 +120,12 @@ export default function LoginPage() {
                     )}
                   </Button>
                 </div>
+                {errors.password && (
+                  <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4 pt-2">
@@ -145,3 +153,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+
