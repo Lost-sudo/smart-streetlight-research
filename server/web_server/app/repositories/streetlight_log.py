@@ -19,3 +19,8 @@ class StreetlightLogRepository:
 
     def get_all(self):
         return self.db.query(StreetlightLog).all()
+
+    def get_by_streetlight_id(self, streetlight_id: int, limit: int = 100):
+        return self.db.query(StreetlightLog).filter(
+            StreetlightLog.streetlight_id == streetlight_id
+        ).order_by(StreetlightLog.timestamp.desc()).limit(limit).all()

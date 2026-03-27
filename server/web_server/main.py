@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.routes.auth import router as auth_router
 from app.routes.streetlight import router as streetlight_router
 from app.routes.user import router as user_router
+from app.routes.streetlight_log import router as streetlight_log_router
 import uvicorn
 
 app = FastAPI(
@@ -14,6 +15,7 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(streetlight_router)
 app.include_router(user_router)
+app.include_router(streetlight_log_router)
 
 @app.get("/")
 def root():

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 from datetime import datetime
 
@@ -66,7 +66,7 @@ class AlertCreate(BaseModel):
     type: str
     severity: str
     message: str
-    is_resolve: bool
+    is_resolved: bool
     created_at: datetime
 
 class AlertRead(BaseModel):
@@ -75,11 +75,11 @@ class AlertRead(BaseModel):
     type: str
     severity: str
     message: str
-    is_resolve: bool
+    is_resolved: bool
     created_at: datetime
 
     class Config:
         from_attributes = True
 
 class AlertUpdate(BaseModel):
-    is_resolve: bool
+    is_resolved: bool
