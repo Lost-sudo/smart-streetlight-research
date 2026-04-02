@@ -108,11 +108,11 @@ export default function UserManagementPage() {
   );
 
   return (
-    <div className="flex-1 space-y-8 p-8 pt-6">
+    <div className="flex-1 space-y-8 p-4 sm:p-8 pt-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">User Management</h2>
-          <p className="text-muted-foreground italic">Admin-only privilege for roles and system access.</p>
+        <div className="space-y-1">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">User Management</h2>
+          <p className="text-sm sm:text-base text-muted-foreground italic">Admin-only privilege for roles and system access.</p>
         </div>
         
         <Dialog open={isAddUserOpen} onOpenChange={(open) => {
@@ -120,7 +120,7 @@ export default function UserManagementPage() {
           if (!open) reset();
         }}>
           <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-95">
+            <Button className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-95">
               <UserPlus className="mr-2 h-4 w-4" />
               Add System User
             </Button>
@@ -201,7 +201,7 @@ export default function UserManagementPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
          <div className="bg-card/50 border border-border/50 rounded-2xl p-6 flex items-center gap-4">
             <div className="bg-primary/10 p-3 rounded-xl">
               <Shield className="h-6 w-6 text-primary" />
@@ -241,9 +241,9 @@ export default function UserManagementPage() {
       </div>
 
       <div className="rounded-2xl border-none shadow-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md overflow-hidden">
-        <div className="p-4 border-b border-border/50 bg-muted/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="p-4 border-b border-border/50 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
            <h3 className="font-bold text-lg">System Access Registry</h3>
-           <div className="relative w-full md:w-[320px]">
+           <div className="relative w-full sm:w-[320px]">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <input 
                  placeholder="Search by username..." 
@@ -253,80 +253,143 @@ export default function UserManagementPage() {
               />
            </div>
         </div>
-        <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead className="font-bold">Username</TableHead>
-              <TableHead className="font-bold">System Role</TableHead>
-              <TableHead className="font-bold">Account Status</TableHead>
-              <TableHead className="font-bold">Created At</TableHead>
-              <TableHead className="text-right font-bold w-[150px]">Management</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isFetching ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    <span className="text-muted-foreground">Loading users...</span>
+
+        {/* Mobile View (Cards) */}
+        <div className="grid gap-4 p-4 md:hidden">
+          {isFetching ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground font-medium">Refreshing user registry...</p>
+            </div>
+          ) : filteredUsers.length > 0 ? (
+            filteredUsers.map((user) => {
+              const RoleIcon = roleIcons[user.role];
+              return (
+                <div key={user.id} className="bg-card/50 border border-border/50 rounded-xl p-4 space-y-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-foreground capitalize text-lg">{user.username}</span>
+                      <span className="text-xs text-muted-foreground font-medium">#{user.id}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <EditUserDialog user={user} />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive hover:bg-destructive/10 transition-colors" 
+                        onClick={() => deleteUser(user.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </TableCell>
-              </TableRow>
-            ) : filteredUsers.length > 0 ? (
-              filteredUsers.map((user) => {
-                const RoleIcon = roleIcons[user.role];
-                return (
-                  <TableRow key={user.id} className="group transition-colors hover:bg-muted/30">
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-foreground capitalize">{user.username}</span>
-                        <span className="text-xs text-muted-foreground font-medium">#{user.id}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground font-semibold mb-1">Role</p>
                       <Badge variant="outline" className={`flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full font-semibold capitalize ${roleColors[user.role]}`}>
                         <RoleIcon className="h-3 w-3" />
                         {user.role}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-semibold mb-1">Status</p>
                       <div className="flex items-center gap-2">
                         <div className={`h-2 w-2 rounded-full ${user.is_active ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
-                        <span className="text-sm font-medium">{user.is_active ? "Active" : "Inactive"}</span>
+                        <span className="font-bold">{user.is_active ? "Active" : "Inactive"}</span>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm font-medium">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <EditUserDialog user={user} />
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-all"
-                          onClick={() => deleteUser(user.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            ) : (
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground font-semibold mb-1">Created At</p>
+                      <p className="font-bold">{user.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "---"}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-12 text-muted-foreground font-medium">
+              No users matched your search criteria.
+            </div>
+          )}
+        </div>
+
+        {/* Desktop View (Table) */}
+        <div className="hidden md:block overflow-x-auto">
+          <Table className="min-w-[900px] lg:min-w-full">
+            <TableHeader className="bg-muted/50 text-sm">
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                  No users matched your search criteria.
-                </TableCell>
+                <TableHead className="font-bold">Username</TableHead>
+                <TableHead className="font-bold">System Role</TableHead>
+                <TableHead className="font-bold text-center">Account Status</TableHead>
+                <TableHead className="font-bold">Created At</TableHead>
+                <TableHead className="text-right font-bold w-[120px]">Management</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {isFetching ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <span className="text-muted-foreground font-medium">Loading system registry...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => {
+                  const RoleIcon = roleIcons[user.role];
+                  return (
+                    <TableRow key={user.id} className="group transition-colors hover:bg-muted/30">
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-foreground capitalize">{user.username}</span>
+                          <span className="text-xs text-muted-foreground font-medium">#{user.id}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full font-semibold capitalize ${roleColors[user.role]}`}>
+                          <RoleIcon className="h-3 w-3" />
+                          {user.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className={`h-2 w-2 rounded-full ${user.is_active ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
+                          <span className="text-sm font-bold">{user.is_active ? "Active" : "Inactive"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm font-bold">
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "---"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <EditUserDialog user={user} />
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-all"
+                            onClick={() => deleteUser(user.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground font-medium">
+                    No users matched your search criteria.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );
