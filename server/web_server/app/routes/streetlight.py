@@ -19,7 +19,9 @@ def create_streetlight(streetlight: StreetlightCreate, db: Session = Depends(get
 def get_streetlight_by_id(streetlight_id: int, db: Session = Depends(get_db)):
     return StreetlightController(db).get_streetlight_by_id(streetlight_id=streetlight_id)
 
-@router.get("/", dependencies=[Depends(require_roles([UserRole.admin, UserRole.operator, UserRole.technician]))], response_model=StreetlightRead)
+from typing import List
+
+@router.get("/", dependencies=[Depends(require_roles([UserRole.admin, UserRole.operator, UserRole.technician]))], response_model=List[StreetlightRead])
 def get_all_streetlight(db: Session = Depends(get_db)):
     return StreetlightController(db).get_all_streetlight()
 

@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.services.streetlight_log import StreetlightLogService
-from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead
+from app.schemas.streetlight import IoTNodeLogCreate, StreetlightLogRead
 from app.models.streetlight import StreetlightLog
 
 @pytest.fixture
@@ -18,8 +18,8 @@ def streetlight_log_service(mock_db):
 
 @pytest.fixture
 def sample_log_create():
-    return StreetlightLogCreate(
-        streetlight_id=1,
+    return IoTNodeLogCreate(
+        device_id="NODE-001",
         voltage=220.5,
         current=0.45,
         power_consumption=99.2,
@@ -39,16 +39,20 @@ def sample_log_model():
         timestamp=datetime.utcnow()
     )
 
-def test_create_streetlight_log_success(streetlight_log_service, sample_log_create, sample_log_model):
+def test_add_log_from_iot_success(streetlight_log_service, sample_log_create, sample_log_model):
     """
-    Test successful creation of a streetlight log.
+    Test successful creation of a streetlight log from IoT telemetry.
     """
-    with patch.object(streetlight_log_service.streetlight_log_repo, "create", return_value=sample_log_model) as mock_create:
-        result = streetlight_log_service.create_streetlight_log(sample_log_create)
-        
-        assert result.streetlight_id == sample_log_create.streetlight_id
-        assert result.id == 101
-        mock_create.assert_called_once()
+    mock_streetlight = MagicMock()
+    mock_streetlight.id = 1
+    
+    with patch.object(streetlight_log_service.streetlight_repo, "get_by_device_id", return_value=mock_streetlight):
+        with patch.object(streetlight_log_service.streetlight_log_repo, "create", return_value=sample_log_model) as mock_create:
+            result = streetlight_log_service.add_log_from_iot(sample_log_create)
+            
+            assert result.streetlight_id == 1
+            assert result.id == 101
+            mock_create.assert_called_once_with(1, sample_log_create)
 
 def test_get_streetlight_log_by_id_success(streetlight_log_service, sample_log_model):
     """
@@ -84,15 +88,18 @@ def test_streetlight_log_stress_simulated(streetlight_log_service, sample_log_cr
     """
     iterations = 1000
     mock_log = MagicMock(spec=StreetlightLog)
+    mock_streetlight = MagicMock()
+    mock_streetlight.id = 1
     
-    with patch.object(streetlight_log_service.streetlight_log_repo, "create", return_value=mock_log) as mock_create:
-        for i in range(iterations):
-            # Simulate logs coming in every minute
-            sample_log_create.timestamp = datetime.utcnow() + timedelta(minutes=i)
-            result = streetlight_log_service.create_streetlight_log(sample_log_create)
-            assert result is not None
-        
-        assert mock_create.call_count == iterations
+    with patch.object(streetlight_log_service.streetlight_repo, "get_by_device_id", return_value=mock_streetlight):
+        with patch.object(streetlight_log_service.streetlight_log_repo, "create", return_value=mock_log) as mock_create:
+            for i in range(iterations):
+                # Simulate logs coming in every minute
+                sample_log_create.timestamp = datetime.utcnow() + timedelta(minutes=i)
+                result = streetlight_log_service.add_log_from_iot(sample_log_create)
+                assert result is not None
+            
+            assert mock_create.call_count == iterations
 
 def test_latest_logs_retrieval_limit(streetlight_log_service):
     """

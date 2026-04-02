@@ -44,14 +44,6 @@ class StreetlightRead(BaseModel):
     class Config:
         from_attributes = True
 
-class StreetlightLogCreate(BaseModel):
-    streetlight_id: int
-    voltage: float
-    current: float
-    power_consumption: float
-    light_intensity: float
-    timestamp: datetime
-
 class IoTNodeLogCreate(BaseModel):
     device_id: str
     voltage: float

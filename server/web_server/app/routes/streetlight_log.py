@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead, IoTNodeLogCreate
+from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate
 from app.controllers.streetlight_log import StreetlightLogController
 from app.dependencies.rbac import require_roles
 from app.models.user import UserRole

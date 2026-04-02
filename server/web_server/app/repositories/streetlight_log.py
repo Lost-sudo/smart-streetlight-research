@@ -1,14 +1,16 @@
 from sqlalchemy.orm import Session
 from app.models.streetlight import StreetlightLog
 from fastapi import HTTPException, status
-from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead
+from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate
 
 class StreetlightLogRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, streetlight_log: StreetlightLogCreate):
-        db_streetlight_log = StreetlightLog(**streetlight_log.dict())
+    def create(self, streetlight_id: int, iot_log: IoTNodeLogCreate):
+        data = iot_log.dict(exclude={"device_id"})
+        data["streetlight_id"] = streetlight_id
+        db_streetlight_log = StreetlightLog(**data)
         self.db.add(db_streetlight_log)
         self.db.commit()
         self.db.refresh(db_streetlight_log)

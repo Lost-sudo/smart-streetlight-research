@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead, IoTNodeLogCreate
+from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate
 from app.services.streetlight_log import StreetlightLogService
 
 class StreetlightLogController:
