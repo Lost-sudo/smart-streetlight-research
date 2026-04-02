@@ -167,22 +167,6 @@ class AuthService:
 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token not recognized")
 
-    def logout(self, refresh_token: str):
-        try:
-            payload = jwt.decode(refresh_token, settings.REFRESH_SECRET_KEY, algorithms=[settings.REFRESH_ALGORITHM])
-        except:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-
-        user_id = payload.get("user_id")
-
-        db_tokens = self.refresh_repo.get_all_active_by_user(user_id)
-
-        for db_token in db_tokens:
-            if self.__verify_token(refresh_token, db_token.token):
-                self.refresh_repo.revoke(db_token.token)
-                return
-
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token not recognized")
 
     def get_current_user(self, token: str):
 
@@ -200,8 +184,9 @@ class AuthService:
             )
 
             user_id: int = payload.get("user_id")
+            token_type: str = payload.get("type")
 
-            if user_id is None:
+            if user_id is None or token_type != "access_token":
                 raise credentials_exception
 
         except JWTError:

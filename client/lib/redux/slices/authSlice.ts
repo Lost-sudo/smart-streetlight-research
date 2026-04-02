@@ -4,7 +4,6 @@ import { User } from "@/types/auth";
 interface AuthState {
   user: User | null;
   accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -12,7 +11,6 @@ interface AuthState {
 const initialState: AuthState = {
   user: null,
   accessToken: null,
-  refreshToken: null,
   isAuthenticated: false,
   isLoading: true, // Start with loading true for hydration
 };
@@ -23,24 +21,22 @@ const authSlice = createSlice({
   reducers: {
     setCredentials: (
       state,
-      action: PayloadAction<{ user: User; accessToken: string; refreshToken: string }>
+      action: PayloadAction<{ user: User; accessToken: string }>
     ) => {
-      const { user, accessToken, refreshToken } = action.payload;
+      const { user, accessToken } = action.payload;
       state.user = user;
       state.accessToken = accessToken;
-      state.refreshToken = refreshToken;
       state.isAuthenticated = true;
       state.isLoading = false;
       
       // Persist to localStorage
       if (typeof window !== "undefined") {
-        localStorage.setItem("smartlight_auth", JSON.stringify({ user, accessToken, refreshToken }));
+        localStorage.setItem("smartlight_auth", JSON.stringify({ user, accessToken }));
       }
     },
     logOut: (state) => {
       state.user = null;
       state.accessToken = null;
-      state.refreshToken = null;
       state.isAuthenticated = false;
       state.isLoading = false;
       
@@ -53,10 +49,9 @@ const authSlice = createSlice({
         const savedAuth = localStorage.getItem("smartlight_auth");
         if (savedAuth) {
           try {
-            const { user, accessToken, refreshToken } = JSON.parse(savedAuth);
+            const { user, accessToken } = JSON.parse(savedAuth);
             state.user = user;
             state.accessToken = accessToken;
-            state.refreshToken = refreshToken;
             state.isAuthenticated = true;
           } catch (e) {
             console.error("Failed to hydrate auth state", e);

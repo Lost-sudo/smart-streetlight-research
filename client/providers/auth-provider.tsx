@@ -2,8 +2,8 @@
 
 import React, { createContext, useContext } from "react";
 import { useRouter } from "next/navigation";
-import { useAppSelector, useAppDispatch } from "@/lib/redux/hooks";
-import { selectCurrentUser, selectAuthLoading, logOut } from "@/lib/redux/slices/authSlice";
+import { useAppSelector } from "@/lib/redux/hooks";
+import { selectCurrentUser, selectAuthLoading } from "@/lib/redux/slices/authSlice";
 import { useLoginMutation, useLogoutMutation } from "@/lib/redux/api/authApi";
 import { User, LoginInput } from "@/types/auth";
 
@@ -19,7 +19,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const user = useAppSelector(selectCurrentUser);
   const isLoading = useAppSelector(selectAuthLoading);
-  const dispatch = useAppDispatch();
   const router = useRouter();
   const [loginTrigger] = useLoginMutation();
   const [logoutTrigger] = useLogoutMutation();
@@ -37,11 +36,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      // The logout mutation in authApi handles dispatch(logOut()) 
+      // in onQueryStarted for both success and failure cases.
       await logoutTrigger().unwrap();
-      router.push("/login");
     } catch (err) {
       console.error("Logout failed", err);
-      dispatch(logOut()); // Force logout anyway
+    } finally {
       router.push("/login");
     }
   };

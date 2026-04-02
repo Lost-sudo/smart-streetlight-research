@@ -22,7 +22,6 @@ export type UserCreate = z.infer<typeof UserCreateSchema>;
 
 export const AuthResponseSchema = z.object({
   access_token: z.string(),
-  refresh_token: z.string(),
   token_type: z.string(),
   user: UserSchema,
 });

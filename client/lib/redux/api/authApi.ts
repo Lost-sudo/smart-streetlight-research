@@ -10,8 +10,9 @@ const baseQueryWithReauth: BaseQueryFn<
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
+  const isLogoutRequest = typeof args === 'object' && 'url' in args && args.url === '/auth/logout';
 
-  if (result.error && result.error.status === 401) {
+  if (result.error && result.error.status === 401 && !isLogoutRequest) {
     const refreshResult = await baseQuery(
       { url: "/auth/refresh", method: "POST" },
       api,
@@ -23,11 +24,10 @@ const baseQueryWithReauth: BaseQueryFn<
       const user = (api.getState() as RootState).auth.user;
       
       if (user) {
-          api.dispatch(setCredentials({ 
-              user, 
-              accessToken: access_token, 
-              refreshToken: (api.getState() as RootState).auth.refreshToken || "" 
-          }));
+        api.dispatch(setCredentials({
+          user,
+          accessToken: access_token,
+        }));
       }
 
       result = await baseQuery(args, api, extraOptions);
@@ -60,7 +60,6 @@ export const authApi = createApi({
               dispatch(setCredentials({
                   user: data.user,
                   accessToken: data.access_token,
-                  refreshToken: data.refresh_token
               }));
           } catch (err) {
               console.error("Login failed", err);
@@ -86,6 +85,8 @@ export const authApi = createApi({
               dispatch(logOut());
           } catch (err) {
               console.error("Logout failed", err);
+              // Clear client state even if backend call fails
+              dispatch(logOut());
           }
       }
     }),
