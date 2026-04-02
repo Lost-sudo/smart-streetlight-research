@@ -34,7 +34,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { Zap, Activity, Sun, Loader2, RefreshCcw, Cpu, MapPin, Calendar, Lightbulb } from "lucide-react";
+import { Zap, Activity, Sun, RefreshCcw, Cpu, MapPin, Calendar, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetStreetlightLogsQuery } from "@/lib/redux/api/streetlightApi";
 import type { Streetlight } from "@/lib/redux/api/streetlightApi";
