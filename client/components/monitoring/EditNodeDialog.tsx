@@ -61,7 +61,7 @@ export function EditNodeDialog({ node, open, onOpenChange }: EditNodeDialogProps
       device_id: "",
       latitude: 0,
       longitude: 0,
-      status: "Normal",
+      status: "active",
       model_info: "",
       dimming_level: 100,
     },
@@ -197,8 +197,10 @@ export function EditNodeDialog({ node, open, onOpenChange }: EditNodeDialogProps
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Normal">Normal</SelectItem>
-                        <SelectItem value="Faulty">Faulty</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="faulty">Faulty</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

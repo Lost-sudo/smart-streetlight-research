@@ -45,6 +45,17 @@ interface NodeDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const statusColors: Record<string, { bg: string; icon: string; badge: "default" | "destructive" | "secondary" | "outline" }> = {
+  active: { bg: "bg-emerald-100 dark:bg-emerald-900/40", icon: "text-emerald-600 dark:text-emerald-400", badge: "default" },
+  inactive: { bg: "bg-zinc-100 dark:bg-zinc-800/60", icon: "text-zinc-500 dark:text-zinc-400", badge: "secondary" },
+  faulty: { bg: "bg-red-100 dark:bg-red-900/40", icon: "text-red-600 dark:text-red-400", badge: "destructive" },
+  maintenance: { bg: "bg-amber-100 dark:bg-amber-900/40", icon: "text-amber-600 dark:text-amber-400", badge: "outline" },
+};
+
+function getColors(status?: string) {
+  return statusColors[status || ""] || statusColors.inactive;
+}
+
 export function NodeDetailsDialog({ node, open, onOpenChange }: NodeDetailsDialogProps) {
   const { data: logs = [], isFetching, refetch } = useGetStreetlightLogsQuery(
     { id: node?.id ?? 0 },
@@ -73,11 +84,11 @@ export function NodeDetailsDialog({ node, open, onOpenChange }: NodeDetailsDialo
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "h-10 w-10 rounded-xl flex items-center justify-center",
-                  node?.status === "Normal" ? "bg-emerald-100 dark:bg-emerald-900/40" : "bg-red-100 dark:bg-red-900/40"
+                  getColors(node?.status).bg
                 )}>
                   <Lightbulb className={cn(
                     "h-5 w-5",
-                    node?.status === "Normal" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                    getColors(node?.status).icon
                   )} />
                 </div>
                 <div>
@@ -85,7 +96,7 @@ export function NodeDetailsDialog({ node, open, onOpenChange }: NodeDetailsDialo
                   <DialogDescription className="flex items-center gap-2 mt-0.5">
                     <span className="font-mono text-xs">{node?.device_id || "No Device ID"}</span>
                     <span className="text-muted-foreground">·</span>
-                    <Badge variant={node?.status === "Normal" ? "default" : "destructive"} className="text-[10px] px-1.5 py-0">
+                    <Badge variant={getColors(node?.status).badge} className="text-[10px] px-1.5 py-0 capitalize">
                       {node?.status || "Unknown"}
                     </Badge>
                   </DialogDescription>

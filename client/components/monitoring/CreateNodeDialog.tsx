@@ -53,7 +53,7 @@ export function CreateNodeDialog() {
         ...data,
         model_info: "Standard LED Node",
         installation_date: new Date().toISOString(),
-        status: "Normal", // or "inactive" depending on requirements
+        status: "active", // matches DB enum: active, inactive, faulty, maintenance
         is_on: false,
         dimming_level: 100,
       }).unwrap();

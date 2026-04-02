@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -27,6 +27,60 @@ import { EditNodeDialog } from "@/components/monitoring/EditNodeDialog";
 import { NodeDetailsDialog } from "@/components/monitoring/NodeDetailsDialog";
 import type { Streetlight } from "@/lib/redux/api/streetlightApi";
 
+// Status display config — maps DB enum values to colors, labels, and sort priority
+const statusConfig: Record<string, {
+  label: string;
+  dot: string;
+  bg: string;
+  bgHover: string;
+  icon: string;
+  badge: "default" | "destructive" | "secondary" | "outline";
+  priority: number;
+}> = {
+  faulty: {
+    label: "Faulty",
+    dot: "bg-red-500",
+    bg: "bg-red-100 dark:bg-red-900/40",
+    bgHover: "group-hover:bg-red-200 dark:group-hover:bg-red-900/60",
+    icon: "text-red-600 dark:text-red-400",
+    badge: "destructive",
+    priority: 0,
+  },
+  maintenance: {
+    label: "Maintenance",
+    dot: "bg-amber-500",
+    bg: "bg-amber-100 dark:bg-amber-900/40",
+    bgHover: "group-hover:bg-amber-200 dark:group-hover:bg-amber-900/60",
+    icon: "text-amber-600 dark:text-amber-400",
+    badge: "outline",
+    priority: 1,
+  },
+  active: {
+    label: "Active",
+    dot: "bg-emerald-500",
+    bg: "bg-emerald-100 dark:bg-emerald-900/40",
+    bgHover: "group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/60",
+    icon: "text-emerald-600 dark:text-emerald-400",
+    badge: "default",
+    priority: 2,
+  },
+  inactive: {
+    label: "Inactive",
+    dot: "bg-zinc-400",
+    bg: "bg-zinc-100 dark:bg-zinc-800/60",
+    bgHover: "group-hover:bg-zinc-200 dark:group-hover:bg-zinc-800",
+    icon: "text-zinc-500 dark:text-zinc-400",
+    badge: "secondary",
+    priority: 3,
+  },
+};
+
+const defaultStatus = statusConfig.inactive;
+
+function getStatusConfig(status: string) {
+  return statusConfig[status] || defaultStatus;
+}
+
 export default function MonitoringPage() {
   const { data: streetlights = [], isLoading: isStreetlightsLoading } = useGetStreetlightsQuery();
   const [deleteStreetlight, { isLoading: isDeleting }] = useDeleteStreetlightMutation();
@@ -38,19 +92,28 @@ export default function MonitoringPage() {
   const [nodeToDelete, setNodeToDelete] = useState<Streetlight | null>(null);
   const [nodeToEdit, setNodeToEdit] = useState<Streetlight | null>(null);
 
+  // Sort nodes by priority: faulty → maintenance → active → inactive
+  const sortedNodes = useMemo(() => {
+    return [...streetlights].sort((a, b) => {
+      const aPriority = getStatusConfig(a.status).priority;
+      const bPriority = getStatusConfig(b.status).priority;
+      return aPriority - bPriority;
+    });
+  }, [streetlights]);
+
   const handleNodeClick = (node: Streetlight) => {
     setSelectedNode(node);
     setDetailDialogOpen(true);
   };
 
   const handleEditClick = (e: React.MouseEvent, node: Streetlight) => {
-    e.stopPropagation(); // prevent card click
+    e.stopPropagation();
     setNodeToEdit(node);
     setEditDialogOpen(true);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, node: Streetlight) => {
-    e.stopPropagation(); // prevent card click
+    e.stopPropagation();
     setNodeToDelete(node);
     setDeleteDialogOpen(true);
   };
@@ -105,8 +168,9 @@ export default function MonitoringPage() {
         </div>
       ) : (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {streetlights.map((node) => {
-            const isOnline = node.status === "Normal";
+          {sortedNodes.map((node) => {
+            const config = getStatusConfig(node.status);
+            const isActive = node.status === "active";
             return (
               <Card
                 key={node.id}
@@ -123,13 +187,10 @@ export default function MonitoringPage() {
                   {/* Status Indicator Dot */}
                   <div className="absolute top-4 right-4">
                     <span className="relative flex h-3 w-3">
-                      {isOnline && (
+                      {isActive && (
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                       )}
-                      <span className={cn(
-                        "relative inline-flex rounded-full h-3 w-3",
-                        isOnline ? "bg-emerald-500" : "bg-red-500"
-                      )} />
+                      <span className={cn("relative inline-flex rounded-full h-3 w-3", config.dot)} />
                     </span>
                   </div>
 
@@ -137,14 +198,10 @@ export default function MonitoringPage() {
                   <div className="flex items-start gap-3 mb-3">
                     <div className={cn(
                       "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-200",
-                      isOnline
-                        ? "bg-emerald-100 dark:bg-emerald-900/40 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/60"
-                        : "bg-red-100 dark:bg-red-900/40 group-hover:bg-red-200 dark:group-hover:bg-red-900/60"
+                      config.bg,
+                      config.bgHover
                     )}>
-                      <Lightbulb className={cn(
-                        "h-5 w-5",
-                        isOnline ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
-                      )} />
+                      <Lightbulb className={cn("h-5 w-5", config.icon)} />
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
@@ -159,18 +216,18 @@ export default function MonitoringPage() {
                   {/* Meta Row */}
                   <div className="flex items-center justify-between gap-2">
                     <Badge
-                      variant={isOnline ? "default" : "destructive"}
-                      className="text-[10px] px-1.5 py-0"
+                      variant={config.badge}
+                      className="text-[10px] px-1.5 py-0 capitalize"
                     >
-                      {node.status}
+                      {config.label}
                     </Badge>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      {isOnline ? (
+                      {isActive ? (
                         <Wifi className="h-3 w-3 text-emerald-500" />
                       ) : (
                         <WifiOff className="h-3 w-3 text-red-400" />
                       )}
-                      <span>{isOnline ? "Online" : "Offline"}</span>
+                      <span>{isActive ? "Online" : "Offline"}</span>
                     </div>
                   </div>
 
