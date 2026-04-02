@@ -6,6 +6,7 @@ from datetime import datetime
 
 class StreetlightCreate(BaseModel):
     name: str
+    device_id: Optional[str] = None
     latitude: float
     longitude: float
     model_info: str
@@ -17,6 +18,7 @@ class StreetlightCreate(BaseModel):
 
 class StreetlightUpdate(BaseModel):
     name: Optional[str] = None
+    device_id: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     model_info: Optional[str] = None
@@ -29,6 +31,7 @@ class StreetlightUpdate(BaseModel):
 class StreetlightRead(BaseModel):
     id: int
     name: str
+    device_id: Optional[str] = None
     latitude: float
     longitude: float
     model_info: str
@@ -43,6 +46,14 @@ class StreetlightRead(BaseModel):
 
 class StreetlightLogCreate(BaseModel):
     streetlight_id: int
+    voltage: float
+    current: float
+    power_consumption: float
+    light_intensity: float
+    timestamp: datetime
+
+class IoTNodeLogCreate(BaseModel):
+    device_id: str
     voltage: float
     current: float
     power_consumption: float

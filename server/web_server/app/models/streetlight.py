@@ -29,6 +29,7 @@ class UrgencyLevel(str,  PyEnum):
 class Streetlight(Base):
     __tablename__ = "streetlights"
     id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(String, unique=True, index=True, nullable=True)
     name = Column(String, index=True)
     latitude = Column(Float)
     longitude = Column(Float)

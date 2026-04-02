@@ -1,13 +1,14 @@
 from sqlalchemy.orm import Session
-from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead
+from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead, IoTNodeLogCreate
 from app.services.streetlight_log import StreetlightLogService
 
 class StreetlightLogController:
     def __init__(self, db: Session):
         self.service = StreetlightLogService(db)
 
-    def create_streetlight_log(self, streetlight_log: StreetlightLogCreate):
-        return self.service.create_streetlight_log(streetlight_log)
+    def add_log_from_iot(self, iot_log: IoTNodeLogCreate):
+        return self.service.add_log_from_iot(iot_log)
+
 
     def get_streetlight_log_by_id(self, streetlight_log_id: int):
         return self.service.get_streetlight_log_by_id(streetlight_log_id)

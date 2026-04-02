@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead
+from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead, IoTNodeLogCreate
 from app.controllers.streetlight_log import StreetlightLogController
 from app.dependencies.rbac import require_roles
 from app.models.user import UserRole
@@ -12,9 +12,10 @@ router = APIRouter(
     tags=["Streetlight Log"]
 )
 
-@router.post("/create", dependencies=[Depends(require_roles([UserRole.admin, UserRole.operator]))], response_model=StreetlightLogRead)
-def create_streetlight_log(streetlight_log: StreetlightLogCreate, db: Session = Depends(get_db)):
-    return StreetlightLogController(db).create_streetlight_log(streetlight_log=streetlight_log)
+@router.post("/telemetry", response_model=StreetlightLogRead)
+def add_log_from_iot(iot_log: IoTNodeLogCreate, db: Session = Depends(get_db)):
+    return StreetlightLogController(db).add_log_from_iot(iot_log=iot_log)
+
 
 @router.get("/{streetlight_log_id}", dependencies=[Depends(require_roles([UserRole.admin, UserRole.operator, UserRole.technician]))], response_model=StreetlightLogRead)
 def get_streetlight_log_by_id(streetlight_log_id: int, db: Session = Depends(get_db)):

@@ -23,6 +23,9 @@ class StreetlightRepository:
     def get_by_name(self, streetlight_name: str):
         return self.db.query(Streetlight).filter(Streetlight.name == streetlight_name).first()
 
+    def get_by_device_id(self, device_id: str):
+        return self.db.query(Streetlight).filter(Streetlight.device_id == device_id).first()
+
     def update(self, streetlight_id: int, streetlight: StreetlightUpdate):
         self.db.query(Streetlight).filter(Streetlight.id == streetlight_id).update(streetlight.dict(exclude_unset=True))
         self.db.commit()

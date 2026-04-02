@@ -1,5 +1,6 @@
 from app.repositories.streetlight_log import StreetlightLogRepository
-from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead
+from app.repositories.streetlight import StreetlightRepository
+from app.schemas.streetlight import StreetlightLogCreate, StreetlightLogRead, IoTNodeLogCreate
 from app.models.streetlight import StreetlightLog
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -8,9 +9,23 @@ from typing import List
 class StreetlightLogService:
     def __init__(self, db: Session):
         self.streetlight_log_repo = StreetlightLogRepository(db)
+        self.streetlight_repo = StreetlightRepository(db)
 
-    def create_streetlight_log(self, streetlight_log: StreetlightLogCreate) -> StreetlightLogRead:
-        return self.streetlight_log_repo.create(streetlight_log)
+    def add_log_from_iot(self, iot_log: IoTNodeLogCreate) -> StreetlightLogRead:
+        streetlight = self.streetlight_repo.get_by_device_id(iot_log.device_id)
+        if not streetlight:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Streetlight with device_id {iot_log.device_id} not found")
+        
+        log_create = StreetlightLogCreate(
+            streetlight_id=streetlight.id,
+            voltage=iot_log.voltage,
+            current=iot_log.current,
+            power_consumption=iot_log.power_consumption,
+            light_intensity=iot_log.light_intensity,
+            timestamp=iot_log.timestamp
+        )
+        return self.streetlight_log_repo.create(log_create)
+
 
     def get_streetlight_log_by_id(self, streetlight_log_id: int) -> StreetlightLogRead:
         streetlight_log = self.streetlight_log_repo.get_by_id(streetlight_log_id)
