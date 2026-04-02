@@ -6,22 +6,66 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { Lightbulb, Loader2, Wifi, WifiOff, Plus } from "lucide-react";
+import { Lightbulb, Loader2, Wifi, WifiOff, Plus, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { RoleGate } from "@/components/auth/role-gate";
-import { useGetStreetlightsQuery } from "@/lib/redux/api/streetlightApi";
+import { useGetStreetlightsQuery, useDeleteStreetlightMutation } from "@/lib/redux/api/streetlightApi";
 import { CreateNodeDialog } from "@/components/monitoring/CreateNodeDialog";
+import { EditNodeDialog } from "@/components/monitoring/EditNodeDialog";
 import { NodeDetailsDialog } from "@/components/monitoring/NodeDetailsDialog";
 import type { Streetlight } from "@/lib/redux/api/streetlightApi";
 
 export default function MonitoringPage() {
   const { data: streetlights = [], isLoading: isStreetlightsLoading } = useGetStreetlightsQuery();
+  const [deleteStreetlight, { isLoading: isDeleting }] = useDeleteStreetlightMutation();
+
   const [selectedNode, setSelectedNode] = useState<Streetlight | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [nodeToDelete, setNodeToDelete] = useState<Streetlight | null>(null);
+  const [nodeToEdit, setNodeToEdit] = useState<Streetlight | null>(null);
 
   const handleNodeClick = (node: Streetlight) => {
     setSelectedNode(node);
-    setDialogOpen(true);
+    setDetailDialogOpen(true);
+  };
+
+  const handleEditClick = (e: React.MouseEvent, node: Streetlight) => {
+    e.stopPropagation(); // prevent card click
+    setNodeToEdit(node);
+    setEditDialogOpen(true);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, node: Streetlight) => {
+    e.stopPropagation(); // prevent card click
+    setNodeToDelete(node);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!nodeToDelete) return;
+    try {
+      await deleteStreetlight(nodeToDelete.id).unwrap();
+      toast.success(`"${nodeToDelete.name}" has been deleted`);
+      setDeleteDialogOpen(false);
+      setNodeToDelete(null);
+    } catch (error) {
+      const err = error as { data?: { detail?: string } };
+      toast.error(err?.data?.detail || "Failed to delete node");
+    }
   };
 
   if (isStreetlightsLoading) {
@@ -129,6 +173,29 @@ export default function MonitoringPage() {
                       <span>{isOnline ? "Online" : "Offline"}</span>
                     </div>
                   </div>
+
+                  {/* Admin Actions (Edit/Delete) */}
+                  <RoleGate allowedRoles={["admin", "operator"]}>
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-dashed">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 h-8 text-xs"
+                        onClick={(e) => handleEditClick(e, node)}
+                      >
+                        <Pencil className="h-3 w-3 mr-1.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800/40"
+                        onClick={(e) => handleDeleteClick(e, node)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </RoleGate>
                 </CardContent>
               </Card>
             );
@@ -139,9 +206,39 @@ export default function MonitoringPage() {
       {/* Node Details Dialog */}
       <NodeDetailsDialog
         node={selectedNode}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
       />
+
+      {/* Edit Node Dialog */}
+      <EditNodeDialog
+        node={nodeToEdit}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Streetlight Node</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{nodeToDelete?.name}</strong>? This action cannot be undone and will remove all associated telemetry logs.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeleting}
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete Node
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

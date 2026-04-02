@@ -29,7 +29,7 @@ class StreetlightRepository:
     def update(self, streetlight_id: int, streetlight: StreetlightUpdate):
         self.db.query(Streetlight).filter(Streetlight.id == streetlight_id).update(streetlight.dict(exclude_unset=True))
         self.db.commit()
-        updated_streetlight = self.get_by_id(streetlight.id)
+        updated_streetlight = self.get_by_id(streetlight_id)
         return updated_streetlight
 
     def delete(self, streetlight_id: int):

@@ -27,6 +27,18 @@ export interface StreetlightCreate {
   dimming_level: number;
 }
 
+export interface StreetlightUpdate {
+  name?: string;
+  device_id?: string;
+  latitude?: number;
+  longitude?: number;
+  model_info?: string;
+  installation_date?: string;
+  status?: string;
+  is_on?: boolean;
+  dimming_level?: number;
+}
+
 export interface StreetlightLog {
   id: number;
   streetlight_id: number;
@@ -58,6 +70,21 @@ export const streetlightApi = createApi({
       }),
       invalidatesTags: ["Streetlight"],
     }),
+    updateStreetlight: builder.mutation<Streetlight, { id: number; data: StreetlightUpdate }>({
+      query: ({ id, data }) => ({
+        url: `/streetlight/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: ["Streetlight"],
+    }),
+    deleteStreetlight: builder.mutation<void, number>({
+      query: (id) => ({
+        url: `/streetlight/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Streetlight"],
+    }),
   }),
 });
 
@@ -65,4 +92,6 @@ export const {
   useGetStreetlightsQuery,
   useGetStreetlightLogsQuery,
   useCreateStreetlightMutation,
+  useUpdateStreetlightMutation,
+  useDeleteStreetlightMutation,
 } = streetlightApi;
