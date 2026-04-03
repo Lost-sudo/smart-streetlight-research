@@ -24,6 +24,9 @@ class StreetlightLogService:
         Raises:
             HTTPException: If the streetlight with the given device_id is not found
         """
+
+        # Todo:
+        # Implement the prediction logic here and then store the predicted data in the predictive maintenance log
         streetlight = self.streetlight_repo.get_by_device_id(iot_log.device_id)
         if not streetlight:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Streetlight with device_id {iot_log.device_id} not found")
