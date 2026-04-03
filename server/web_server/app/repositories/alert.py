@@ -3,7 +3,7 @@ from app.models.streetlight import Alert
 from fastapi import HTTPException, status
 from app.schemas.streetlight import AlertCreate, AlertRead, AlertUpdate
 
-class AlrtRepository:
+class AlertRepository:
     def __init__(self, db: Session):
         self.db = db
 
@@ -24,7 +24,7 @@ class AlrtRepository:
         db_alert = self.get_by_id(alert_id)
         if not db_alert:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
-        db_alert.is_resolve = alert.is_resolve
+        db_alert.is_resolved = alert.is_resolved
         self.db.commit()
         self.db.refresh(db_alert)
         return db_alert
