@@ -9,10 +9,30 @@ class AuthController:
         self.auth_service = AuthService(db)
 
     def register(self, user: UserCreate) -> UserRead:
+        """
+        Register a new user.
+        
+        Args:
+            user: The user data to register
+            
+        Returns:
+            The created user
+        """
         new_user = self.auth_service.create_user(user)
         return UserRead.model_validate(new_user, from_attributes=True)
 
     def login(self, response: Response, username: str, password: str) -> TokenResponse:
+        """
+        Login a user.
+        
+        Args:
+            response: The response object
+            username: The username of the user
+            password: The password of the user
+            
+        Returns:
+            The token response
+        """
         user = self.auth_service.authenticate_user(username, password)
 
         if not user:
@@ -38,6 +58,16 @@ class AuthController:
         )
 
     def logout(self, request: Request, response: Response):
+        """
+        Logout a user.
+        
+        Args:
+            request: The request object
+            response: The response object
+            
+        Returns:
+            A success message
+        """
         refresh_token = request.cookies.get("refresh_token")
 
         if not refresh_token:
@@ -50,5 +80,14 @@ class AuthController:
         return {"message": "Logout successful"}
 
     def get_current_user(self, token: str) -> UserRead:
+        """
+        Get the current user.
+        
+        Args:
+            token: The token of the user
+            
+        Returns:
+            The current user
+        """
         user = self.auth_service.get_current_user(token)
         return UserRead.model_validate(user, from_attributes=True)

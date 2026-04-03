@@ -9,6 +9,16 @@ class RefreshTokenController:
         self.auth_service = AuthService(db)
 
     def refresh(self, request: Request, response: Response):
+        """
+        Refresh the access token.
+        
+        Args:
+            request: The request object
+            response: The response object
+            
+        Returns:
+            The new access token
+        """
         refresh_token = request.cookies.get("refresh_token")
 
         if not refresh_token:

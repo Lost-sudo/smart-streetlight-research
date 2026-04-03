@@ -5,13 +5,37 @@ from app.services.streetlight import StreetlightService
 
 class StreetlightController:
     def __init__(self, db: Session):
+        """
+        Initialize the StreetlightController.
+        
+        Args:
+            db: The database session
+        """
         self.streetlight_service = StreetlightService(db)
 
     def create_streetlight(self, streetlight: StreetlightCreate) -> StreetlightRead:
+        """
+        Create a new streetlight.
+        
+        Args:
+            streetlight: The streetlight data to create
+            
+        Returns:
+            The created streetlight
+        """
         new_streetlight = self.streetlight_service.create_streetlight(streetlight_data=streetlight)
         return StreetlightRead.model_validate(new_streetlight, from_attributes=True)
 
     def get_streetlight_by_id(self, streetlight_id) -> StreetlightRead:
+        """
+        Get a streetlight by its ID.
+        
+        Args:
+            streetlight_id: The ID of the streetlight to retrieve
+            
+        Returns:
+            The streetlight with the given ID
+        """
         streetlight = self.streetlight_service.get_streetlight_by_id(streetlight_id=streetlight_id)
         if not streetlight:
             return None
@@ -20,6 +44,12 @@ class StreetlightController:
         return sl_data
 
     def get_all_streetlight(self) -> List[StreetlightRead]:
+        """
+        Get all streetlights.
+        
+        Returns:
+            A list of all streetlights
+        """
         streetlights = self.streetlight_service.get_all_streetlight()
         results = []
         for sl in streetlights:
@@ -29,9 +59,28 @@ class StreetlightController:
         return results
 
     def update_streetlight(self, streetlight_id: int, streetlight_data: StreetlightUpdate) -> StreetlightRead:
+        """
+        Update a streetlight.
+        
+        Args:
+            streetlight_id: The ID of the streetlight to update
+            streetlight_data: The streetlight data to update
+            
+        Returns:
+            The updated streetlight
+        """
         updated_streetlight = self.streetlight_service.update_streetlight(streetlight_id=streetlight_id, streetlight_data=streetlight_data)
         return StreetlightRead.model_validate(updated_streetlight, from_attributes=True)
 
     def delete_streetlight(self, streetlight_id: int) -> str:
+        """
+        Delete a streetlight.
+        
+        Args:
+            streetlight_id: The ID of the streetlight to delete
+            
+        Returns:
+            A success message
+        """
         self.streetlight_service.delete_streetlight(streetlight_id=streetlight_id)
         return "Streetlight has been successfully deleted."
