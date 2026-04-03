@@ -86,3 +86,32 @@ class AlertRead(BaseModel):
 
 class AlertUpdate(BaseModel):
     is_resolved: bool
+
+class MaintenanceLogCreate(BaseModel):
+    streetlight_id: int
+    technician_id: int
+    description: str
+    parts_replaced: str
+    scheduled_date: datetime
+    completion_date: Optional[datetime] = None
+    status: str
+
+class MaintenanceLogRead(BaseModel):
+    id: int
+    streetlight_id: int
+    technician_id: int
+    description: str
+    parts_replaced: str
+    scheduled_date: datetime
+    completion_date: Optional[datetime]
+    status: str
+
+    class Config:
+        from_attributes = True
+
+class MaintenanceLogUpdate(BaseModel):
+    description: Optional[str] = None
+    parts_replaced: Optional[str] = None
+    scheduled_date: Optional[datetime] = None
+    completion_date: Optional[datetime] = None
+    status: Optional[str] = None
