@@ -8,6 +8,15 @@ class PredictiveMaintenanceRepository:
         self.db = db
 
     def create(self, log: PredictiveMaintenanceCreate):
+        """
+        Create a new predictive maintenance log.
+        
+        Args:
+            log: The predictive maintenance log data to create
+            
+        Returns:
+            The created predictive maintenance log
+        """
         db_log = PredictiveMaintenance(**log.dict())
         self.db.add(db_log)
         self.db.commit()
@@ -15,12 +24,37 @@ class PredictiveMaintenanceRepository:
         return db_log
 
     def get_by_id(self, log_id: int):
+        """
+        Get a predictive maintenance log by its ID.
+        
+        Args:
+            log_id: The ID of the predictive maintenance log to retrieve
+            
+        Returns:
+            The predictive maintenance log with the given ID
+        """
         return self.db.query(PredictiveMaintenance).filter(PredictiveMaintenance.id == log_id).first()
 
     def get_all(self):
+        """
+        Get all predictive maintenance logs.
+        
+        Returns:
+            A list of all predictive maintenance logs
+        """
         return self.db.query(PredictiveMaintenance).all()
 
     def update(self, log_id: int, log: PredictiveMaintenanceUpdate):
+        """
+        Update a predictive maintenance log.
+        
+        Args:
+            log_id: The ID of the predictive maintenance log to update
+            log: The predictive maintenance log data to update
+            
+        Returns:
+            The updated predictive maintenance log
+        """
         db_log = self.get_by_id(log_id)
         if not db_log:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Predictive maintenance log not found")
@@ -34,6 +68,15 @@ class PredictiveMaintenanceRepository:
         return db_log
 
     def delete(self, log_id: int):
+        """
+        Delete a predictive maintenance log.
+        
+        Args:
+            log_id: The ID of the predictive maintenance log to delete
+            
+        Returns:
+            True if the predictive maintenance log was deleted successfully, False otherwise
+        """
         db_log = self.get_by_id(log_id)
         if not db_log:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Predictive maintenance log not found")
