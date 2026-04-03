@@ -115,3 +115,25 @@ class MaintenanceLogUpdate(BaseModel):
     scheduled_date: Optional[datetime] = None
     completion_date: Optional[datetime] = None
     status: Optional[str] = None
+
+class PredictiveMaintenanceCreate(BaseModel):
+    streetlight_id: int
+    failure_probability: float
+    predicted_failure_date: datetime
+    urgency_level: str
+
+class PredictiveMaintenanceRead(BaseModel):
+    id: int
+    streetlight_id: int
+    failure_probability: float
+    predicted_failure_date: datetime
+    urgency_level: str
+    last_updated: datetime
+
+    class Config:
+        from_attributes = True
+
+class PredictiveMaintenanceUpdate(BaseModel):
+    failure_probability: Optional[float] = None
+    predicted_failure_date: Optional[datetime] = None
+    urgency_level: Optional[str] = None
