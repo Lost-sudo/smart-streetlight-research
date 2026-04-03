@@ -261,3 +261,73 @@ def test_delete_alert_success(alert_service):
 
 ### 6. Deployment Notes
 - **IoT Payload Mapping**: When the physical ESP32/IoT nodes are deployed, ensure their HTTP payloads *only* contain `device_id` and raw telemetry parameters. The API abstracts all internal SQL ID generation safely.
+
+---
+
+## Phase 4: Machine Learning Pipeline Standardization
+
+### 1. User Story & Goal
+**Goal**: Establish a robust, scalable architecture for the Machine Learning module that supports multiple predictive tasks (classification and regression). The pipeline must export standardized models and preprocessing artifacts that can be intuitively consumed by the web server for real-time analytics.
+
+**User Story**:
+> "As an ML Engineer, I want to redesign the machine learning directory to implement a classification model (Random Forest) for immediate anomaly detection, and a regression model (LSTM) for long-term degradation forecasting, so that the web server can seamlessly deserialize these models for live dashboard reporting."
+
+### 2. Acceptance Criteria
+- [x] Standardized folder structure created for exporting `.joblib` and `.pt` machine learning models.
+- [x] A Random Forest model pipeline is implemented for classification of immediate anomalies/faults.
+- [x] A Long Short-Term Memory (LSTM) neural network pipeline using PyTorch is implemented for forecasting time-series degradation trends.
+- [x] Preprocessing artifacts (like Scalers) are actively saved alongside the models for identical inference-time data transformations.
+- [x] Synthetic dataset generation scripts are constructed to bootstrap model training.
+
+### 3. Design & Architecture Overview
+The machine learning repository implements an isolated artifact pipeline that bridges data science with backend ingestion:
+- **Synthetic Generators**: Because real streetlight degradation takes years, we built `generate_dataset.py` to synthesize realistic failure modes (e.g., voltage spikes, bulb degradation).
+- **Separation of Tasks**:
+  - **Random Forest (Classification)**: Used for instantaneous fault detection. It processes isolated payload frames to determine if a node is currently failing.
+  - **LSTM (Regression)**: Used for Predictive Maintenance. It processes multi-day historical windows sequences to forecast the remaining useful life (RUL) or future degradation trends.
+
+### 4. Implementation Notes & Snippets
+
+#### 4.1 Artifact Exporting Pattern
+To ensure the backend API can reliably load the trained parameters without environment drift, models and their specific `StandardScaler` instances are exported together.
+
+```python
+# snippet representing standardized model saving
+import joblib
+
+# Training random forest
+model = RandomForestClassifier()
+model.fit(X_train_scaled, y_train)
+
+# Save inference artifacts
+joblib.dump(scaler, 'models/feature_scaler.joblib')
+joblib.dump(model, 'models/random_forest_clf.joblib')
+```
+
+#### 4.2 LSTM Forecasting Blueprint
+The Long Short-Term Memory architecture leverages sequential data structures using PyTorch `nn.Module`.
+
+```python
+import torch.nn as nn
+
+class DegradationLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, output_size):
+        super(DegradationLSTM, self).__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        # Predict based on the last time step
+        out = self.fc(out[:, -1, :]) 
+        return out
+```
+
+### 5. Testing Plan for Machine Learning
+1. **Model Evaluation Metrics**: Ensure Random Forest hits an F1-Score of > 0.90 for anomaly classification on the synthetic holdout set. Map LSTM errors using Root Mean Square Error (RMSE).
+2. **Artifact Deserialization Check**: Create a simple test script inside the web server context to load `.joblib` and `.pt` files to guarantee dependency versions match and models instantiate successfully in inference mode.
+3. **Unit Testing Integration**: Create unit tests employing `pytest` within the ML directory to ensure datasets are properly standardized (e.g., shape validation, zero-mean targeting) before being passed to the training loop.
+
+### 6. Deployment Notes
+- **Web Server Ingestion**: When the FastAPI server starts, models should ideally be loaded into memory globally during application startup to avoid I/O bottlenecks during live REST evaluations.
+- **Model Drift Retraining**: Future sprints should implement a periodic pipeline to rebuild `.joblib` files locally using real-world PostgreSQL data instead of synthetic datasets.
