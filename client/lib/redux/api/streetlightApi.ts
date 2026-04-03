@@ -11,8 +11,8 @@ export interface Streetlight {
   installation_date: string;
   status: string;
   is_on: boolean;
-  dimming_level: number;
   created_at: string;
+  has_telemetry: boolean;
 }
 
 export interface StreetlightCreate {
@@ -24,7 +24,6 @@ export interface StreetlightCreate {
   installation_date: string;
   status: string;
   is_on: boolean;
-  dimming_level: number;
 }
 
 export interface StreetlightUpdate {
@@ -36,7 +35,6 @@ export interface StreetlightUpdate {
   installation_date?: string;
   status?: string;
   is_on?: boolean;
-  dimming_level?: number;
 }
 
 export interface StreetlightLog {

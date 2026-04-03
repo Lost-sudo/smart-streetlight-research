@@ -40,7 +40,6 @@ const editNodeSchema = z.object({
   longitude: z.number().min(-180).max(180),
   status: z.string().min(1, "Status is required"),
   model_info: z.string().min(1, "Model info is required"),
-  dimming_level: z.number().min(0).max(100),
 });
 
 type EditNodeFormValues = z.infer<typeof editNodeSchema>;
@@ -63,7 +62,6 @@ export function EditNodeDialog({ node, open, onOpenChange }: EditNodeDialogProps
       longitude: 0,
       status: "active",
       model_info: "",
-      dimming_level: 100,
     },
   });
 
@@ -77,7 +75,6 @@ export function EditNodeDialog({ node, open, onOpenChange }: EditNodeDialogProps
         longitude: node.longitude,
         status: node.status,
         model_info: node.model_info,
-        dimming_level: node.dimming_level,
       });
     }
   }, [node, open, form]);
@@ -183,7 +180,7 @@ export function EditNodeDialog({ node, open, onOpenChange }: EditNodeDialogProps
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1">
               <FormField
                 control={form.control}
                 name="status"
@@ -208,25 +205,7 @@ export function EditNodeDialog({ node, open, onOpenChange }: EditNodeDialogProps
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="dimming_level"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Dimming Level (%)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.value === "" ? "" : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
             </div>
 
             <FormField

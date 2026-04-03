@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   Wrench,
   Zap,
-  Sun,
   CheckCircle2,
   Loader2,
   Wifi,
@@ -20,7 +19,7 @@ export default function DashboardPage() {
   const { data: streetlights = [], isLoading } = useGetStreetlightsQuery();
 
   const totalNodes = streetlights.length;
-  const activeNodes = streetlights.filter((n) => n.status === "active").length;
+  const activeNodes = streetlights.filter((n) => n.status === "active" && n.has_telemetry).length;
   const faultyNodes = streetlights.filter((n) => n.status === "faulty").length;
   const maintenanceNodes = streetlights.filter((n) => n.status === "maintenance").length;
   const inactiveNodes = streetlights.filter((n) => n.status === "inactive").length;
@@ -127,6 +126,7 @@ export default function DashboardPage() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {streetlights.map((node) => {
               const isActive = node.status === "active";
+              const isOnline = isActive && node.has_telemetry;
               const isFaulty = node.status === "faulty";
               const isMaintenance = node.status === "maintenance";
 
@@ -156,8 +156,7 @@ export default function DashboardPage() {
                 ? "border-t-amber-500"
                 : "border-t-zinc-400";
 
-              const healthWidth = isActive ? "w-[95%]" : isFaulty ? "w-[15%]" : isMaintenance ? "w-[45%]" : "w-[0%]";
-              const healthColor = isActive ? "bg-emerald-500" : isFaulty ? "bg-red-500" : isMaintenance ? "bg-amber-500" : "bg-zinc-400";
+
 
               return (
                 <Card
@@ -177,12 +176,12 @@ export default function DashboardPage() {
                         {node.status}
                       </Badge>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-                        {isActive ? (
+                        {isOnline ? (
                           <Wifi className="h-3 w-3 text-emerald-500" />
                         ) : (
                           <WifiOff className="h-3 w-3 text-red-400" />
                         )}
-                        <span>{isActive ? "Online" : "Offline"}</span>
+                        <span>{isOnline ? "Online" : "Offline"}</span>
                       </div>
                     </div>
 
@@ -191,25 +190,9 @@ export default function DashboardPage() {
                         <Zap className="h-4 w-4" />
                         <span className="font-mono text-[10px]">{node.device_id || "No ID"}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground font-medium">
-                        <Sun className="h-4 w-4" />
-                        <span>{node.dimming_level}%</span>
-                      </div>
                     </div>
 
-                    <div className="pt-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Node Health</div>
-                        <div className="text-[10px] font-mono text-muted-foreground">
-                          {isActive ? "95%" : isFaulty ? "15%" : isMaintenance ? "45%" : "0%"}
-                        </div>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className={`h-1.5 rounded-full transition-all duration-700 ease-in-out ${healthColor} ${healthWidth}`}
-                        />
-                      </div>
-                    </div>
+
                   </CardContent>
                 </Card>
               );

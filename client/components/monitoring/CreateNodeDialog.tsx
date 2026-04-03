@@ -55,7 +55,6 @@ export function CreateNodeDialog() {
         installation_date: new Date().toISOString(),
         status: "active", // matches DB enum: active, inactive, faulty, maintenance
         is_on: false,
-        dimming_level: 100,
       }).unwrap();
       
       toast.success("Streetlight node created successfully");

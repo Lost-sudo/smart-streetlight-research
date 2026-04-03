@@ -57,7 +57,6 @@ Stores metadata and current status of each streetlight node in the system.
 | `installation_date` | Date     | Date the streetlight was installed                            |
 | `status`            | Enum     | Current status: `active`, `inactive`, `faulty`, `maintenance` |
 | `is_on`             | Boolean  | Real-time state (ON/OFF)                                      |
-| `dimming_level`     | Integer  | Dimming percentage (0-100)                                    |
 | `created_at`        | DateTime | Record creation timestamp                                     |
 
 **Relationships:**

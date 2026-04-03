@@ -13,7 +13,6 @@ class StreetlightCreate(BaseModel):
     installation_date: datetime
     status: str
     is_on: bool
-    dimming_level: int
 
 
 class StreetlightUpdate(BaseModel):
@@ -25,7 +24,6 @@ class StreetlightUpdate(BaseModel):
     installation_date: Optional[datetime] = None
     status: Optional[str] = None
     is_on: Optional[bool] = None
-    dimming_level: Optional[int] = None
 
 
 class StreetlightRead(BaseModel):
@@ -38,8 +36,8 @@ class StreetlightRead(BaseModel):
     installation_date: datetime
     status: str
     is_on: bool
-    dimming_level: int
     created_at: datetime
+    has_telemetry: bool = False
 
     class Config:
         from_attributes = True

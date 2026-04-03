@@ -13,11 +13,20 @@ class StreetlightController:
 
     def get_streetlight_by_id(self, streetlight_id) -> StreetlightRead:
         streetlight = self.streetlight_service.get_streetlight_by_id(streetlight_id=streetlight_id)
-        return StreetlightRead.model_validate(streetlight, from_attributes=True)
+        if not streetlight:
+            return None
+        sl_data = StreetlightRead.model_validate(streetlight, from_attributes=True)
+        sl_data.has_telemetry = len(streetlight.logs) > 0
+        return sl_data
 
     def get_all_streetlight(self) -> List[StreetlightRead]:
         streetlights = self.streetlight_service.get_all_streetlight()
-        return [StreetlightRead.model_validate(sl, from_attributes=True) for sl in streetlights]
+        results = []
+        for sl in streetlights:
+            sl_data = StreetlightRead.model_validate(sl, from_attributes=True)
+            sl_data.has_telemetry = len(sl.logs) > 0
+            results.append(sl_data)
+        return results
 
     def update_streetlight(self, streetlight_id: int, streetlight_data: StreetlightUpdate) -> StreetlightRead:
         updated_streetlight = self.streetlight_service.update_streetlight(streetlight_id=streetlight_id, streetlight_data=streetlight_data)

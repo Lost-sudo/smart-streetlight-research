@@ -171,6 +171,7 @@ export default function MonitoringPage() {
           {sortedNodes.map((node) => {
             const config = getStatusConfig(node.status);
             const isActive = node.status === "active";
+            const isOnline = isActive && node.has_telemetry;
             return (
               <Card
                 key={node.id}
@@ -222,12 +223,12 @@ export default function MonitoringPage() {
                       {config.label}
                     </Badge>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      {isActive ? (
+                      {isOnline ? (
                         <Wifi className="h-3 w-3 text-emerald-500" />
                       ) : (
                         <WifiOff className="h-3 w-3 text-red-400" />
                       )}
-                      <span>{isActive ? "Online" : "Offline"}</span>
+                      <span>{isOnline ? "Online" : "Offline"}</span>
                     </div>
                   </div>
 

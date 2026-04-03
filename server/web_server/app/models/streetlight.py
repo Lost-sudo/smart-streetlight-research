@@ -37,7 +37,6 @@ class Streetlight(Base):
     installation_date = Column(DateTime)
     status = Column(Enum(StreetlightStatus, name="streetlight_status_enum"), nullable=False, default=StreetlightStatus.inactive, server_default=StreetlightStatus.inactive.value)
     is_on = Column(Boolean, default=False)
-    dimming_level = Column(Integer, default=100)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     logs = relationship("StreetlightLog", back_populates="streetlight")

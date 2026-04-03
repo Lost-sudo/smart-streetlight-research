@@ -10,15 +10,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
+  ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
 } from "recharts";
 import {
   BrainCircuit,
@@ -37,15 +35,7 @@ const featureImportanceData = [
   { name: "Temp.", value: 15 },
 ];
 
-const degradationData = [
-  { day: "Day 1", health: 100 },
-  { day: "Day 5", health: 98 },
-  { day: "Day 10", health: 95 },
-  { day: "Day 15", health: 90 },
-  { day: "Day 20", health: 82 },
-  { day: "Day 25", health: 75 },
-  { day: "Day 30", health: 68 },
-];
+
 
 export default function AnalyticsPage() {
   return (
@@ -69,7 +59,7 @@ export default function AnalyticsPage() {
           <CardContent className="space-y-6">
             <div className="flex flex-col items-center justify-center py-4 bg-muted/30 rounded-2xl">
               <Badge variant="outline" className="mb-2 text-emerald-500 border-emerald-500/30 bg-emerald-500/5 px-3 py-1">
-                Healthy - Low Risk
+                Stable - Low Risk
               </Badge>
               <div className="text-4xl font-black text-foreground">98.2%</div>
               <p className="text-xs text-muted-foreground mt-1">Prediction Confidence</p>
@@ -121,7 +111,7 @@ export default function AnalyticsPage() {
               <div className="flex items-start gap-3 p-3 bg-orange-500/5 border border-orange-500/10 rounded-xl">
                 <TrendingDown className="h-5 w-5 text-orange-500 mt-0.5" />
                 <div className="text-xs text-orange-700 dark:text-orange-300">
-                  <span className="font-bold">Maintenance Trend:</span> Node 4 health has decreased by 12% in the last 15 days.
+                  <span className="font-bold">Maintenance Trend:</span> Node 4 failure probability has increased by 12% in the last 15 days.
                 </div>
               </div>
             </div>
@@ -142,46 +132,7 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Degradation Trend Chart */}
-        <Card className="border-none shadow-lg bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
-          <CardHeader>
-            <CardTitle>Health Degradation Trend</CardTitle>
-            <CardDescription>Visualizing asset health score over time</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px] min-h-0">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <LineChart data={degradationData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
-                <XAxis 
-                  dataKey="day" 
-                  stroke="#888888" 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={false} 
-                />
-                <YAxis 
-                  stroke="#888888" 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={false}
-                  domain={[0, 100]}
-                  tickFormatter={(value) => `${value}%`}
-                />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', border: 'none', borderRadius: '12px', boxShadow: '0 8px 30px rgba(0,0,0,0.1)' }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="health" 
-                  stroke="#f97316" 
-                  strokeWidth={4} 
-                  dot={{ r: 4, strokeWidth: 2, fill: '#fff' }}
-                  activeDot={{ r: 8, strokeWidth: 0 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+
 
         {/* Feature Importance Bar Chart */}
         <Card className="border-none shadow-lg bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">

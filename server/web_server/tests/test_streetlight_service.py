@@ -25,8 +25,7 @@ def sample_streetlight_create():
         model_info="LED-V1",
         installation_date=datetime.utcnow(),
         status="active",
-        is_on=True,
-        dimming_level=100
+        is_on=True
     )
 
 @pytest.fixture
@@ -39,8 +38,7 @@ def sample_streetlight_model():
         model_info="LED-V1",
         installation_date=datetime.utcnow(),
         status="active",
-        is_on=True,
-        dimming_level=100
+        is_on=True
     )
 
 def test_create_streetlight_success(streetlight_service, sample_streetlight_create, sample_streetlight_model):
