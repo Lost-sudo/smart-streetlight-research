@@ -10,12 +10,42 @@ class StreetlightService:
         self.streetlight_repo = StreetlightRepository(db)
     
     def get_streetlight_by_id(self, streetlight_id: int) -> StreetlightRead:
+        """
+        Get a streetlight by its ID.
+        
+        Args:
+            streetlight_id: The ID of the streetlight to retrieve
+            
+        Returns:
+            The streetlight with the given ID
+            
+        Raises:
+            HTTPException: If the streetlight with the given ID is not found
+        """
         return self.streetlight_repo.get_by_id(streetlight_id=streetlight_id)
 
     def get_all_streetlight(self) -> List[StreetlightRead]:
+        """
+        Get all streetlights.
+        
+        Returns:
+            A list of all streetlights
+        """
         return self.streetlight_repo.get_all()
 
     def create_streetlight(self, streetlight_data: StreetlightCreate) -> StreetlightRead:
+        """
+        Create a new streetlight.
+        
+        Args:
+            streetlight_data: The streetlight data to create
+            
+        Returns:
+            The created streetlight
+            
+        Raises:
+            HTTPException: If the streetlight with the given name already exists
+        """
         is_existing = self.streetlight_repo.get_by_name(streetlight_name=streetlight_data.name)
 
         if is_existing:
@@ -24,6 +54,19 @@ class StreetlightService:
         return self.streetlight_repo.create(streetlight=streetlight_data)
 
     def update_streetlight(self, streetlight_id: int, streetlight_data: StreetlightUpdate) -> StreetlightRead:
+        """
+        Update a streetlight.
+        
+        Args:
+            streetlight_id: The ID of the streetlight to update
+            streetlight_data: The streetlight data to update
+            
+        Returns:
+            The updated streetlight
+            
+        Raises:
+            HTTPException: If the streetlight with the given ID is not found
+        """
         is_existing = self.get_streetlight_by_id(streetlight_id=streetlight_id)
 
         if not is_existing:
@@ -32,6 +75,18 @@ class StreetlightService:
         return self.streetlight_repo.update(streetlight_id=streetlight_id, streetlight=streetlight_data)
 
     def delete_streetlight(self, streetlight_id: int) -> bool:
+        """
+        Delete a streetlight.
+        
+        Args:
+            streetlight_id: The ID of the streetlight to delete
+            
+        Returns:
+            True if the streetlight was deleted successfully, False otherwise
+            
+        Raises:
+            HTTPException: If the streetlight with the given ID is not found
+        """
         is_existing = self.get_streetlight_by_id(streetlight_id=streetlight_id)
 
         if not is_existing:

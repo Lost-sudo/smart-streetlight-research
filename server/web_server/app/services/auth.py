@@ -17,23 +17,80 @@ class AuthService:
         self.refresh_repo = RefreshTokenRepository(db)
 
     def __hash_password(self, password: str):
+        """
+        Hash a password.
+        
+        Args:
+            password: The password to hash
+            
+        Returns:
+            The hashed password
+        """
         return hash_password(password)
 
     def __verify_password(self, plain_password: str, hashed_password: str):
+        """
+        Verify a password.
+        
+        Args:
+            plain_password: The plain password to verify
+            hashed_password: The hashed password to verify against
+            
+        Returns:
+            True if the password is correct, False otherwise
+        """
         return verify_password(plain_password, hashed_password)
 
     def __hash_token(self, token: str):
+        """
+        Hash a token.
+        
+        Args:
+            token: The token to hash
+            
+        Returns:
+            The hashed token
+        """
         return hash_password(token)
 
     def __verify_token(self, plain_token: str, hashed_token: str):
+        """
+        Verify a token.
+        
+        Args:
+            plain_token: The plain token to verify
+            hashed_token: The hashed token to verify against
+            
+        Returns:
+            True if the token is correct, False otherwise
+        """
         return verify_password(plain_token, hashed_token)
 
 
 
     def __get_user(self, username: str):
+        """
+        Get a user by username.
+        
+        Args:
+            username: The username of the user to retrieve
+            
+        Returns:
+            The user with the given username
+        """
         return self.user_repo.get_by_username(username)
 
     def create_access_token(self, user: User, refresh_token_id: int):
+        """
+        Create an access token.
+        
+        Args:
+            user: The user to create an access token for
+            refresh_token_id: The ID of the refresh token
+            
+        Returns:
+            The access token
+        """
         expire = datetime.utcnow() + timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
@@ -54,6 +111,15 @@ class AuthService:
         )
 
     def create_refresh_token(self, user: User):
+        """
+        Create a refresh token.
+        
+        Args:
+            user: The user to create a refresh token for
+            
+        Returns:
+            The refresh token and its expiration time
+        """
         expires_at = datetime.utcnow() + timedelta(
             minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES
         )
@@ -76,6 +142,17 @@ class AuthService:
         
 
     def save_refresh_token(self, token: str, user_id: int, expires_at: datetime):
+        """
+        Save a refresh token.
+        
+        Args:
+            token: The refresh token to save
+            user_id: The ID of the user
+            expires_at: The expiration time of the refresh token
+            
+        Returns:
+            The saved refresh token
+        """
         hashed_token = self.__hash_token(token)
 
         return self.refresh_repo.create(
@@ -86,6 +163,18 @@ class AuthService:
 
     
     def refresh_access_token(self, refresh_token: str) -> TokenServiceResponse:
+        """
+        Refresh an access token.
+        
+        Args:
+            refresh_token: The refresh token to use
+            
+        Returns:
+            The new access token and refresh token
+            
+        Raises:
+            HTTPException: If the refresh token is invalid or expired
+        """
         try:
             payload = jwt.decode(
                 refresh_token,
@@ -131,6 +220,18 @@ class AuthService:
 
 
     def create_user(self, user: UserCreate) -> User:
+        """
+        Create a new user.
+        
+        Args:
+            user: The user data to create
+            
+        Returns:
+            The created user
+            
+        Raises:
+            HTTPException: If the username already exists
+        """
         if self.__get_user(user.username):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
         hashed_password = self.__hash_password(user.password)
@@ -143,6 +244,19 @@ class AuthService:
         return self.user_repo.create(user=new_user)
         
     def authenticate_user(self, username: str, password: str) -> User:
+        """
+        Authenticate a user.
+        
+        Args:
+            username: The username of the user to authenticate
+            password: The password of the user to authenticate
+            
+        Returns:
+            The authenticated user
+            
+        Raises:
+            HTTPException: If the username or password is incorrect
+        """
         user = self.user_repo.get_by_username(username)
 
         if not user or not self.__verify_password(password, user.hashed_password):
@@ -151,6 +265,15 @@ class AuthService:
         return user
 
     def logout(self, refresh_token: str):
+        """
+        Logout a user.
+        
+        Args:
+            refresh_token: The refresh token to use
+            
+        Raises:
+            HTTPException: If the refresh token is invalid or expired
+        """
         try:
             payload = jwt.decode(refresh_token, settings.REFRESH_SECRET_KEY, algorithms=[settings.REFRESH_ALGORITHM])
         except:
@@ -169,7 +292,18 @@ class AuthService:
 
 
     def get_current_user(self, token: str):
-
+        """
+        Get the current user.
+        
+        Args:
+            token: The access token to use
+            
+        Returns:
+            The current user
+            
+        Raises:
+            HTTPException: If the token is invalid or expired
+        """
         credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
