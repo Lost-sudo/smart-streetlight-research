@@ -3,4 +3,5 @@ from .refresh_token import RefreshTokenRepository
 from .streetlight import StreetlightRepository
 from .alert import AlertRepository
 from .maintenance_log import MaintenanceLogRepository
+from .streetlight_log import StreetlightLogRepository
 from .predictive_maintenance_log import PredictiveMaintenanceRepository
