@@ -11,13 +11,6 @@ class RepairTaskStatus(str, PyEnum):
     in_progress = "in_progress"
     completed = "completed"
 
-
-class TechnicianAvailability(str, PyEnum):
-    available = "available"
-    busy = "busy"
-    offline = "offline"
-
-
 class AssignedByType(str, PyEnum):
     admin = "admin"
     operator = "operator"

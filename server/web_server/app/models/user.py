@@ -3,13 +3,17 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 from enum import Enum as PyEnum
 from datetime import datetime
-from app.models.repair_task import TechnicianAvailability
 
 class UserRole(str, PyEnum):
     admin = "admin"
     operator = "operator"
     technician = "technician"
     viewer = "viewer"
+
+class TechnicianAvailability(str, PyEnum):
+    available = "available"
+    busy = "busy"
+    offline = "offline"
 
 class User(Base):
     __tablename__ = "users"
