@@ -40,7 +40,6 @@ import {
   User as UserIcon, 
   Wrench, 
   Eye, 
-  Trash2, 
   Lock,
   History as HistoryIcon,
   Loader2,
@@ -49,8 +48,7 @@ import {
 } from "lucide-react";
 import { 
   useGetUsersQuery, 
-  useCreateUserMutation, 
-  useDeleteUserMutation
+  useCreateUserMutation
 } from "@/lib/redux/api/userApi";
 import { UserCreate, UserCreateSchema, Role } from "@/types/auth";
 
@@ -69,12 +67,13 @@ const roleColors: Record<Role, string> = {
 };
 
 import { EditUserDialog } from "@/components/users/EditUserDialog";
+import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
 
 export default function UserManagementPage() {
   const { data: users = [], isLoading: isFetching } = useGetUsersQuery();
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
-  const [deleteUser] = useDeleteUserMutation();
   
+
   const [search, setSearch] = useState("");
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
 
@@ -273,14 +272,7 @@ export default function UserManagementPage() {
                     </div>
                     <div className="flex items-center gap-1">
                       <EditUserDialog user={user} />
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10 transition-colors" 
-                        onClick={() => deleteUser(user.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <DeleteUserDialog userId={user.id} username={user.username} />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
@@ -364,14 +356,7 @@ export default function UserManagementPage() {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <EditUserDialog user={user} />
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-all"
-                            onClick={() => deleteUser(user.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <DeleteUserDialog userId={user.id} username={user.username} />
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <MoreVertical className="h-4 w-4 text-muted-foreground" />
                           </Button>
