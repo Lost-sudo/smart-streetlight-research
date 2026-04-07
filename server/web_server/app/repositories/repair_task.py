@@ -3,8 +3,8 @@ from sqlalchemy import and_
 from fastapi import HTTPException, status
 from datetime import datetime
 
-from app.models.repair_task import RepairTask, RepairTaskStatus, TechnicianAvailability
-from app.models.user import User
+from app.models.repair_task import RepairTask, RepairTaskStatus
+from app.models.user import User, TechnicianAvailability
 from app.models.streetlight import Alert
 from app.schemas.repair_task import RepairTaskCreate
 
