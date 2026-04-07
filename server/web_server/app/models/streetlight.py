@@ -68,6 +68,7 @@ class Alert(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     streetlight = relationship("Streetlight", back_populates="alerts")
+    repair_task = relationship("RepairTask", back_populates="alert", uselist=False)
 
 class MaintenanceLog(Base):
     __tablename__ = "maintenance_logs"

@@ -5,3 +5,4 @@ from .alert import AlertRepository
 from .maintenance_log import MaintenanceLogRepository
 from .streetlight_log import StreetlightLogRepository
 from .predictive_maintenance_log import PredictiveMaintenanceRepository
+from .repair_task import RepairTaskRepository
