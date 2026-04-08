@@ -123,6 +123,15 @@ export default function MaintenancePage() {
     setSelectedTech("");
   };
 
+  const handleClaim = (taskId: string) => {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId 
+        ? { ...task, assignedTo: "You", status: "In Progress" } 
+        : task
+    ));
+    showNotification("Task claimed successfully. It is now assigned to you.", 'success');
+  };
+
   const handleLogRepair = (taskId: string) => {
     setTasks(prev => prev.filter(task => task.id !== taskId));
     showNotification("Repair logged and alert closed successfully!", 'success');
@@ -245,6 +254,29 @@ export default function MaintenancePage() {
                                   </Button>
                                 </div>
                               </div>
+                            </RoleGate>
+
+                            <RoleGate allowedRoles={["technician"]}>
+                              {!task.assignedTo && (
+                                <div className="space-y-3 p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-dashed border-emerald-200 dark:border-emerald-800">
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-sm font-bold flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                                      <UserPlus className="h-4 w-4" />
+                                      Available for Claim
+                                    </Label>
+                                    <Button 
+                                      onClick={() => handleClaim(task.id)}
+                                      size="sm"
+                                      className="rounded-lg shadow-md h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    >
+                                      Claim Task
+                                    </Button>
+                                  </div>
+                                  <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80">
+                                    By claiming this task, you will be assigned to resolve the fault.
+                                  </p>
+                                </div>
+                              )}
                             </RoleGate>
 
                             <RoleGate allowedRoles={["admin", "technician"]}>
