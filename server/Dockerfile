@@ -41,5 +41,6 @@ WORKDIR /app/web_server
 EXPOSE 8000
 
 # Start the uvicorn server
-# We use shell execution mode ($PORT) to allow environment variable expansion
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# We use 'python -m uvicorn' to ensure the binary is found in the Python path
+# and shell execution mode ($PORT) to allow environment variable expansion
+CMD python -m uvicorn main:app --host 0.0.0.0 --port $PORT
