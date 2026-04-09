@@ -47,8 +47,8 @@ const sidebarItems: SidebarItem[] = [
     allowedRoles: ["admin", "operator"],
   },
   {
-    title: "Maintenance",
-    href: "/maintenance",
+    title: "Immediate Repairs",
+    href: "/immediate-repairs",
     icon: Wrench,
     allowedRoles: ["admin", "operator", "technician"],
   },
