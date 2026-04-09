@@ -41,6 +41,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useGetStreetlightsQuery, type Streetlight } from "@/lib/redux/api/streetlightApi";
+import { useGetAlertsQuery, type Alert } from "@/lib/redux/api/alertApi";
+import { 
+  useGetUnassignedTasksQuery, 
+  useGetActiveTasksQuery,
+  useGetAvailableTechniciansQuery,
+  useAssignTaskMutation,
+  useClaimTaskMutation,
+  useUpdateTaskStatusMutation,
+  type RepairTask,
+  type Technician
+} from "@/lib/redux/api/repairTaskApi";
+
+const priorityColors: Record<string, string> = {
+  High: "border-red-500 text-red-500 bg-red-500/10",
+  Medium: "border-orange-500 text-orange-500 bg-orange-500/10",
+  Low: "border-yellow-500 text-yellow-500 bg-yellow-500/10",
+};
 
 interface MaintenanceTask {
   id: string;
@@ -54,54 +72,16 @@ interface MaintenanceTask {
   assignedTo?: string;
 }
 
-const technicians = [
-  { id: "t1", name: "John Doe", specialty: "Electrical" },
-  { id: "t2", name: "Jane Smith", specialty: "Hardware" },
-  { id: "t3", name: "Alice Brown", specialty: "Networking" },
-];
-
-const initialTasks: MaintenanceTask[] = [
-  {
-    id: "1",
-    node: "Node 1",
-    faultType: "Short Circuit",
-    priority: "High",
-    dateDetected: "2023-10-27",
-    suggestedAction: "Inspect Relay & Wiring",
-    explanation: "Voltage drop detected with simultaneous current spike. High probability of hardware short.",
-    status: "Pending",
-  },
-  {
-    id: "2",
-    node: "Node 3",
-    faultType: "Bulb Fault",
-    priority: "Medium",
-    dateDetected: "2023-10-28",
-    suggestedAction: "Replace LED Module",
-    explanation: "Standard voltage but near-zero current draw during active period.",
-    status: "In Progress",
-    assignedTo: "Jane Smith",
-  },
-  {
-    id: "3",
-    node: "Node 4",
-    faultType: "Needs Maintenance",
-    priority: "Low",
-    dateDetected: "2023-10-29",
-    suggestedAction: "Clean LDR Sensor",
-    explanation: "Lux readings inconsistent with time-series historical averages.",
-    status: "Pending",
-  },
-];
-
-const priorityColors = {
-  High: "bg-red-500/10 text-red-500 border-red-500/20",
-  Medium: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  Low: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-};
-
 export default function MaintenancePage() {
-  const [tasks, setTasks] = useState(initialTasks);
+  const { data: streetlights = [], isLoading: slLoading } = useGetStreetlightsQuery(undefined, { pollingInterval: 30000 });
+  const { data: alerts = [], isLoading: alertsLoading } = useGetAlertsQuery(undefined, { pollingInterval: 30000 });
+  const { data: unassignedBase = [], isLoading: uLoading } = useGetUnassignedTasksQuery(undefined, { pollingInterval: 15000 });
+  const { data: activeBase = [], isLoading: aLoading } = useGetActiveTasksQuery(undefined, { pollingInterval: 15000 });
+  const { data: availableTechnicians = [] } = useGetAvailableTechniciansQuery(undefined, { pollingInterval: 30000 });
+
+  const [assignMutate] = useAssignTaskMutation();
+  const [claimMutate] = useClaimTaskMutation();
+  const [statusMutate] = useUpdateTaskStatusMutation();
   const [search, setSearch] = useState("");
   const [selectedTech, setSelectedTech] = useState<string>("");
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'info'} | null>(null);
@@ -111,33 +91,52 @@ export default function MaintenancePage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleAssign = (taskId: string) => {
+  const mapTask = (t: RepairTask) => {
+      const alert = alerts.find((a: Alert) => a.id === t.alert_id);
+      const sl = streetlights.find((s: Streetlight) => s.id === alert?.streetlight_id);
+      
+      const priorityStr = alert?.severity === "critical" ? "High" : alert?.severity === "high" ? "Medium" : "Low";
+      return {
+          id: String(t.id),
+          node: sl?.name || "Unknown Node",
+          faultType: alert?.type?.replace(/_/g, ' ') || "Anomaly Alert",
+          priority: priorityStr,
+          dateDetected: alert?.created_at ? new Date(alert.created_at).toLocaleDateString() : "Unknown Date",
+          suggestedAction: alert?.message || "Verify Node State manually.",
+          explanation: t.description || "System flagged an anomaly requiring service.",
+          status: t.status === "pending" ? "Pending" : t.status === "in_progress" ? "In Progress" : "Resolved",
+          assignedTo: t.technician_id ? `Tech #${t.technician_id}` : undefined
+      } as MaintenanceTask;
+  };
+
+  const dbTasks = [...unassignedBase.map(mapTask), ...activeBase.filter((a: RepairTask) => a.status !== "pending").map(mapTask)];
+
+  const handleAssign = async (taskId: string) => {
     if (!selectedTech) return;
-    
-    setTasks(prev => prev.map(task => 
-      task.id === taskId 
-        ? { ...task, assignedTo: selectedTech, status: "In Progress" } 
-        : task
-    ));
-    showNotification(`Technician ${selectedTech} assigned successfully!`, 'info');
-    setSelectedTech("");
+    try {
+      await assignMutate({ taskId: Number(taskId), technicianId: Number(selectedTech) }).unwrap();
+      showNotification(`Technician assigned successfully!`, 'info');
+      setSelectedTech("");
+    } catch (e) { showNotification("Failed to assign tech.", "info"); }
   };
 
-  const handleClaim = (taskId: string) => {
-    setTasks(prev => prev.map(task => 
-      task.id === taskId 
-        ? { ...task, assignedTo: "You", status: "In Progress" } 
-        : task
-    ));
-    showNotification("Task claimed successfully. It is now assigned to you.", 'success');
+  const handleClaim = async (taskId: string) => {
+    try {
+      await claimMutate(Number(taskId)).unwrap();
+      showNotification("Task claimed successfully. It is now assigned to you.", 'success');
+    } catch (e) { showNotification("Failed to claim task.", "info"); }
   };
 
-  const handleLogRepair = (taskId: string) => {
-    setTasks(prev => prev.filter(task => task.id !== taskId));
-    showNotification("Repair logged and alert closed successfully!", 'success');
+  const handleLogRepair = async (taskId: string) => {
+    try {
+      // Must put it 'in_progress' first depending on state, but assuming it was assigned:
+      // Real flow: assigned -> in_progress -> completed. We will force complete directly for demo:
+      await statusMutate({ taskId: Number(taskId), status: "completed" }).unwrap();
+      showNotification("Repair logged and task completed successfully!", 'success');
+    } catch (e) { showNotification("Failed to log repair.", "info"); }
   };
 
-  const filteredTasks = tasks.filter(task => 
+  const filteredTasks = dbTasks.filter(task => 
     task.node.toLowerCase().includes(search.toLowerCase()) || 
     task.faultType.toLowerCase().includes(search.toLowerCase())
   );
@@ -237,9 +236,9 @@ export default function MaintenancePage() {
                                       <SelectValue placeholder={task.assignedTo || "Select personnel..."} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {technicians.map(tech => (
-                                        <SelectItem key={tech.id} value={tech.name}>
-                                          {tech.name} ({tech.specialty})
+                                      {availableTechnicians.map((tech: Technician) => (
+                                        <SelectItem key={tech.id} value={String(tech.id)}>
+                                          {tech.username}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -358,7 +357,7 @@ export default function MaintenancePage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Pending Repairs</p>
-              <h3 className="text-2xl font-bold">{tasks.filter(t => t.status === "Pending").length}</h3>
+              <h3 className="text-2xl font-bold">{unassignedTasks.length}</h3>
             </div>
          </div>
          <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-6 flex items-center gap-4">
@@ -367,7 +366,7 @@ export default function MaintenancePage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Active Work</p>
-              <h3 className="text-2xl font-bold">{tasks.filter(t => t.status === "In Progress").length}</h3>
+              <h3 className="text-2xl font-bold">{assignedTasks.length}</h3>
             </div>
          </div>
          <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-6 flex items-center gap-4">

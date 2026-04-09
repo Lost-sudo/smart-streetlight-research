@@ -38,7 +38,7 @@ def create_repair_task(
     return controller.create_repair_task(task)
 
 
-@router.get("/active", response_model=List[RepairTaskRead], dependencies=[Depends(require_roles(["admin", "operator"]))])
+@router.get("/active", response_model=List[RepairTaskRead], dependencies=[Depends(require_roles(["admin", "operator", "technician"]))])
 def get_active_tasks(
     controller: RepairTaskController = Depends(get_repair_task_controller),
 ):
@@ -93,7 +93,7 @@ def delete_repair_task(
 # Technician endpoints
 # ──────────────────────────────────────────────
 
-@router.get("/unassigned", response_model=List[RepairTaskRead], dependencies=[Depends(require_roles(["technician"]))])
+@router.get("/unassigned", response_model=List[RepairTaskRead], dependencies=[Depends(require_roles(["admin", "operator", "technician"]))])
 def get_unassigned_tasks(
     controller: RepairTaskController = Depends(get_repair_task_controller),
 ):

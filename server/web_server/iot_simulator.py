@@ -36,7 +36,7 @@ def generate_data(device_id: str, test_mode: bool = False) -> dict:
         }
 
     # 10% chance to generate an anomaly (to trigger Alerts via ML Pipeline)
-    is_anomaly = random.random() < 0.50
+    is_anomaly = random.random() < 0.90
 
     if is_anomaly:
         return {

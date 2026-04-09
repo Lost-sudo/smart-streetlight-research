@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.models.streetlight import PredictiveMaintenance
 from fastapi import HTTPException, status
 from app.schemas.streetlight import PredictiveMaintenanceCreate, PredictiveMaintenanceRead, PredictiveMaintenanceUpdate
+from datetime import datetime
 
 class PredictiveMaintenanceRepository:
     def __init__(self, db: Session):
@@ -74,6 +75,8 @@ class PredictiveMaintenanceRepository:
         update_data = log.dict(exclude_unset=True)
         for key, value in update_data.items():
             setattr(db_log, key, value)
+            
+        db_log.last_updated = datetime.utcnow()
             
         self.db.commit()
         self.db.refresh(db_log)

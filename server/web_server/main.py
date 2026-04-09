@@ -7,6 +7,7 @@ from app.routes.streetlight_log import router as streetlight_log_router
 from app.routes.alert import router as alert_router
 from app.routes.maintenance_log import router as maintenance_log_router
 from app.routes.repair_task import router as repair_task_router
+from app.routes.predictive_maintenance_log import router as predictive_maintenance_router
 import uvicorn
 
 app = FastAPI(
@@ -38,6 +39,7 @@ app.include_router(streetlight_log_router)
 app.include_router(alert_router)
 app.include_router(maintenance_log_router)
 app.include_router(repair_task_router)
+app.include_router(predictive_maintenance_router)
 
 @app.get("/")
 def root():

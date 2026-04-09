@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,15 +15,45 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useGetStreetlightsQuery } from "@/lib/redux/api/streetlightApi";
+import { useGetPredictiveMaintenanceLogsQuery } from "@/lib/redux/api/predictiveMaintenanceApi";
 
 export default function DashboardPage() {
-  const { data: streetlights = [], isLoading } = useGetStreetlightsQuery();
+  const { data: streetlights = [], isLoading: isStreetlightsLoading } = useGetStreetlightsQuery(undefined, { pollingInterval: 15000 });
+  const { data: pmLogs = [], isLoading: isLogsLoading } = useGetPredictiveMaintenanceLogsQuery(undefined, { pollingInterval: 15000 });
 
-  const totalNodes = streetlights.length;
-  const activeNodes = streetlights.filter((n) => n.status === "active" && n.has_telemetry).length;
-  const faultyNodes = streetlights.filter((n) => n.status === "faulty").length;
-  const maintenanceNodes = streetlights.filter((n) => n.status === "maintenance").length;
-  const inactiveNodes = streetlights.filter((n) => n.status === "inactive").length;
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowTick(Date.now());
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const { activeNodes, faultyNodes, maintenanceNodes, inactiveNodes, totalNodes } = useMemo(() => {
+    let active = 0;
+    let inactive = 0;
+    let faulty = 0;
+    let maintenance = 0;
+
+    streetlights.forEach((n) => {
+      let isOnline = false;
+      const pm = pmLogs.find(p => p.streetlight_id === n.id);
+      if (pm && pm.last_updated) {
+        const dateStr = pm.last_updated.endsWith('Z') ? pm.last_updated : `${pm.last_updated}Z`;
+        if (nowTick - new Date(dateStr).getTime() <= 120_000) {
+           isOnline = true;
+        }
+      }
+
+      if (n.status === "faulty") faulty++;
+      else if (n.status === "maintenance") maintenance++;
+      else if (n.status === "inactive" || (n.status === "active" && !isOnline)) inactive++;
+      else active++;
+    });
+
+    return { activeNodes: active, inactiveNodes: inactive, faultyNodes: faulty, maintenanceNodes: maintenance, totalNodes: streetlights.length };
+  }, [streetlights, pmLogs, nowTick]);
 
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -30,7 +61,7 @@ export default function DashboardPage() {
     day: "numeric",
   });
 
-  if (isLoading) {
+  if (isStreetlightsLoading || isLogsLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-8 pt-6 h-full">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mr-2" />
@@ -125,8 +156,16 @@ export default function DashboardPage() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {streetlights.map((node) => {
-              const isActive = node.status === "active";
-              const isOnline = isActive && node.has_telemetry;
+              let isOnline = false;
+              const pm = pmLogs.find(p => p.streetlight_id === node.id);
+              if (pm && pm.last_updated) {
+                const dateStr = pm.last_updated.endsWith('Z') ? pm.last_updated : `${pm.last_updated}Z`;
+                if (nowTick - new Date(dateStr).getTime() <= 120_000) {
+                   isOnline = true;
+                }
+              }
+
+              const isActive = (node.status === "active" && isOnline);
               const isFaulty = node.status === "faulty";
               const isMaintenance = node.status === "maintenance";
 
@@ -173,7 +212,7 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between">
                       <Badge variant="outline" className={`${statusColor} border-current gap-1 capitalize py-0 px-2 text-[10px]`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
-                        {node.status}
+                        {node.status === "active" && !isOnline ? "offline" : node.status}
                       </Badge>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
                         {isOnline ? (

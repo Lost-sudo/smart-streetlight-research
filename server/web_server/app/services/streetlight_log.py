@@ -2,8 +2,9 @@ from app.repositories.streetlight_log import StreetlightLogRepository
 from app.repositories.streetlight import StreetlightRepository
 from app.repositories.predictive_maintenance_log import PredictiveMaintenanceRepository
 from app.repositories.alert import AlertRepository
-from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate, PredictiveMaintenanceCreate, PredictiveMaintenanceUpdate, AlertCreate
-from app.models.streetlight import StreetlightLog
+from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate, PredictiveMaintenanceCreate, PredictiveMaintenanceUpdate, AlertCreate, StreetlightUpdate
+from app.schemas.repair_task import RepairTaskCreate
+from app.repositories.repair_task import RepairTaskRepository
 from app.services.ml_prediction import MLPredictionService
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -17,6 +18,7 @@ class StreetlightLogService:
         self.streetlight_repo = StreetlightRepository(db)
         self.predictive_maintenance_repo = PredictiveMaintenanceRepository(db)
         self.alert_repo = AlertRepository(db)
+        self.repair_task_repo = RepairTaskRepository(db)
         self.ml_service = MLPredictionService()
 
     def add_log_from_iot(self, iot_log: IoTNodeLogCreate) -> StreetlightLogRead:
@@ -73,7 +75,17 @@ class StreetlightLogService:
                     is_resolved=False,
                     created_at=datetime.utcnow()
                 )
-                self.alert_repo.create(alert_create)
+                db_alert = self.alert_repo.create(alert_create)
+                
+                # Automatically spawn a RepairTask assigned to this alert 
+                self.repair_task_repo.create(RepairTaskCreate(
+                    alert_id=db_alert.id, 
+                    description="AI-generated maintenance prediction. Requires immediate field inspection."
+                ))
+
+                # 5. Automatically mark the physical node state as Faulty (if not under active Maintenance)
+                if streetlight.status != "maintenance":
+                    self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))
 
         except Exception as e:
             print(f"Error during ML prediction flow: {e}")

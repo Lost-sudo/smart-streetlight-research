@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -22,6 +22,7 @@ import { Lightbulb, Loader2, Wifi, WifiOff, Plus, Pencil, Trash2 } from "lucide-
 import { toast } from "sonner";
 import { RoleGate } from "@/components/auth/role-gate";
 import { useGetStreetlightsQuery, useDeleteStreetlightMutation } from "@/lib/redux/api/streetlightApi";
+import { useGetPredictiveMaintenanceLogsQuery } from "@/lib/redux/api/predictiveMaintenanceApi";
 import { CreateNodeDialog } from "@/components/monitoring/CreateNodeDialog";
 import { EditNodeDialog } from "@/components/monitoring/EditNodeDialog";
 import { NodeDetailsDialog } from "@/components/monitoring/NodeDetailsDialog";
@@ -82,7 +83,8 @@ function getStatusConfig(status: string) {
 }
 
 export default function MonitoringPage() {
-  const { data: streetlights = [], isLoading: isStreetlightsLoading } = useGetStreetlightsQuery();
+  const { data: streetlights = [], isLoading: isStreetlightsLoading } = useGetStreetlightsQuery(undefined, { pollingInterval: 15000 });
+  const { data: pmLogs = [] } = useGetPredictiveMaintenanceLogsQuery(undefined, { pollingInterval: 15000 });
   const [deleteStreetlight, { isLoading: isDeleting }] = useDeleteStreetlightMutation();
 
   const [selectedNode, setSelectedNode] = useState<Streetlight | null>(null);
@@ -91,6 +93,15 @@ export default function MonitoringPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [nodeToDelete, setNodeToDelete] = useState<Streetlight | null>(null);
   const [nodeToEdit, setNodeToEdit] = useState<Streetlight | null>(null);
+  
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowTick(Date.now());
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Sort nodes by priority: faulty → maintenance → active → inactive
   const sortedNodes = useMemo(() => {
@@ -171,7 +182,17 @@ export default function MonitoringPage() {
           {sortedNodes.map((node) => {
             const config = getStatusConfig(node.status);
             const isActive = node.status === "active";
-            const isOnline = isActive && node.has_telemetry;
+            let isOnline = false;
+            const pm = pmLogs.find(p => p.streetlight_id === node.id);
+            if (pm && pm.last_updated) {
+              const dateStr = pm.last_updated.endsWith('Z') ? pm.last_updated : `${pm.last_updated}Z`;
+              if (nowTick - new Date(dateStr).getTime() <= 120_000) {
+                 isOnline = true;
+              }
+            }
+            // Enforce config styling based on network drop
+            const renderedConfig = isOnline || !isActive ? config : { ...config, bg: "bg-zinc-100 dark:bg-zinc-800/60", icon: "text-zinc-500 dark:text-zinc-400", dot: "bg-zinc-400", badge: "secondary" as const };
+
             return (
               <Card
                 key={node.id}
@@ -188,10 +209,10 @@ export default function MonitoringPage() {
                   {/* Status Indicator Dot */}
                   <div className="absolute top-4 right-4">
                     <span className="relative flex h-3 w-3">
-                      {isActive && (
+                      {isOnline && (
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                       )}
-                      <span className={cn("relative inline-flex rounded-full h-3 w-3", config.dot)} />
+                      <span className={cn("relative inline-flex rounded-full h-3 w-3", renderedConfig.dot)} />
                     </span>
                   </div>
 
@@ -199,10 +220,10 @@ export default function MonitoringPage() {
                   <div className="flex items-start gap-3 mb-3">
                     <div className={cn(
                       "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-200",
-                      config.bg,
-                      config.bgHover
+                      renderedConfig.bg,
+                      renderedConfig.bgHover
                     )}>
-                      <Lightbulb className={cn("h-5 w-5", config.icon)} />
+                      <Lightbulb className={cn("h-5 w-5", renderedConfig.icon)} />
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
@@ -217,10 +238,10 @@ export default function MonitoringPage() {
                   {/* Meta Row */}
                   <div className="flex items-center justify-between gap-2">
                     <Badge
-                      variant={config.badge}
+                      variant={renderedConfig.badge}
                       className="text-[10px] px-1.5 py-0 capitalize"
                     >
-                      {config.label}
+                      {node.status === "active" && !isOnline ? "Offline" : renderedConfig.label}
                     </Badge>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       {isOnline ? (
