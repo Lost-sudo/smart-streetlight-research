@@ -1,15 +1,23 @@
 from app.repositories.streetlight_log import StreetlightLogRepository
 from app.repositories.streetlight import StreetlightRepository
-from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate
+from app.repositories.predictive_maintenance_log import PredictiveMaintenanceRepository
+from app.repositories.alert import AlertRepository
+from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate, PredictiveMaintenanceCreate, PredictiveMaintenanceUpdate, AlertCreate
 from app.models.streetlight import StreetlightLog
+from app.services.ml_prediction import MLPredictionService
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime
+
 
 class StreetlightLogService:
     def __init__(self, db: Session):
         self.streetlight_log_repo = StreetlightLogRepository(db)
         self.streetlight_repo = StreetlightRepository(db)
+        self.predictive_maintenance_repo = PredictiveMaintenanceRepository(db)
+        self.alert_repo = AlertRepository(db)
+        self.ml_service = MLPredictionService()
 
     def add_log_from_iot(self, iot_log: IoTNodeLogCreate) -> StreetlightLogRead:
         """
@@ -25,13 +33,52 @@ class StreetlightLogService:
             HTTPException: If the streetlight with the given device_id is not found
         """
 
-        # Todo:
-        # Implement the prediction logic here and then store the predicted data in the predictive maintenance log
+        # Get the streetlight to ensure it exists
         streetlight = self.streetlight_repo.get_by_device_id(iot_log.device_id)
         if not streetlight:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Streetlight with device_id {iot_log.device_id} not found")
         
-        return self.streetlight_log_repo.create(streetlight.id, iot_log)
+        # 1. Create the standard streetlight log
+        created_log = self.streetlight_log_repo.create(streetlight.id, iot_log)
+
+        # 2. Run ML Prediction
+        try:
+            prediction_result = self.ml_service.predict_failure(iot_log)
+            
+            # 3. Upsert Predictive Maintenance Log
+            existing_pm = self.predictive_maintenance_repo.get_by_streetlight_id(streetlight.id)
+            if existing_pm:
+                pm_update = PredictiveMaintenanceUpdate(
+                    failure_probability=prediction_result["failure_probability"],
+                    predicted_failure_date=prediction_result["predicted_failure_date"],
+                    urgency_level=prediction_result["urgency_level"]
+                )
+                self.predictive_maintenance_repo.update(existing_pm.id, pm_update)
+            else:
+                pm_create = PredictiveMaintenanceCreate(
+                    streetlight_id=streetlight.id,
+                    failure_probability=prediction_result["failure_probability"],
+                    predicted_failure_date=prediction_result["predicted_failure_date"],
+                    urgency_level=prediction_result["urgency_level"]
+                )
+                self.predictive_maintenance_repo.create(pm_create)
+
+            # 4. Generate Alert if criticality is high/critical
+            if prediction_result["urgency_level"] in ["high", "critical"] or prediction_result["failure_probability"] >= 0.8:
+                alert_create = AlertCreate(
+                    streetlight_id=streetlight.id,
+                    type="predictive_maintenance_alert",
+                    severity="critical" if prediction_result["failure_probability"] >= 0.9 else "high",
+                    message=f"High failure probability detected: {prediction_result['failure_probability']*100:.1f}%. Predicted failure date: {prediction_result['predicted_failure_date'].strftime('%Y-%m-%d')}.",
+                    is_resolved=False,
+                    created_at=datetime.utcnow()
+                )
+                self.alert_repo.create(alert_create)
+
+        except Exception as e:
+            print(f"Error during ML prediction flow: {e}")
+
+        return created_log
 
 
     def get_streetlight_log_by_id(self, streetlight_log_id: int) -> StreetlightLogRead:

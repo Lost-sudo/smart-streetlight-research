@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from app.models.streetlight import PredictiveMaintenance
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from app.schemas.streetlight import PredictiveMaintenanceCreate, PredictiveMaintenanceRead, PredictiveMaintenanceUpdate
 
 class PredictiveMaintenanceRepository:
@@ -34,6 +34,18 @@ class PredictiveMaintenanceRepository:
             The predictive maintenance log with the given ID
         """
         return self.db.query(PredictiveMaintenance).filter(PredictiveMaintenance.id == log_id).first()
+
+    def get_by_streetlight_id(self, streetlight_id: int):
+        """
+        Get a predictive maintenance log by its streetlight ID.
+        
+        Args:
+            streetlight_id: The ID of the streetlight
+            
+        Returns:
+            The predictive maintenance log for the given streetlight
+        """
+        return self.db.query(PredictiveMaintenance).filter(PredictiveMaintenance.streetlight_id == streetlight_id).first()
 
     def get_all(self):
         """
