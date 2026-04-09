@@ -13,6 +13,7 @@ services:
       - ./web_server/.env
     environment:
       # If these are not provided in .env, Docker will attempt to pull them from the host
+      - PORT=8000
       - POSTGRES_HOST=${POSTGRES_HOST:-localhost}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_USER=${POSTGRES_USER}
