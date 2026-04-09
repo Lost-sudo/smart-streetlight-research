@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./server/web_server
+      dockerfile: Dockerfile
+    container_name: smart-streetlight-backend
+    ports:
+      - "8000:8000"
+    # Load environment variables from the .env file in the backend directory
+    env_file:
+      - ./server/web_server/.env
+    environment:
+      # If these are not provided in .env, Docker will attempt to pull them from the host
+      - POSTGRES_HOST=${POSTGRES_HOST:-localhost}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    restart: always
+
+# Define volumes if needed (e.g. for persistent storage if not using Supabase)
+# volumes:
+#   postgres_data:
