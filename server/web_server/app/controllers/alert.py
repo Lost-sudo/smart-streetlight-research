@@ -43,6 +43,19 @@ class AlertController:
         alerts = self.alert_service.get_all_alerts()
         return [AlertRead.model_validate(a, from_attributes=True) for a in alerts]
 
+    def get_alerts_by_type(self, alert_type: str) -> List[AlertRead]:
+        """
+        Get all alerts filtered by alert_type.
+        
+        Args:
+            alert_type: FAULT or PREDICTIVE
+            
+        Returns:
+            A list of filtered alerts
+        """
+        alerts = self.alert_service.get_alerts_by_type(alert_type)
+        return [AlertRead.model_validate(a, from_attributes=True) for a in alerts]
+
     def update_alert(self, alert_id: int, alert: AlertUpdate) -> AlertRead:
         """
         Update an alert.

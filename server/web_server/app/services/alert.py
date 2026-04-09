@@ -39,6 +39,18 @@ class AlertService:
         """
         return self.alert_repo.get_all()
 
+    def get_alerts_by_type(self, alert_type: str):
+        """
+        Get all alerts filtered by alert_type (FAULT or PREDICTIVE).
+        
+        Args:
+            alert_type: The alert type to filter by
+            
+        Returns:
+            A list of alerts of the specified type
+        """
+        return self.alert_repo.get_by_alert_type(alert_type)
+
     def update_alert(self, alert_id: int, alert: AlertUpdate):
         """
         Update an alert.

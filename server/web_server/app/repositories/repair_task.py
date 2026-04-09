@@ -3,7 +3,7 @@ from sqlalchemy import and_
 from fastapi import HTTPException, status
 from datetime import datetime
 
-from app.models.repair_task import RepairTask, RepairTaskStatus
+from app.models.repair_task import RepairTask, RepairTaskStatus, RepairTaskSourceType, RepairTaskPriority
 from app.models.user import User, TechnicianAvailability
 from app.models.streetlight import Alert
 from app.schemas.repair_task import RepairTaskCreate
@@ -47,6 +47,9 @@ class RepairTaskRepository:
             alert_id=task.alert_id,
             description=task.description,
             status=RepairTaskStatus.pending,
+            source_type=RepairTaskSourceType(task.source_type.value) if task.source_type else RepairTaskSourceType.FAULT,
+            priority=RepairTaskPriority(task.priority.value) if task.priority else RepairTaskPriority.high,
+            scheduled_at=task.scheduled_at,
         )
         self.db.add(db_task)
         self.db.commit()
@@ -103,6 +106,47 @@ class RepairTaskRepository:
             )
             .all()
         )
+
+    def get_by_source_type(self, source_type: str):
+        """
+        Get all repair tasks filtered by source_type (FAULT or PREDICTIVE).
+        """
+        return (
+            self.db.query(RepairTask)
+            .filter(RepairTask.source_type == source_type)
+            .all()
+        )
+
+    def get_active_by_streetlight_id(self, streetlight_id: int, source_type: str = None):
+        """
+        Get the active (non-completed) repair task for a streetlight, optionally filtered by source_type.
+        Used for escalation logic.
+        """
+        query = (
+            self.db.query(RepairTask)
+            .join(Alert, RepairTask.alert_id == Alert.id)
+            .filter(
+                Alert.streetlight_id == streetlight_id,
+                RepairTask.status != RepairTaskStatus.completed,
+            )
+        )
+        if source_type:
+            query = query.filter(RepairTask.source_type == source_type)
+        return query.first()
+
+    def escalate_predictive_task(self, task_id: int, new_priority: str):
+        """
+        Escalate a predictive task to a higher priority (e.g., when a fault occurs on the same node).
+        Changes source_type to FAULT and updates priority.
+        """
+        db_task = self.get_by_id(task_id)
+        if not db_task:
+            return None
+        db_task.source_type = RepairTaskSourceType.FAULT
+        db_task.priority = RepairTaskPriority(new_priority)
+        self.db.commit()
+        self.db.refresh(db_task)
+        return db_task
 
     def get_by_technician(self, technician_id: int):
         """

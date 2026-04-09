@@ -39,6 +39,8 @@ export const ROLE_PERMISSIONS = {
     "monitoring",
     "analytics",
     "immediate-repairs",
+    "predictive-maintenance",
+    "repair-tasks",
     "reports",
     "users",
     "settings",
@@ -48,10 +50,18 @@ export const ROLE_PERMISSIONS = {
     "monitoring",
     "analytics",
     "immediate-repairs",
+    "predictive-maintenance",
+    "repair-tasks",
     "reports",
     "settings",
   ],
-  technician: ["dashboard", "monitoring", "immediate-repairs", "settings"],
+  technician: [
+    "dashboard",
+    "monitoring",
+    "immediate-repairs",
+    "repair-tasks",
+    "settings"
+  ],
   viewer: ["dashboard", "reports"],
 } as const;
 

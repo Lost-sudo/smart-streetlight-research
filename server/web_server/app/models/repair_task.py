@@ -5,6 +5,17 @@ from datetime import datetime
 from enum import Enum as PyEnum
 
 
+class RepairTaskSourceType(str, PyEnum):
+    FAULT = "FAULT"
+    PREDICTIVE = "PREDICTIVE"
+
+class RepairTaskPriority(str, PyEnum):
+    critical = "critical"
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+
 class RepairTaskStatus(str, PyEnum):
     pending = "pending"
     assigned = "assigned"
@@ -33,10 +44,23 @@ class RepairTask(Base):
         default=RepairTaskStatus.pending,
         server_default=RepairTaskStatus.pending.value,
     )
+    source_type = Column(
+        Enum(RepairTaskSourceType, name="repair_task_source_type_enum"),
+        nullable=False,
+        default=RepairTaskSourceType.FAULT,
+        server_default=RepairTaskSourceType.FAULT.value,
+    )
+    priority = Column(
+        Enum(RepairTaskPriority, name="repair_task_priority_enum"),
+        nullable=False,
+        default=RepairTaskPriority.high,
+        server_default=RepairTaskPriority.high.value,
+    )
     description = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     assigned_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+    scheduled_at = Column(DateTime, nullable=True)
     version = Column(Integer, nullable=False, default=1, server_default="1")
 
     # Relationships

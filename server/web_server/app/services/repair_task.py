@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from app.repositories.repair_task import RepairTaskRepository
-from app.schemas.repair_task import RepairTaskCreate
-from app.models.repair_task import AssignedByType
+from app.schemas.repair_task import RepairTaskCreate, RepairTaskSchedule
+from app.models.repair_task import AssignedByType, RepairTaskSourceType, RepairTaskPriority
 
 
 class RepairTaskService:
@@ -40,6 +40,38 @@ class RepairTaskService:
             A list of all repair tasks
         """
         return self.repair_task_repo.get_all()
+
+    def get_tasks_by_source_type(self, source_type: str):
+        """
+        Get all repair tasks filtered by source_type (FAULT or PREDICTIVE).
+
+        Args:
+            source_type: The source type to filter by
+
+        Returns:
+            A list of repair tasks of the specified source type
+        """
+        return self.repair_task_repo.get_by_source_type(source_type)
+
+    def schedule_predictive_task(self, schedule: RepairTaskSchedule):
+        """
+        Create a repair task for predictive maintenance (admin action).
+        Sets source_type to PREDICTIVE.
+
+        Args:
+            schedule: The task scheduling data
+
+        Returns:
+            The created repair task
+        """
+        task_create = RepairTaskCreate(
+            alert_id=schedule.alert_id,
+            description=schedule.description,
+            source_type="PREDICTIVE",
+            priority=schedule.priority.value if schedule.priority else "medium",
+            scheduled_at=schedule.scheduled_at,
+        )
+        return self.repair_task_repo.create(task_create)
 
     def get_unassigned_tasks(self):
         """

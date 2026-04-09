@@ -8,13 +8,15 @@ import {
   LayoutDashboard,
   Lightbulb,
   LineChart,
-  Wrench,
   FileBarChart,
   Users,
   Settings,
   Zap,
   LogOut,
   User as UserIcon,
+  AlertTriangle,
+  BrainCircuit,
+  ClipboardList,
   LucideIcon
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
@@ -47,9 +49,21 @@ const sidebarItems: SidebarItem[] = [
     allowedRoles: ["admin", "operator"],
   },
   {
-    title: "Immediate Repairs",
+    title: "Fault Monitoring",
     href: "/immediate-repairs",
-    icon: Wrench,
+    icon: AlertTriangle,
+    allowedRoles: ["admin", "operator", "technician"],
+  },
+  {
+    title: "Predictive Maintenance",
+    href: "/predictive-maintenance",
+    icon: BrainCircuit,
+    allowedRoles: ["admin", "operator"],
+  },
+  {
+    title: "Repair Tasks",
+    href: "/repair-tasks",
+    icon: ClipboardList,
     allowedRoles: ["admin", "operator", "technician"],
   },
   {

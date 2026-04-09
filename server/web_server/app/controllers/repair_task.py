@@ -7,6 +7,7 @@ from app.schemas.repair_task import (
     RepairTaskRead,
     RepairTaskAssign,
     RepairTaskUpdateStatus,
+    RepairTaskSchedule,
     TechnicianStatusUpdate,
     TechnicianRead,
 )
@@ -57,6 +58,20 @@ class RepairTaskController:
         """
         tasks = self.repair_task_service.get_all_repair_tasks()
         return [RepairTaskRead.model_validate(t, from_attributes=True) for t in tasks]
+
+    def get_tasks_by_source_type(self, source_type: str) -> List[RepairTaskRead]:
+        """
+        Get all repair tasks filtered by source_type (FAULT or PREDICTIVE).
+        """
+        tasks = self.repair_task_service.get_tasks_by_source_type(source_type)
+        return [RepairTaskRead.model_validate(t, from_attributes=True) for t in tasks]
+
+    def schedule_predictive_task(self, schedule: RepairTaskSchedule) -> RepairTaskRead:
+        """
+        Create a repair task for predictive maintenance (admin action).
+        """
+        new_task = self.repair_task_service.schedule_predictive_task(schedule)
+        return RepairTaskRead.model_validate(new_task, from_attributes=True)
 
     def get_unassigned_tasks(self) -> List[RepairTaskRead]:
         """

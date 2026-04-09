@@ -9,6 +9,7 @@ from app.schemas.repair_task import (
     RepairTaskRead,
     RepairTaskAssign,
     RepairTaskUpdateStatus,
+    RepairTaskSchedule,
     TechnicianStatusUpdate,
     TechnicianRead,
 )
@@ -36,6 +37,15 @@ def create_repair_task(
 ):
     """Create a new repair task from an alert (admin/operator only)."""
     return controller.create_repair_task(task)
+
+
+@router.post("/schedule", response_model=RepairTaskRead, dependencies=[Depends(require_roles(["admin", "operator"]))])
+def schedule_predictive_task(
+    schedule: RepairTaskSchedule,
+    controller: RepairTaskController = Depends(get_repair_task_controller),
+):
+    """Schedule a predictive maintenance repair task (admin/operator only)."""
+    return controller.schedule_predictive_task(schedule)
 
 
 @router.get("/active", response_model=List[RepairTaskRead], dependencies=[Depends(require_roles(["admin", "operator", "technician"]))])
@@ -148,6 +158,15 @@ def get_all_repair_tasks(
 ):
     """Get all repair tasks."""
     return controller.get_all_repair_tasks()
+
+
+@router.get("/by-type/{source_type}", response_model=List[RepairTaskRead], dependencies=[Depends(require_roles(["admin", "operator", "technician"]))])
+def get_tasks_by_source_type(
+    source_type: str,
+    controller: RepairTaskController = Depends(get_repair_task_controller),
+):
+    """Get all repair tasks filtered by source type (FAULT or PREDICTIVE)."""
+    return controller.get_tasks_by_source_type(source_type)
 
 
 @router.get("/{task_id}", response_model=RepairTaskRead, dependencies=[Depends(require_roles(["admin", "operator", "technician"]))])

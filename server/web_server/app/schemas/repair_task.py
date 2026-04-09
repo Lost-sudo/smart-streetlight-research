@@ -11,6 +11,18 @@ class RepairTaskStatusEnum(str, Enum):
     completed = "completed"
 
 
+class RepairTaskSourceTypeEnum(str, Enum):
+    FAULT = "FAULT"
+    PREDICTIVE = "PREDICTIVE"
+
+
+class RepairTaskPriorityEnum(str, Enum):
+    critical = "critical"
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+
 class TechnicianAvailabilityEnum(str, Enum):
     available = "available"
     busy = "busy"
@@ -28,6 +40,9 @@ class AssignedByTypeEnum(str, Enum):
 class RepairTaskCreate(BaseModel):
     alert_id: int
     description: Optional[str] = None
+    source_type: RepairTaskSourceTypeEnum = RepairTaskSourceTypeEnum.FAULT
+    priority: RepairTaskPriorityEnum = RepairTaskPriorityEnum.high
+    scheduled_at: Optional[datetime] = None
 
 
 class RepairTaskRead(BaseModel):
@@ -37,14 +52,25 @@ class RepairTaskRead(BaseModel):
     assigned_by_user_id: Optional[int] = None
     assigned_by_type: Optional[AssignedByTypeEnum] = None
     status: RepairTaskStatusEnum
+    source_type: RepairTaskSourceTypeEnum
+    priority: RepairTaskPriorityEnum
     description: Optional[str] = None
     created_at: datetime
     assigned_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    scheduled_at: Optional[datetime] = None
     version: int
 
     class Config:
         from_attributes = True
+
+
+class RepairTaskSchedule(BaseModel):
+    """Used by admin to create a predictive maintenance repair task."""
+    alert_id: int
+    description: Optional[str] = None
+    priority: RepairTaskPriorityEnum = RepairTaskPriorityEnum.medium
+    scheduled_at: Optional[datetime] = None
 
 
 class RepairTaskAssign(BaseModel):

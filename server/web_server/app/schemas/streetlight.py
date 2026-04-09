@@ -64,6 +64,7 @@ class StreetlightLogRead(BaseModel):
 
 class AlertCreate(BaseModel):
     streetlight_id: int
+    alert_type: str = "FAULT"
     type: str
     severity: str
     message: str
@@ -73,6 +74,7 @@ class AlertCreate(BaseModel):
 class AlertRead(BaseModel):
     id: int
     streetlight_id: int
+    alert_type: str
     type: str
     severity: str
     message: str

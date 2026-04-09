@@ -50,6 +50,8 @@ class StreetlightLogService:
                 if streetlight.status != "maintenance":
                     self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))
                 
+                fault_priority = "critical" if fault_result["confidence"] >= 0.8 else "high"
+
                 # Avoid spamming duplicate hardware fault alerts
                 existing_fault_alert = self.alert_repo.get_unresolved_by_streetlight_id(
                     streetlight.id, alert_type="hardware_fault_alert"
@@ -58,17 +60,31 @@ class StreetlightLogService:
                 if not existing_fault_alert:
                     alert_create = AlertCreate(
                         streetlight_id=streetlight.id,
+                        alert_type="FAULT",
                         type="hardware_fault_alert",
-                        severity="critical" if fault_result["confidence"] >= 0.8 else "high",
+                        severity=fault_priority,
                         message=f"Immediate hardware fault detected ({fault_result['confidence']*100:.1f}% confidence).",
                         is_resolved=False,
                         created_at=datetime.utcnow()
                     )
                     db_alert = self.alert_repo.create(alert_create)
-                    self.repair_task_repo.create(RepairTaskCreate(
-                        alert_id=db_alert.id, 
-                        description="Hardware fault auto-detected. Requires emergency field intervention."
-                    ))
+
+                    # ESCALATION: Check if a PREDICTIVE repair task already exists for this node.
+                    # If so, escalate it to FAULT priority instead of creating a duplicate task.
+                    existing_predictive_task = self.repair_task_repo.get_active_by_streetlight_id(
+                        streetlight.id, source_type="PREDICTIVE"
+                    )
+                    if existing_predictive_task:
+                        self.repair_task_repo.escalate_predictive_task(
+                            existing_predictive_task.id, new_priority=fault_priority
+                        )
+                    else:
+                        self.repair_task_repo.create(RepairTaskCreate(
+                            alert_id=db_alert.id, 
+                            description="Hardware fault auto-detected. Requires emergency field intervention.",
+                            source_type="FAULT",
+                            priority=fault_priority
+                        ))
         except Exception as e:
             print(f"Error during Fault Detection flow: {e}")
 
@@ -100,10 +116,9 @@ class StreetlightLogService:
                 )
                 self.predictive_maintenance_repo.create(pm_create)
 
-            # Note: We specifically DO NOT generate an immediate 'predictive_maintenance_alert' 
-            # or 'RepairTask' here to avoid spamming the technicians.
-            # Predictive Maintenance simply updates the DB so it can be viewed on the 
-            # Predictive Analytics dashboard, where admins can manually schedule maintenance.
+            # Predictive Maintenance only updates the PM record in the database.
+            # Repair tasks for predictive maintenance are created MANUALLY by admins
+            # from the Predictive Maintenance dashboard.
 
         except Exception as e:
             print(f"Error during ML prediction flow: {e}")

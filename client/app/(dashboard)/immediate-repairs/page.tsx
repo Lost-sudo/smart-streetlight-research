@@ -31,7 +31,8 @@ import {
   Clock, 
   History as HistoryIcon,
   Info,
-  UserPlus
+  UserPlus,
+  Loader2
 } from "lucide-react";
 import { RoleGate } from "@/components/auth/role-gate";
 import {
@@ -315,6 +316,17 @@ export default function ImmediateRepairsPage() {
     </div>
   );
 
+  const isLoading = slLoading || alertsLoading || uLoading || aLoading;
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8 pt-6 h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mr-2" />
+        <span className="text-muted-foreground font-medium">Synchronizing fault data...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 space-y-8 p-8 pt-6 relative">
       {/* Success/Info Notification Popover */}
@@ -331,8 +343,8 @@ export default function ImmediateRepairsPage() {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Immediate Repairs</h2>
-          <p className="text-muted-foreground italic">Actionable workflow for immediate fault repairs.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Fault Monitoring</h2>
+          <p className="text-muted-foreground italic">Reactive workflow for real-time fault detection and immediate repairs.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">

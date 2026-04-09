@@ -8,10 +8,13 @@ export interface RepairTask {
   assigned_by_user_id: number | null;
   assigned_by_type: string | null;
   status: string;
+  source_type: "FAULT" | "PREDICTIVE";
+  priority: "critical" | "high" | "medium" | "low";
   description: string | null;
   created_at: string;
   assigned_at: string | null;
   completed_at: string | null;
+  scheduled_at: string | null;
   version: number;
 }
 
@@ -19,6 +22,13 @@ export interface Technician {
   id: number;
   username: string;
   availability: string | null;
+}
+
+export interface ScheduleTaskPayload {
+  alert_id: number;
+  description?: string;
+  priority?: "critical" | "high" | "medium" | "low";
+  scheduled_at?: string;
 }
 
 export const repairTaskApi = createApi({
@@ -32,6 +42,14 @@ export const repairTaskApi = createApi({
     }),
     getActiveTasks: builder.query<RepairTask[], void>({
       query: () => "/repair-tasks/active",
+      providesTags: ["RepairTask"],
+    }),
+    getAllRepairTasks: builder.query<RepairTask[], void>({
+      query: () => "/repair-tasks/",
+      providesTags: ["RepairTask"],
+    }),
+    getTasksBySourceType: builder.query<RepairTask[], string>({
+      query: (sourceType) => `/repair-tasks/by-type/${sourceType}`,
       providesTags: ["RepairTask"],
     }),
     getAvailableTechnicians: builder.query<Technician[], void>({
@@ -61,14 +79,25 @@ export const repairTaskApi = createApi({
       }),
       invalidatesTags: ["RepairTask", "Technician"],
     }),
+    scheduleTask: builder.mutation<RepairTask, ScheduleTaskPayload>({
+      query: (payload) => ({
+        url: "/repair-tasks/schedule",
+        method: "POST",
+        body: payload,
+      }),
+      invalidatesTags: ["RepairTask"],
+    }),
   }),
 });
 
 export const {
   useGetUnassignedTasksQuery,
   useGetActiveTasksQuery,
+  useGetAllRepairTasksQuery,
+  useGetTasksBySourceTypeQuery,
   useGetAvailableTechniciansQuery,
   useAssignTaskMutation,
   useClaimTaskMutation,
   useUpdateTaskStatusMutation,
+  useScheduleTaskMutation,
 } = repairTaskApi;

@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.controllers.alert import AlertController
 from app.core.database import get_db
 from app.schemas.streetlight import AlertCreate, AlertRead, AlertUpdate
-from typing import List
+from typing import List, Optional
 
 router = APIRouter(
     prefix="/alert",
@@ -22,7 +22,12 @@ def get_alert(alert_id: int, controller: AlertController = Depends(get_alert_con
     return controller.get_alert_by_id(alert_id)
 
 @router.get("/", response_model=List[AlertRead])
-def get_all_alerts(controller: AlertController = Depends(get_alert_controller)):
+def get_all_alerts(
+    alert_type: Optional[str] = Query(None, description="Filter by alert type: FAULT or PREDICTIVE"),
+    controller: AlertController = Depends(get_alert_controller)
+):
+    if alert_type:
+        return controller.get_alerts_by_type(alert_type)
     return controller.get_all_alerts()
 
 @router.patch("/{alert_id}", response_model=AlertRead)
