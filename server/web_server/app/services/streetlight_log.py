@@ -43,11 +43,46 @@ class StreetlightLogService:
         # 1. Create the standard streetlight log
         created_log = self.streetlight_log_repo.create(streetlight.id, iot_log)
 
-        # 2. Run ML Prediction
+        # 2. FAULT DETECTION (Random Forest)
         try:
-            prediction_result = self.ml_service.predict_failure(iot_log)
+            fault_result = self.ml_service.detect_fault(iot_log)
+            if fault_result.get("is_faulty", False):
+                if streetlight.status != "maintenance":
+                    self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))
+                
+                # Avoid spamming duplicate hardware fault alerts
+                existing_fault_alert = self.alert_repo.get_unresolved_by_streetlight_id(
+                    streetlight.id, alert_type="hardware_fault_alert"
+                )
+                
+                if not existing_fault_alert:
+                    alert_create = AlertCreate(
+                        streetlight_id=streetlight.id,
+                        type="hardware_fault_alert",
+                        severity="critical" if fault_result["confidence"] >= 0.8 else "high",
+                        message=f"Immediate hardware fault detected ({fault_result['confidence']*100:.1f}% confidence).",
+                        is_resolved=False,
+                        created_at=datetime.utcnow()
+                    )
+                    db_alert = self.alert_repo.create(alert_create)
+                    self.repair_task_repo.create(RepairTaskCreate(
+                        alert_id=db_alert.id, 
+                        description="Hardware fault auto-detected. Requires emergency field intervention."
+                    ))
+        except Exception as e:
+            print(f"Error during Fault Detection flow: {e}")
+
+        # 3. PREDICTIVE MAINTENANCE FORECASTING (LSTM)
+        try:
+            # Fetch up to 10 recent logs. The first one is the active log we just created.
+            # We skip the first and take the next 9 historical logs, then reverse to be chronological.
+            recent_logs = self.streetlight_log_repo.get_by_streetlight_id(streetlight.id, limit=10)
+            historical_logs = recent_logs[1:10]
+            historical_logs.reverse()
             
-            # 3. Upsert Predictive Maintenance Log
+            prediction_result = self.ml_service.predict_failure(iot_log, historical_logs)
+            
+            # Upsert Predictive Maintenance Log
             existing_pm = self.predictive_maintenance_repo.get_by_streetlight_id(streetlight.id)
             if existing_pm:
                 pm_update = PredictiveMaintenanceUpdate(
@@ -65,27 +100,10 @@ class StreetlightLogService:
                 )
                 self.predictive_maintenance_repo.create(pm_create)
 
-            # 4. Generate Alert if criticality is high/critical
-            if prediction_result["urgency_level"] in ["high", "critical"] or prediction_result["failure_probability"] >= 0.8:
-                alert_create = AlertCreate(
-                    streetlight_id=streetlight.id,
-                    type="predictive_maintenance_alert",
-                    severity="critical" if prediction_result["failure_probability"] >= 0.9 else "high",
-                    message=f"High failure probability detected: {prediction_result['failure_probability']*100:.1f}%. Predicted failure date: {prediction_result['predicted_failure_date'].strftime('%Y-%m-%d')}.",
-                    is_resolved=False,
-                    created_at=datetime.utcnow()
-                )
-                db_alert = self.alert_repo.create(alert_create)
-                
-                # Automatically spawn a RepairTask assigned to this alert 
-                self.repair_task_repo.create(RepairTaskCreate(
-                    alert_id=db_alert.id, 
-                    description="AI-generated maintenance prediction. Requires immediate field inspection."
-                ))
-
-                # 5. Automatically mark the physical node state as Faulty (if not under active Maintenance)
-                if streetlight.status != "maintenance":
-                    self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))
+            # Note: We specifically DO NOT generate an immediate 'predictive_maintenance_alert' 
+            # or 'RepairTask' here to avoid spamming the technicians.
+            # Predictive Maintenance simply updates the DB so it can be viewed on the 
+            # Predictive Analytics dashboard, where admins can manually schedule maintenance.
 
         except Exception as e:
             print(f"Error during ML prediction flow: {e}")

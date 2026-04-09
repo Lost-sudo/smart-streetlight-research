@@ -44,6 +44,18 @@ class AlertRepository:
         """
         return self.db.query(Alert).all()
 
+    def get_unresolved_by_streetlight_id(self, streetlight_id: int, alert_type: str = None):
+        """
+        Get the first unresolved alert for a streetlight, optionally filtered by type.
+        """
+        query = self.db.query(Alert).filter(
+            Alert.streetlight_id == streetlight_id,
+            Alert.is_resolved == False
+        )
+        if alert_type:
+            query = query.filter(Alert.type == alert_type)
+        return query.first()
+
     def update(self, alert_id: int, alert: AlertUpdate):
         """
         Update an alert.
