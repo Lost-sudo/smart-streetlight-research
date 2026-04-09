@@ -81,6 +81,7 @@ class RepairTaskAssign(BaseModel):
 class RepairTaskUpdateStatus(BaseModel):
     """Used by technician to update their task status."""
     status: RepairTaskStatusEnum
+    description: Optional[str] = None
 
 
 # --- Technician Schemas ---

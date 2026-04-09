@@ -52,12 +52,12 @@ class StreetlightLogService:
                 
                 fault_priority = "critical" if fault_result["confidence"] >= 0.8 else "high"
 
-                # Avoid spamming duplicate hardware fault alerts
-                existing_fault_alert = self.alert_repo.get_unresolved_by_streetlight_id(
+                # Avoid spamming duplicate hardware fault alerts, BUT allow if previous was resolved
+                existing_active_fault = self.alert_repo.get_unresolved_by_streetlight_id(
                     streetlight.id, alert_type="hardware_fault_alert"
                 )
                 
-                if not existing_fault_alert:
+                if not existing_active_fault:
                     alert_create = AlertCreate(
                         streetlight_id=streetlight.id,
                         alert_type="FAULT",
@@ -70,7 +70,6 @@ class StreetlightLogService:
                     db_alert = self.alert_repo.create(alert_create)
 
                     # ESCALATION: Check if a PREDICTIVE repair task already exists for this node.
-                    # If so, escalate it to FAULT priority instead of creating a duplicate task.
                     existing_predictive_task = self.repair_task_repo.get_active_by_streetlight_id(
                         streetlight.id, source_type="PREDICTIVE"
                     )
@@ -90,8 +89,6 @@ class StreetlightLogService:
 
         # 3. PREDICTIVE MAINTENANCE FORECASTING (LSTM)
         try:
-            # Fetch up to 10 recent logs. The first one is the active log we just created.
-            # We skip the first and take the next 9 historical logs, then reverse to be chronological.
             recent_logs = self.streetlight_log_repo.get_by_streetlight_id(streetlight.id, limit=10)
             historical_logs = recent_logs[1:10]
             historical_logs.reverse()
@@ -116,9 +113,30 @@ class StreetlightLogService:
                 )
                 self.predictive_maintenance_repo.create(pm_create)
 
-            # Predictive Maintenance only updates the PM record in the database.
-            # Repair tasks for predictive maintenance are created MANUALLY by admins
-            # from the Predictive Maintenance dashboard.
+            # AUTOMATION: If urgency is Critical or High, create a Predictive Alert and Repair Task automatically
+            if prediction_result["urgency_level"] in ["critical", "high"]:
+                existing_pred_alert = self.alert_repo.get_unresolved_by_streetlight_and_alert_type(
+                    streetlight.id, alert_type="PREDICTIVE"
+                )
+                
+                if not existing_pred_alert:
+                    pred_alert = self.alert_repo.create(AlertCreate(
+                        streetlight_id=streetlight.id,
+                        alert_type="PREDICTIVE",
+                        type="predicted_failure",
+                        severity=prediction_result["urgency_level"],
+                        message=f"LSTM Model predicts failure by {prediction_result['predicted_failure_date'].strftime('%Y-%m-%d')}.",
+                        is_resolved=False,
+                        created_at=datetime.utcnow()
+                    ))
+                    
+                    self.repair_task_repo.create(RepairTaskCreate(
+                        alert_id=pred_alert.id,
+                        description=f"Proactive maintenance required. Failure predicted for {prediction_result['predicted_failure_date'].strftime('%b %d, %Y')}.",
+                        source_type="PREDICTIVE",
+                        priority=prediction_result["urgency_level"],
+                        scheduled_at=prediction_result["predicted_failure_date"]
+                    ))
 
         except Exception as e:
             print(f"Error during ML prediction flow: {e}")

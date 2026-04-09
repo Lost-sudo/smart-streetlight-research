@@ -152,21 +152,23 @@ class RepairTaskService:
             assigned_by_type=AssignedByType.self_assigned,
         )
 
-    def update_task_status(self, task_id: int, new_status: str, technician_id: int):
+    def update_task_status(self, task_id: int, new_status: str, user_id: int, user_role: str, description: str = None):
         """
-        Update the status of a repair task (technician action).
+        Update the status of a repair task.
         Enforces valid status transitions: ASSIGNED → IN_PROGRESS → COMPLETED.
         Automatically reverts technician availability to AVAILABLE on completion.
 
         Args:
             task_id: The repair task ID
             new_status: The new status value
-            technician_id: The requesting technician's user ID
+            user_id: The ID of the user performing the update
+            user_role: The role of the user performing the update
+            description: Optional repair details/notes
 
         Returns:
             The updated repair task
         """
-        return self.repair_task_repo.update_status(task_id, new_status, technician_id)
+        return self.repair_task_repo.update_status(task_id, new_status, user_id, user_role, description)
 
     def get_available_technicians(self):
         """
@@ -201,3 +203,9 @@ class RepairTaskService:
             Success message
         """
         return self.repair_task_repo.delete(task_id)
+
+    def get_resolved_count_today(self):
+        """
+        Get the count of repair tasks completed on the current day.
+        """
+        return self.repair_task_repo.get_resolved_count_today()

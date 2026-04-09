@@ -1,11 +1,11 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from fastapi import HTTPException, status
 from datetime import datetime
 
 from app.models.repair_task import RepairTask, RepairTaskStatus, RepairTaskSourceType, RepairTaskPriority
-from app.models.user import User, TechnicianAvailability
-from app.models.streetlight import Alert
+from app.models.user import User, TechnicianAvailability, UserRole
+from app.models.streetlight import Alert, Streetlight, StreetlightStatus
 from app.schemas.repair_task import RepairTaskCreate
 
 
@@ -252,14 +252,17 @@ class RepairTaskRepository:
         self.db.refresh(db_task)
         return db_task
 
-    def update_status(self, task_id: int, new_status: str, technician_id: int):
+    def update_status(self, task_id: int, new_status: str, user_id: int, user_role: str, description: str = None):
         """
-        Update the status of a repair task. Only the assigned technician can update.
+        Update the status of a repair task. 
+        Only the assigned technician or an admin/operator can update.
 
         Args:
             task_id: The repair task ID
             new_status: The new status value
-            technician_id: The requesting technician's user ID
+            user_id: The ID of the user performing the update
+            user_role: The role of the user performing the update
+            description: Optional repair details/notes
 
         Returns:
             The updated repair task
@@ -271,10 +274,14 @@ class RepairTaskRepository:
                 detail="Repair task not found",
             )
 
-        if db_task.technician_id != technician_id:
+        # Permission check: assigned technician OR admin/operator
+        is_assigned_tech = db_task.technician_id == user_id
+        is_admin_or_operator = user_role in ["admin", "operator"]
+
+        if not (is_assigned_tech or is_admin_or_operator):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only the assigned technician can update this task",
+                detail="Only the assigned technician or an admin/operator can update this task",
             )
 
         # Validate status transitions
@@ -293,13 +300,24 @@ class RepairTaskRepository:
             )
 
         db_task.status = target
+        if description:
+            db_task.description = description
+
+        # Sync Streetlight Status
+        if db_task.alert and db_task.alert.streetlight:
+            if target == RepairTaskStatus.in_progress:
+                db_task.alert.streetlight.status = StreetlightStatus.maintenance
+            elif target == RepairTaskStatus.completed:
+                db_task.alert.streetlight.status = StreetlightStatus.active
+                db_task.alert.is_resolved = True
 
         if target == RepairTaskStatus.completed:
             db_task.completed_at = datetime.utcnow()
-            # Revert technician availability to AVAILABLE
-            technician = self.db.query(User).filter(User.id == technician_id).first()
-            if technician:
-                technician.availability = TechnicianAvailability.available
+            # Revert technician availability to AVAILABLE on completion
+            if db_task.technician_id:
+                technician = self.db.query(User).filter(User.id == db_task.technician_id).first()
+                if technician:
+                    technician.availability = TechnicianAvailability.available
 
         self.db.commit()
         self.db.refresh(db_task)
@@ -315,8 +333,11 @@ class RepairTaskRepository:
         return (
             self.db.query(User)
             .filter(
-                User.role == "technician",
-                User.availability == TechnicianAvailability.available,
+                User.role == UserRole.technician,
+                or_(
+                    User.availability == TechnicianAvailability.available,
+                    User.availability == None,
+                ),
                 User.is_active == True,
             )
             .all()
@@ -370,3 +391,17 @@ class RepairTaskRepository:
         self.db.delete(db_task)
         self.db.commit()
         return {"message": "Repair task deleted successfully"}
+
+    def get_resolved_count_today(self):
+        """
+        Count repair tasks completed on the current day.
+        """
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        return (
+            self.db.query(RepairTask)
+            .filter(
+                RepairTask.status == RepairTaskStatus.completed,
+                RepairTask.completed_at >= today_start
+            )
+            .count()
+        )

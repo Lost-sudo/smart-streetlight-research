@@ -26,7 +26,7 @@ class User(Base):
     availability = Column(
         Enum(TechnicianAvailability, name="technician_availability_enum"),
         nullable=True,
-        default=None,
+        default=TechnicianAvailability.available,
     )
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     maintenance_logs = relationship("MaintenanceLog", back_populates="technician")

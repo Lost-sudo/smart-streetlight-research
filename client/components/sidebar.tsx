@@ -61,10 +61,16 @@ const sidebarItems: SidebarItem[] = [
     allowedRoles: ["admin", "operator"],
   },
   {
+    title: "My Tasks",
+    href: "/my-assigned-tasks",
+    icon: ClipboardList,
+    allowedRoles: ["technician"],
+  },
+  {
     title: "Repair Tasks",
     href: "/repair-tasks",
     icon: ClipboardList,
-    allowedRoles: ["admin", "operator", "technician"],
+    allowedRoles: ["admin", "operator"],
   },
   {
     title: "Reports",

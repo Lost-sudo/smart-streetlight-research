@@ -52,9 +52,17 @@ export const repairTaskApi = createApi({
       query: (sourceType) => `/repair-tasks/by-type/${sourceType}`,
       providesTags: ["RepairTask"],
     }),
+    getMyTasks: builder.query<RepairTask[], void>({
+      query: () => "/repair-tasks/my-tasks",
+      providesTags: ["RepairTask"],
+    }),
     getAvailableTechnicians: builder.query<Technician[], void>({
       query: () => "/repair-tasks/technicians/available",
       providesTags: ["Technician"],
+    }),
+    getResolvedTodayCount: builder.query<number, void>({
+      query: () => "/repair-tasks/stats/resolved-today",
+      providesTags: ["RepairTask"],
     }),
     assignTask: builder.mutation<RepairTask, { taskId: number; technicianId: number }>({
       query: ({ taskId, technicianId }) => ({
@@ -71,11 +79,11 @@ export const repairTaskApi = createApi({
       }),
       invalidatesTags: ["RepairTask", "Technician"],
     }),
-    updateTaskStatus: builder.mutation<RepairTask, { taskId: number; status: string }>({
-      query: ({ taskId, status }) => ({
+    updateTaskStatus: builder.mutation<RepairTask, { taskId: number; status: string; description?: string }>({
+      query: ({ taskId, status, description }) => ({
         url: `/repair-tasks/${taskId}/status`,
         method: "PATCH",
-        body: { status },
+        body: { status, description },
       }),
       invalidatesTags: ["RepairTask", "Technician"],
     }),
@@ -95,7 +103,9 @@ export const {
   useGetActiveTasksQuery,
   useGetAllRepairTasksQuery,
   useGetTasksBySourceTypeQuery,
+  useGetMyTasksQuery,
   useGetAvailableTechniciansQuery,
+  useGetResolvedTodayCountQuery,
   useAssignTaskMutation,
   useClaimTaskMutation,
   useUpdateTaskStatusMutation,

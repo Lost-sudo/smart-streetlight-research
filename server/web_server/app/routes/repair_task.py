@@ -99,6 +99,14 @@ def delete_repair_task(
     return controller.delete_repair_task(task_id)
 
 
+@router.get("/stats/resolved-today", response_model=int, dependencies=[Depends(require_roles(["admin", "operator", "technician"]))])
+def get_resolved_count_today(
+    controller: RepairTaskController = Depends(get_repair_task_controller),
+):
+    """Get the count of repair tasks completed on the current day."""
+    return controller.get_resolved_count_today()
+
+
 # ──────────────────────────────────────────────
 # Technician endpoints
 # ──────────────────────────────────────────────
@@ -124,18 +132,19 @@ def self_assign_task(
     )
 
 
-@router.patch("/{task_id}/status", response_model=RepairTaskRead, dependencies=[Depends(require_roles(["technician"]))])
+@router.patch("/{task_id}/status", response_model=RepairTaskRead, dependencies=[Depends(require_roles(["admin", "operator", "technician"]))])
 def update_task_status(
     task_id: int,
     status_update: RepairTaskUpdateStatus,
     current_user=Depends(get_current_user),
     controller: RepairTaskController = Depends(get_repair_task_controller),
 ):
-    """Update the status of a repair task (assigned technician only)."""
+    """Update the status of a repair task (authorized roles only)."""
     return controller.update_task_status(
         task_id=task_id,
         status_update=status_update,
-        technician_id=current_user.id,
+        user_id=current_user.id,
+        user_role=current_user.role.value,
     )
 
 

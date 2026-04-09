@@ -51,6 +51,7 @@ import {
   useAssignTaskMutation,
   useClaimTaskMutation,
   useUpdateTaskStatusMutation,
+  useGetResolvedTodayCountQuery,
   type RepairTask,
   type Technician
 } from "@/lib/redux/api/repairTaskApi";
@@ -69,7 +70,7 @@ interface MaintenanceTask {
   dateDetected: string;
   suggestedAction: string;
   explanation: string;
-  status: "Pending" | "In Progress" | "Resolved";
+  status: "Pending" | "Assigned" | "In Progress" | "Resolved";
   assignedTo?: string;
 }
 
@@ -79,6 +80,7 @@ export default function ImmediateRepairsPage() {
   const { data: unassignedBase = [], isLoading: uLoading } = useGetUnassignedTasksQuery(undefined, { pollingInterval: 15000 });
   const { data: activeBase = [], isLoading: aLoading } = useGetActiveTasksQuery(undefined, { pollingInterval: 15000 });
   const { data: availableTechnicians = [] } = useGetAvailableTechniciansQuery(undefined, { pollingInterval: 30000 });
+  const { data: resolvedToday = 0, isLoading: rtLoading } = useGetResolvedTodayCountQuery(undefined, { pollingInterval: 15000 });
 
   const [assignMutate] = useAssignTaskMutation();
   const [claimMutate] = useClaimTaskMutation();
@@ -105,7 +107,7 @@ export default function ImmediateRepairsPage() {
           dateDetected: alert?.created_at ? new Date(alert.created_at).toLocaleDateString() : "Unknown Date",
           suggestedAction: alert?.message || "Verify Node State manually.",
           explanation: t.description || "System flagged an anomaly requiring service.",
-          status: t.status === "pending" ? "Pending" : t.status === "in_progress" ? "In Progress" : "Resolved",
+          status: t.status === "pending" ? "Pending" : t.status === "assigned" ? "Assigned" : t.status === "in_progress" ? "In Progress" : "Resolved",
           assignedTo: t.technician_id ? `Tech #${t.technician_id}` : undefined
       } as MaintenanceTask;
   };
@@ -128,13 +130,18 @@ export default function ImmediateRepairsPage() {
     } catch (e) { showNotification("Failed to claim task.", "info"); }
   };
 
-  const handleLogRepair = async (taskId: string) => {
+  const handleUpdateStatus = async (taskId: string, status: string) => {
     try {
-      // Must put it 'in_progress' first depending on state, but assuming it was assigned:
-      // Real flow: assigned -> in_progress -> completed. We will force complete directly for demo:
-      await statusMutate({ taskId: Number(taskId), status: "completed" }).unwrap();
-      showNotification("Repair logged and task completed successfully!", 'success');
-    } catch (e) { showNotification("Failed to log repair.", "info"); }
+      await statusMutate({ taskId: Number(taskId), status }).unwrap();
+      const action = status === "in_progress" ? "started" : "completed";
+      showNotification(`Repair ${action} successfully!`, 'success');
+      if (status === "completed") {
+        (document.querySelector('[data-state="open"]') as HTMLElement)?.click();
+      }
+    } catch (e) { 
+      console.error(e);
+      showNotification(`Failed to move to ${status}.`, "info"); 
+    }
   };
 
   const filteredTasks = dbTasks.filter(task => 
@@ -237,11 +244,17 @@ export default function ImmediateRepairsPage() {
                                       <SelectValue placeholder={task.assignedTo || "Select personnel..."} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {availableTechnicians.map((tech: Technician) => (
-                                        <SelectItem key={tech.id} value={String(tech.id)}>
-                                          {tech.username}
-                                        </SelectItem>
-                                      ))}
+                                      {availableTechnicians.length > 0 ? (
+                                        availableTechnicians.map((tech: Technician) => (
+                                          <SelectItem key={tech.id} value={String(tech.id)}>
+                                            {tech.username}
+                                          </SelectItem>
+                                        ))
+                                      ) : (
+                                        <div className="p-2 text-xs text-muted-foreground text-center italic">
+                                          No personnel available
+                                        </div>
+                                      )}
                                     </SelectContent>
                                   </Select>
                                   <Button 
@@ -294,8 +307,14 @@ export default function ImmediateRepairsPage() {
 
                         <DialogFooter className="gap-2 sm:gap-0 mt-4">
                           <Button variant="outline" className="flex-1 sm:flex-none border-border hover:bg-muted" onClick={() => (document.querySelector('[data-state="open"]') as HTMLElement)?.click()}>Close</Button>
-                          <RoleGate allowedRoles={["admin", "technician"]}>
-                            <Button className="flex-1 sm:flex-none font-semibold" onClick={() => handleLogRepair(task.id)}>Log & Close Alert</Button>
+                          <RoleGate allowedRoles={["admin", "operator", "technician"]}>
+                            {task.status === "Pending" ? (
+                              <span className="text-xs text-muted-foreground flex items-center pr-4 italic">Assign to start repair</span>
+                            ) : task.status === "Assigned" ? (
+                              <Button className="flex-1 sm:flex-none font-semibold bg-blue-600 hover:bg-blue-700" onClick={() => handleUpdateStatus(task.id, "in_progress")}>Start Repair</Button>
+                            ) : task.status === "In Progress" ? (
+                              <Button className="flex-1 sm:flex-none font-semibold bg-emerald-600 hover:bg-emerald-700" onClick={() => handleUpdateStatus(task.id, "completed")}>Complete Repair</Button>
+                            ) : null}
                           </RoleGate>
                         </DialogFooter>
                       </DialogContent>
@@ -316,7 +335,7 @@ export default function ImmediateRepairsPage() {
     </div>
   );
 
-  const isLoading = slLoading || alertsLoading || uLoading || aLoading;
+  const isLoading = slLoading || alertsLoading || uLoading || aLoading || rtLoading;
 
   if (isLoading) {
     return (
@@ -387,7 +406,7 @@ export default function ImmediateRepairsPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Resolved Today</p>
-              <h3 className="text-2xl font-bold">12</h3>
+              <h3 className="text-2xl font-bold">{resolvedToday}</h3>
             </div>
          </div>
       </div>

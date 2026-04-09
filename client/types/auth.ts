@@ -41,6 +41,7 @@ export const ROLE_PERMISSIONS = {
     "immediate-repairs",
     "predictive-maintenance",
     "repair-tasks",
+    "my-assigned-tasks",
     "reports",
     "users",
     "settings",
@@ -52,6 +53,7 @@ export const ROLE_PERMISSIONS = {
     "immediate-repairs",
     "predictive-maintenance",
     "repair-tasks",
+    "my-assigned-tasks",
     "reports",
     "settings",
   ],
@@ -60,6 +62,7 @@ export const ROLE_PERMISSIONS = {
     "monitoring",
     "immediate-repairs",
     "repair-tasks",
+    "my-assigned-tasks",
     "settings"
   ],
   viewer: ["dashboard", "reports"],

@@ -144,14 +144,15 @@ class RepairTaskController:
         )
         return RepairTaskRead.model_validate(updated, from_attributes=True)
 
-    def update_task_status(self, task_id: int, status_update: RepairTaskUpdateStatus, technician_id: int) -> RepairTaskRead:
+    def update_task_status(self, task_id: int, status_update: RepairTaskUpdateStatus, user_id: int, user_role: str) -> RepairTaskRead:
         """
-        Update the status of a repair task (technician action).
+        Update the status of a repair task.
 
         Args:
             task_id: The repair task ID
-            status_update: Contains the new status
-            technician_id: The requesting technician's user ID
+            status_update: Contains the new status and optional description
+            user_id: The ID of the user performing the update
+            user_role: The role of the user performing the update
 
         Returns:
             The updated repair task
@@ -159,7 +160,9 @@ class RepairTaskController:
         updated = self.repair_task_service.update_task_status(
             task_id=task_id,
             new_status=status_update.status.value,
-            technician_id=technician_id,
+            user_id=user_id,
+            user_role=user_role,
+            description=status_update.description,
         )
         return RepairTaskRead.model_validate(updated, from_attributes=True)
 
@@ -202,3 +205,9 @@ class RepairTaskController:
         """
         self.repair_task_service.delete_repair_task(task_id)
         return "Repair task has been successfully deleted."
+
+    def get_resolved_count_today(self) -> int:
+        """
+        Get the count of repair tasks completed on the current day.
+        """
+        return self.repair_task_service.get_resolved_count_today()
