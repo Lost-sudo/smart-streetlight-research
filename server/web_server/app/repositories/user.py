@@ -64,12 +64,6 @@ class UserRepository:
         Returns:
             The updated user
         """
-        self.db.query(User).filter(User.id == user.id).update({
-            User.username: user.username,
-            User.email: user.email,
-            User.role: user.role,
-            User.is_active: user.is_active
-        })
         self.db.commit()
         self.db.refresh(user)
         return user
