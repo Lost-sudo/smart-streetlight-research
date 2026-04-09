@@ -8,6 +8,7 @@ from app.routes.alert import router as alert_router
 from app.routes.maintenance_log import router as maintenance_log_router
 from app.routes.repair_task import router as repair_task_router
 from app.routes.predictive_maintenance_log import router as predictive_maintenance_router
+from app.core.config import settings
 import uvicorn
 
 app = FastAPI(
@@ -17,10 +18,7 @@ app = FastAPI(
 )
 
 # CORS Middleware
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+origins = settings.CORS_ORIGINS
 
 app.add_middleware(
     CORSMiddleware,

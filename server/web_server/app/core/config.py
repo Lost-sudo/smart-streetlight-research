@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List
 
 class Settings(BaseSettings):
     POSTGRES_USER: str
@@ -12,6 +13,7 @@ class Settings(BaseSettings):
     REFRESH_SECRET_KEY: str
     REFRESH_ALGORITHM: str
     REFRESH_TOKEN_EXPIRE_MINUTES: int
+    CORS_ORIGINS: List[str]
 
     model_config = SettingsConfigDict(
         env_file=".env",
