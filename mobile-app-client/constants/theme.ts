@@ -16,6 +16,13 @@ export const Colors = {
     muted: '#A3A3A3',
     border: '#E5E5E5',
     error: '#EF4444',
+    success: '#10B981',
+    warning: '#F59E0B',
+    card: '#FDFDFD',
+    cardBorder: '#E5E5E5',
+    surface: 'rgba(0,0,0,0.05)',
+    input: '#F5F5F5',
+    inputBorder: '#E5E5E5',
   },
   dark: {
     text: '#FAFAFA',
@@ -29,6 +36,13 @@ export const Colors = {
     muted: '#737373',
     border: '#262626',
     error: '#F87171',
+    success: '#34D399',
+    warning: '#FBBF24',
+    card: '#121212',
+    cardBorder: '#262626',
+    surface: 'rgba(255,255,255,0.08)',
+    input: '#1A1A1A',
+    inputBorder: '#262626',
   },
 };
 

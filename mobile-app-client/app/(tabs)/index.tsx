@@ -68,9 +68,9 @@ export default function DashboardScreen() {
             <ThemedText style={styles.greetingText}>Hello, Technician</ThemedText>
             <ThemedText type="title" style={styles.welcomeText}>System Overview</ThemedText>
           </View>
-          <TouchableOpacity style={styles.notificationBtn}>
+          <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: theme.surface }]}>
             <Bell size={24} color={theme.text} />
-            <View style={styles.notificationBadge} />
+            <View style={[styles.notificationBadge, { borderColor: theme.background }]} />
           </TouchableOpacity>
         </ThemedView>
 
@@ -86,7 +86,7 @@ export default function DashboardScreen() {
         {/* Summary Grid */}
         <View style={styles.summaryGrid}>
           {SUMMARY_STATS.map((stat, index) => (
-            <ThemedView key={index} style={styles.summaryCard}>
+            <ThemedView key={index} style={[styles.summaryCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
               <View style={[styles.iconContainer, { backgroundColor: `${stat.color}20` }]}>
                 <stat.icon size={20} color={stat.color} />
               </View>
@@ -106,7 +106,7 @@ export default function DashboardScreen() {
 
         <View style={styles.tasksList}>
           {RECENT_TASKS.map((task) => (
-            <TouchableOpacity key={task.id} style={styles.taskCard}>
+            <TouchableOpacity key={task.id} style={[styles.taskCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
               <View style={styles.taskHeader}>
                 <View style={styles.taskTitleRow}>
                   <ThemedText style={styles.taskTitle}>{task.title}</ThemedText>
@@ -115,7 +115,7 @@ export default function DashboardScreen() {
                 <ThemedText style={styles.taskTime}>{task.time}</ThemedText>
               </View>
               
-              <View style={styles.taskFooter}>
+              <View style={[styles.taskFooter, { borderTopColor: theme.cardBorder }]}>
                 <View style={styles.taskInfoItem}>
                   <MapPin size={14} color="#6B7280" />
                   <ThemedText style={styles.taskInfoText}>{task.location}</ThemedText>
@@ -127,9 +127,9 @@ export default function DashboardScreen() {
         </View>
 
         {/* Quick Tips or Info */}
-        <ThemedView style={styles.infoCard}>
-          <ThemedText style={styles.infoTitle}>Technician Tip</ThemedText>
-          <ThemedText style={styles.infoDescription}>
+        <ThemedView style={[styles.infoCard, { backgroundColor: theme.secondary }]}>
+          <ThemedText style={[styles.infoTitle, { color: theme.text }]}>Technician Tip</ThemedText>
+          <ThemedText style={[styles.infoDescription, { color: theme.text }]}>
             Always verify the power source isolation before performing any wiring repairs.
           </ThemedText>
         </ThemedView>
@@ -165,7 +165,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.05)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -178,7 +177,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#EF4444',
     borderWidth: 2,
-    borderColor: '#FFF',
   },
   alertCard: {
     flexDirection: 'row',
@@ -207,9 +205,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.03)',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
     alignItems: 'center',
   },
   iconContainer: {
@@ -249,9 +245,7 @@ const styles = StyleSheet.create({
   taskCard: {
     padding: 16,
     borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.02)',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
   },
   taskHeader: {
     flexDirection: 'row',
@@ -278,12 +272,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
   },
   taskInfoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flex: 1,
   },
   taskInfoText: {
     fontSize: 12,
@@ -292,16 +286,14 @@ const styles = StyleSheet.create({
   infoCard: {
     padding: 20,
     borderRadius: 20,
-    backgroundColor: '#1F2937',
   },
   infoTitle: {
-    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   infoDescription: {
-    color: 'rgba(255,255,255,0.7)',
+    opacity: 0.7,
     fontSize: 14,
     lineHeight: 20,
   },

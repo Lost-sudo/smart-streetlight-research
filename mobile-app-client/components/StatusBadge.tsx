@@ -1,58 +1,70 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ThemedText } from './themed-text';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export type StatusType = 'assigned' | 'in_progress' | 'completed' | 'urgent' | 'high' | 'medium' | 'low';
+export type StatusType = 'assigned' | 'in_progress' | 'completed' | 'urgent' | 'high' | 'medium' | 'low' | 'active' | 'inactive' | 'faulty' | 'maintenance';
 
 interface StatusBadgeProps {
   status: StatusType;
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
+
   const getStyles = () => {
     switch (status) {
       case 'urgent':
       case 'high':
+      case 'faulty':
         return {
-          container: styles.urgentContainer,
-          text: styles.urgentText,
+          backgroundColor: `${theme.error}20`,
+          borderColor: theme.error,
+          textColor: theme.error,
           label: status.toUpperCase(),
         };
       case 'in_progress':
       case 'medium':
+      case 'maintenance':
         return {
-          container: styles.warningContainer,
-          text: styles.warningText,
+          backgroundColor: `${theme.warning}20`,
+          borderColor: theme.warning,
+          textColor: theme.warning,
           label: status.replace('_', ' ').toUpperCase(),
         };
       case 'completed':
       case 'low':
+      case 'active':
         return {
-          container: styles.successContainer,
-          text: styles.successText,
+          backgroundColor: `${theme.success}20`,
+          borderColor: theme.success,
+          textColor: theme.success,
           label: status.toUpperCase(),
         };
       default:
         return {
-          container: styles.defaultContainer,
-          text: styles.defaultText,
+          backgroundColor: `${theme.muted}20`,
+          borderColor: theme.muted,
+          textColor: theme.muted,
           label: status.toUpperCase(),
         };
     }
   };
 
-  const { container, text, label } = getStyles();
+  const { backgroundColor, borderColor, textColor, label } = getStyles();
 
   return (
-    <View style={[styles.badge, container]}>
-      <ThemedText style={[styles.text, text]}>{label}</ThemedText>
+    <View style={[styles.badge, { backgroundColor, borderColor }]}>
+      <ThemedText style={[styles.text, { color: textColor }]}>{label}</ThemedText>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   badge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
@@ -61,34 +73,6 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  urgentContainer: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: '#EF4444',
-  },
-  urgentText: {
-    color: '#EF4444',
-  },
-  warningContainer: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: '#F59E0B',
-  },
-  warningText: {
-    color: '#F59E0B',
-  },
-  successContainer: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: '#10B981',
-  },
-  successText: {
-    color: '#10B981',
-  },
-  defaultContainer: {
-    backgroundColor: 'rgba(107, 114, 128, 0.1)',
-    borderColor: '#6B7280',
-  },
-  defaultText: {
-    color: '#6B7280',
+    // Removed letterSpacing to prevent clipping on some devices
   },
 });

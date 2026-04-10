@@ -89,7 +89,7 @@ export default function LoginScreen() {
 
           <Animated.View 
             entering={FadeInUp.delay(400).duration(1000).springify()}
-            style={[styles.card, { backgroundColor: colorScheme === 'light' ? '#FDFDFD' : '#121212', borderColor: colors.border }]}
+            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           >
             <Text style={[styles.cardTitle, { color: colors.text }]}>System Access</Text>
             <Text style={[styles.cardSubtitle, { color: colors.muted }]}>Enter your credentials to manage local grid nodes</Text>
@@ -97,7 +97,7 @@ export default function LoginScreen() {
             <View style={styles.form}>
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>Username</Text>
-                <View style={[styles.inputContainer, { borderColor: colors.border, backgroundColor: colorScheme === 'light' ? '#F5F5F5' : '#1A1A1A' }]}>
+                <View style={[styles.inputContainer, { borderColor: colors.inputBorder, backgroundColor: colors.input }]}>
                   <Mail size={20} color={colors.muted} style={styles.inputIcon} />
                   <TextInput
                     style={[styles.input, { color: colors.text }]}
@@ -112,7 +112,7 @@ export default function LoginScreen() {
 
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>Password</Text>
-                <View style={[styles.inputContainer, { borderColor: colors.border, backgroundColor: colorScheme === 'light' ? '#F5F5F5' : '#1A1A1A' }]}>
+                <View style={[styles.inputContainer, { borderColor: colors.inputBorder, backgroundColor: colors.input }]}>
                   <Lock size={20} color={colors.muted} style={styles.inputIcon} />
                   <TextInput
                     style={[styles.input, { color: colors.text }]}
