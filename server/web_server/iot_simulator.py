@@ -12,7 +12,7 @@ from app.schemas.streetlight import IoTNodeLogCreate
 API_URL = "http://localhost:8000"
 ENDPOINT = "/streetlight_log/telemetry"
 INTERVAL_SECONDS = 30
-DEVICE_IDS = ["Node-1"]
+DEVICE_IDS = ["NODE-001"]
 TEST_MODE = False
 
 def generate_data(device_id: str, test_mode: bool = False) -> dict:
