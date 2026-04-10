@@ -1,6 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { User } from "@/types/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface AuthState {
   user: User | null;
@@ -29,17 +28,12 @@ const authSlice = createSlice({
       state.accessToken = accessToken;
       state.isAuthenticated = true;
       state.isLoading = false;
-      
-      // Persist to AsyncStorage
-      AsyncStorage.setItem("smartlight_auth", JSON.stringify({ user, accessToken }));
     },
     logOut: (state) => {
       state.user = null;
       state.accessToken = null;
       state.isAuthenticated = false;
       state.isLoading = false;
-      
-      AsyncStorage.removeItem("smartlight_auth");
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;

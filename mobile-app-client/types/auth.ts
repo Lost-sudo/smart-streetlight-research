@@ -8,7 +8,6 @@ export const UserSchema = z.object({
   username: z.string(),
   role: RoleSchema,
   is_active: z.boolean(),
-  created_at: z.string(),
 });
 export type User = z.infer<typeof UserSchema>;
 

@@ -43,16 +43,16 @@ function RootLayoutContent() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = (segments[0] as any) === 'login';
+    const inAuthGroup = (segments as string[]).includes('login') || (segments as string[]).length === 0;
 
     if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to login if not authenticated
-      router.replace('/login' as any);
-    } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to home if authenticated
-      router.replace('/(tabs)' as any);
+      // Redirect to login if not authenticated and trying to access protected screens
+      router.replace('/login');
+    } else if (isAuthenticated && (inAuthGroup || segments[0] === 'login')) {
+      // Redirect to dashboard if authenticated and on login screen
+      router.replace('/(tabs)');
     }
-  }, [isAuthenticated, segments, isLoading]);
+  }, [isAuthenticated, segments, isLoading, router]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

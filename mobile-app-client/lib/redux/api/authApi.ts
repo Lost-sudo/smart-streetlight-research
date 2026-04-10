@@ -1,4 +1,5 @@
 import { createApi, BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AuthResponse, User, LoginInput, UserCreate } from "@/types/auth";
 import { setCredentials, logOut } from "../slices/authSlice";
 import { RootState } from "../store";
@@ -44,28 +45,28 @@ export const authApi = createApi({
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginInput>({
       query: (credentials) => {
-        // Use standard JSON body for mobile if possible, 
-        // but keeping it the same as web if they expect Form Data.
-        // Web used URLSearchParams.
         const body = new URLSearchParams();
         body.append("username", credentials.username);
         body.append("password", credentials.password);
         return {
           url: "/auth/login",
           method: "POST",
-          body: body.toString(), // URLSearchParams.toString() works in RN
+          body: body.toString(),
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
         };
       },
-
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
           try {
               const { data } = await queryFulfilled;
               dispatch(setCredentials({
                   user: data.user,
                   accessToken: data.access_token,
+              }));
+              await AsyncStorage.setItem("smartlight_auth", JSON.stringify({ 
+                  user: data.user, 
+                  accessToken: data.access_token 
               }));
           } catch (err) {
               console.error("Login failed", err);
@@ -89,10 +90,12 @@ export const authApi = createApi({
           try {
               await queryFulfilled;
               dispatch(logOut());
+              await AsyncStorage.removeItem("smartlight_auth");
           } catch (err) {
               console.error("Logout failed", err);
               // Clear client state even if backend call fails
               dispatch(logOut());
+              await AsyncStorage.removeItem("smartlight_auth");
           }
       }
     }),
