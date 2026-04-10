@@ -8,8 +8,11 @@ from app.repositories.repair_task import RepairTaskRepository
 from app.services.ml_prediction import MLPredictionService
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class StreetlightLogService:
@@ -21,7 +24,7 @@ class StreetlightLogService:
         self.repair_task_repo = RepairTaskRepository(db)
         self.ml_service = MLPredictionService()
 
-    def add_log_from_iot(self, iot_log: IoTNodeLogCreate) -> StreetlightLogRead:
+    def add_log_from_iot(self, iot_log: IoTNodeLogCreate):
         """
         Add a new streetlight log from an IoT node.
         
@@ -85,7 +88,7 @@ class StreetlightLogService:
                             priority=fault_priority
                         ))
         except Exception as e:
-            print(f"Error during Fault Detection flow: {e}")
+            logger.exception("Error during Fault Detection flow")
 
         # 3. PREDICTIVE MAINTENANCE FORECASTING (LSTM)
         try:
@@ -139,12 +142,12 @@ class StreetlightLogService:
                     ))
 
         except Exception as e:
-            print(f"Error during ML prediction flow: {e}")
+            logger.exception("Error during ML prediction flow")
 
         return created_log
 
 
-    def get_streetlight_log_by_id(self, streetlight_log_id: int) -> StreetlightLogRead:
+    def get_streetlight_log_by_id(self, streetlight_log_id: int):
         """
         Get a streetlight log by its ID.
         
@@ -162,7 +165,7 @@ class StreetlightLogService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Streetlight log not found")
         return streetlight_log
 
-    def get_all_streetlight_logs(self) -> List[StreetlightLogRead]:
+    def get_all_streetlight_logs(self):
         """
         Get all streetlight logs.
         
@@ -171,7 +174,7 @@ class StreetlightLogService:
         """
         return self.streetlight_log_repo.get_all()
 
-    def get_streetlight_logs_by_streetlight_id(self, streetlight_id: int, limit: int = 100) -> List[StreetlightLogRead]:
+    def get_streetlight_logs_by_streetlight_id(self, streetlight_id: int, limit: int = 100):
         """
         Get streetlight logs by streetlight ID.
         

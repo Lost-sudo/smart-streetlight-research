@@ -80,5 +80,4 @@ class AlertController:
         Returns:
             A success message
         """
-        self.alert_service.delete_alert(alert_id=alert_id)
-        return "Alert has been successfully deleted."
+        return self.alert_service.delete_alert(alert_id=alert_id)

@@ -1,13 +1,13 @@
 from sqlalchemy.orm import Session
 from app.models.streetlight import Alert
-from fastapi import HTTPException, status
 from app.schemas.streetlight import AlertCreate, AlertUpdate
+from typing import Optional, List
 
 class AlertRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, alert: AlertCreate):
+    def create(self, alert: AlertCreate) -> Alert:
         """
         Create a new alert.
         
@@ -17,13 +17,13 @@ class AlertRepository:
         Returns:
             The created alert
         """
-        db_alert = Alert(**alert.dict())
+        db_alert = Alert(**alert.model_dump())
         self.db.add(db_alert)
         self.db.commit()
         self.db.refresh(db_alert)
         return db_alert
 
-    def get_by_id(self, alert_id: int):
+    def get_by_id(self, alert_id: int) -> Optional[Alert]:
         """
         Get an alert by its ID.
         
@@ -35,7 +35,7 @@ class AlertRepository:
         """
         return self.db.query(Alert).filter(Alert.id == alert_id).first()
 
-    def get_all(self):
+    def get_all(self) -> List[Alert]:
         """
         Get all alerts.
         
@@ -56,7 +56,7 @@ class AlertRepository:
             query = query.filter(Alert.type == alert_type)
         return query.first()
 
-    def get_by_alert_type(self, alert_type: str):
+    def get_by_alert_type(self, alert_type: str) -> List[Alert]:
         """
         Get all alerts filtered by alert_type (FAULT or PREDICTIVE).
         """
@@ -73,7 +73,7 @@ class AlertRepository:
             Alert.is_resolved == False
         ).first()
 
-    def update(self, alert_id: int, alert: AlertUpdate):
+    def update(self, alert_id: int, alert: AlertUpdate) -> Optional[Alert]:
         """
         Update an alert.
         
@@ -86,13 +86,13 @@ class AlertRepository:
         """
         db_alert = self.get_by_id(alert_id)
         if not db_alert:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+            return None
         db_alert.is_resolved = alert.is_resolved
         self.db.commit()
         self.db.refresh(db_alert)
         return db_alert
 
-    def delete(self, alert_id: int):
+    def delete(self, alert_id: int) -> Optional[Alert]:
         """
         Delete an alert.
         
@@ -104,7 +104,7 @@ class AlertRepository:
         """
         db_alert = self.get_by_id(alert_id)
         if not db_alert:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+            return None
         self.db.delete(db_alert)
         self.db.commit()
-        return {"message": "Alert deleted successfully"}
+        return db_alert

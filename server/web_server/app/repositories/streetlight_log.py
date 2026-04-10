@@ -1,13 +1,13 @@
 from sqlalchemy.orm import Session
 from app.models.streetlight import StreetlightLog
-from fastapi import HTTPException, status
-from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate
+from app.schemas.streetlight import IoTNodeLogCreate
+from typing import List, Optional
 
 class StreetlightLogRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, streetlight_id: int, iot_log: IoTNodeLogCreate):
+    def create(self, streetlight_id: int, iot_log: IoTNodeLogCreate) -> StreetlightLog:
         """
         Create a new streetlight log.
         
@@ -18,7 +18,7 @@ class StreetlightLogRepository:
         Returns:
             The created streetlight log
         """
-        data = iot_log.dict(exclude={"device_id"})
+        data = iot_log.model_dump(exclude={"device_id"})
         data["streetlight_id"] = streetlight_id
         db_streetlight_log = StreetlightLog(**data)
         self.db.add(db_streetlight_log)
@@ -26,7 +26,7 @@ class StreetlightLogRepository:
         self.db.refresh(db_streetlight_log)
         return db_streetlight_log
 
-    def get_by_id(self, streetlight_log_id: int):
+    def get_by_id(self, streetlight_log_id: int) -> Optional[StreetlightLog]:
         """
         Get a streetlight log by its ID.
         
@@ -38,7 +38,7 @@ class StreetlightLogRepository:
         """
         return self.db.query(StreetlightLog).filter(StreetlightLog.id == streetlight_log_id).first()
 
-    def get_all(self):
+    def get_all(self) -> List[StreetlightLog]:
         """
         Get all streetlight logs.
         
@@ -47,7 +47,7 @@ class StreetlightLogRepository:
         """
         return self.db.query(StreetlightLog).all()
 
-    def get_by_streetlight_id(self, streetlight_id: int, limit: int = 100):
+    def get_by_streetlight_id(self, streetlight_id: int, limit: int = 100) -> List[StreetlightLog]:
         """
         Get streetlight logs by streetlight ID.
         

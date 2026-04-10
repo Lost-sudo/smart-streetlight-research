@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.repositories.alert import AlertRepository
 from app.schemas.streetlight import AlertCreate, AlertUpdate
+from fastapi import HTTPException, status
 
 class AlertService:
     def __init__(self, db: Session):
@@ -28,7 +29,10 @@ class AlertService:
         Returns:
             The alert with the given ID
         """
-        return self.alert_repo.get_by_id(alert_id)
+        alert = self.alert_repo.get_by_id(alert_id)
+        if alert is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        return alert
 
     def get_all_alerts(self):
         """
@@ -62,7 +66,10 @@ class AlertService:
         Returns:
             The updated alert
         """
-        return self.alert_repo.update(alert_id, alert)
+        updated = self.alert_repo.update(alert_id, alert)
+        if updated is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        return updated
 
     def delete_alert(self, alert_id: int):
         """
@@ -74,4 +81,7 @@ class AlertService:
         Returns:
             True if the alert was deleted successfully, False otherwise
         """
-        return self.alert_repo.delete(alert_id)
+        deleted = self.alert_repo.delete(alert_id)
+        if deleted is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        return {"message": "Alert deleted successfully"}
