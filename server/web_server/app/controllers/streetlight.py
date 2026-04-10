@@ -2,6 +2,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from app.schemas.streetlight import StreetlightCreate, StreetlightRead, StreetlightUpdate
 from app.services.streetlight import StreetlightService
+from fastapi import HTTPException, status
 
 class StreetlightController:
     def __init__(self, db: Session):
@@ -26,7 +27,7 @@ class StreetlightController:
         new_streetlight = self.streetlight_service.create_streetlight(streetlight_data=streetlight)
         return StreetlightRead.model_validate(new_streetlight, from_attributes=True)
 
-    def get_streetlight_by_id(self, streetlight_id) -> StreetlightRead:
+    def get_streetlight_by_id(self, streetlight_id: int) -> StreetlightRead:
         """
         Get a streetlight by its ID.
         
@@ -38,7 +39,7 @@ class StreetlightController:
         """
         streetlight = self.streetlight_service.get_streetlight_by_id(streetlight_id=streetlight_id)
         if not streetlight:
-            return None
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Streetlight not found")
         sl_data = StreetlightRead.model_validate(streetlight, from_attributes=True)
         sl_data.has_telemetry = len(streetlight.logs) > 0
         return sl_data
@@ -83,4 +84,4 @@ class StreetlightController:
             A success message
         """
         self.streetlight_service.delete_streetlight(streetlight_id=streetlight_id)
-        return "Streetlight has been successfully deleted."
+        return {"message": "Streetlight has been successfully deleted."}

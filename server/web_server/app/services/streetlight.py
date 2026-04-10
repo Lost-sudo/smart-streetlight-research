@@ -3,13 +3,13 @@ from app.schemas.streetlight import StreetlightCreate, StreetlightRead, Streetli
 from app.models.streetlight import Streetlight
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 class StreetlightService:
     def __init__(self, db: Session):
         self.streetlight_repo = StreetlightRepository(db)
     
-    def get_streetlight_by_id(self, streetlight_id: int) -> StreetlightRead:
+    def get_streetlight_by_id(self, streetlight_id: int) -> Optional[Streetlight]:
         """
         Get a streetlight by its ID.
         
@@ -24,7 +24,7 @@ class StreetlightService:
         """
         return self.streetlight_repo.get_by_id(streetlight_id=streetlight_id)
 
-    def get_all_streetlight(self) -> List[StreetlightRead]:
+    def get_all_streetlight(self) -> List[Streetlight]:
         """
         Get all streetlights.
         
@@ -33,7 +33,7 @@ class StreetlightService:
         """
         return self.streetlight_repo.get_all()
 
-    def create_streetlight(self, streetlight_data: StreetlightCreate) -> StreetlightRead:
+    def create_streetlight(self, streetlight_data: StreetlightCreate) -> Streetlight:
         """
         Create a new streetlight.
         
@@ -53,7 +53,7 @@ class StreetlightService:
 
         return self.streetlight_repo.create(streetlight=streetlight_data)
 
-    def update_streetlight(self, streetlight_id: int, streetlight_data: StreetlightUpdate) -> StreetlightRead:
+    def update_streetlight(self, streetlight_id: int, streetlight_data: StreetlightUpdate) -> Streetlight:
         """
         Update a streetlight.
         
@@ -72,7 +72,11 @@ class StreetlightService:
         if not is_existing:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Streetlight with the given id does not exist.")
 
-        return self.streetlight_repo.update(streetlight_id=streetlight_id, streetlight=streetlight_data)
+        updated = self.streetlight_repo.update(streetlight_id=streetlight_id, streetlight=streetlight_data)
+        if updated is None:
+            # In case the record disappeared between existence check and update.
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Streetlight with the given id does not exist.")
+        return updated
 
     def delete_streetlight(self, streetlight_id: int) -> bool:
         """
@@ -92,5 +96,7 @@ class StreetlightService:
         if not is_existing:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Streetlight with the given ID does not exist. Deletion terminated.")
 
-        self.streetlight_repo.delete(streetlight_id=streetlight_id)
+        deleted = self.streetlight_repo.delete(streetlight_id=streetlight_id)
+        if deleted is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Streetlight with the given ID does not exist. Deletion terminated.")
         return True

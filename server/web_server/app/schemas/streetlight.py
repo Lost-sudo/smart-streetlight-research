@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from enum import Enum
 from datetime import datetime
@@ -39,8 +39,7 @@ class StreetlightRead(BaseModel):
     created_at: datetime
     has_telemetry: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class IoTNodeLogCreate(BaseModel):
     device_id: str
@@ -59,8 +58,7 @@ class StreetlightLogRead(BaseModel):
     light_intensity: float
     timestamp: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AlertCreate(BaseModel):
     streetlight_id: int
@@ -81,8 +79,7 @@ class AlertRead(BaseModel):
     is_resolved: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AlertUpdate(BaseModel):
     is_resolved: bool
@@ -106,8 +103,7 @@ class MaintenanceLogRead(BaseModel):
     completion_date: Optional[datetime]
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MaintenanceLogUpdate(BaseModel):
     description: Optional[str] = None
@@ -130,8 +126,7 @@ class PredictiveMaintenanceRead(BaseModel):
     urgency_level: str
     last_updated: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PredictiveMaintenanceUpdate(BaseModel):
     failure_probability: Optional[float] = None

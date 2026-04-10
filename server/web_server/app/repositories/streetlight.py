@@ -1,13 +1,13 @@
 from sqlalchemy.orm import Session
 from app.models.streetlight import Streetlight
 from app.schemas.streetlight import StreetlightCreate, StreetlightUpdate
-from fastapi import HTTPException, status
+from typing import Optional, List
 
 class StreetlightRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, streetlight: StreetlightCreate):
+    def create(self, streetlight: StreetlightCreate) -> Streetlight:
         """
         Create a new streetlight.
         
@@ -17,13 +17,13 @@ class StreetlightRepository:
         Returns:
             The created streetlight
         """
-        db_streetlight = Streetlight(**streetlight.dict())
+        db_streetlight = Streetlight(**streetlight.model_dump())
         self.db.add(db_streetlight)
         self.db.commit()
         self.db.refresh(db_streetlight)
         return db_streetlight
 
-    def get_by_id(self, streetlight_id: int):
+    def get_by_id(self, streetlight_id: int) -> Optional[Streetlight]:
         """
         Get a streetlight by its ID.
         
@@ -35,7 +35,7 @@ class StreetlightRepository:
         """
         return self.db.query(Streetlight).filter(Streetlight.id == streetlight_id).first()
 
-    def get_all(self):
+    def get_all(self) -> List[Streetlight]:
         """
         Get all streetlights.
         
@@ -44,7 +44,7 @@ class StreetlightRepository:
         """
         return self.db.query(Streetlight).all()
 
-    def get_by_name(self, streetlight_name: str):
+    def get_by_name(self, streetlight_name: str) -> Optional[Streetlight]:
         """
         Get a streetlight by its name.
         
@@ -56,7 +56,7 @@ class StreetlightRepository:
         """
         return self.db.query(Streetlight).filter(Streetlight.name == streetlight_name).first()
 
-    def get_by_device_id(self, device_id: str):
+    def get_by_device_id(self, device_id: str) -> Optional[Streetlight]:
         """
         Get a streetlight by its device ID.
         
@@ -68,7 +68,7 @@ class StreetlightRepository:
         """
         return self.db.query(Streetlight).filter(Streetlight.device_id == device_id).first()
 
-    def update(self, streetlight_id: int, streetlight: StreetlightUpdate):
+    def update(self, streetlight_id: int, streetlight: StreetlightUpdate) -> Optional[Streetlight]:
         """
         Update a streetlight.
         
@@ -79,12 +79,14 @@ class StreetlightRepository:
         Returns:
             The updated streetlight
         """
-        self.db.query(Streetlight).filter(Streetlight.id == streetlight_id).update(streetlight.dict(exclude_unset=True))
+        self.db.query(Streetlight).filter(Streetlight.id == streetlight_id).update(
+            streetlight.model_dump(exclude_unset=True)
+        )
         self.db.commit()
         updated_streetlight = self.get_by_id(streetlight_id)
         return updated_streetlight
 
-    def delete(self, streetlight_id: int):
+    def delete(self, streetlight_id: int) -> Optional[Streetlight]:
         """
         Delete a streetlight.
         
@@ -96,7 +98,7 @@ class StreetlightRepository:
         """
         streetlight = self.get_by_id(streetlight_id)
         if not streetlight:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Streetlight not found")
+            return None
         self.db.delete(streetlight)
         self.db.commit()
         return streetlight
