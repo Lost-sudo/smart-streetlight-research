@@ -27,7 +27,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { StatusBadge, StatusType } from '@/components/StatusBadge';
-import { Colors } from '@/constants/theme';
+import { Colors, Layout, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { width, height } = Dimensions.get('window');
@@ -338,9 +338,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: Layout.screenPadding,
     marginTop: 10,
-    marginBottom: 20,
+    marginBottom: Layout.spacingMd,
   },
   subtitle: {
     fontSize: 14,
@@ -356,9 +356,9 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: Layout.screenPadding,
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: Layout.spacingLg,
   },
   statCard: {
     width: (width - 64) / 3,
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   searchContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Layout.screenPadding,
     marginBottom: 16,
   },
   searchBar: {
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: Layout.screenPadding,
     marginBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
@@ -418,19 +418,19 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   listContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Layout.screenPadding,
     paddingBottom: 40,
   },
   faultCard: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: Layout.borderRadius,
+    padding: Layout.cardPadding,
     borderWidth: 1,
     marginBottom: 12,
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 10,
   },
   faultCardMain: {
     flex: 1,

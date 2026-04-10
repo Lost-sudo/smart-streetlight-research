@@ -22,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { StatusBadge, StatusType } from '@/components/StatusBadge';
-import { Colors } from '@/constants/theme';
+import { Colors, Layout, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { height } = Dimensions.get('window');
@@ -277,9 +277,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: Layout.screenPadding,
     marginTop: 10,
-    marginBottom: 24,
+    marginBottom: Layout.spacingLg,
   },
   subtitle: {
     fontSize: 14,
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 24,
+    paddingHorizontal: Layout.screenPadding,
     paddingBottom: 40,
   },
   section: {
@@ -322,9 +322,9 @@ const styles = StyleSheet.create({
     color: '#3B82F6',
   },
   taskCard: {
-    borderRadius: 24,
+    borderRadius: Layout.borderRadius,
     borderWidth: 1,
-    padding: 20,
+    padding: Layout.cardPadding,
     marginBottom: 16,
     elevation: 3,
     shadowColor: '#000',

@@ -24,7 +24,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { Colors, Layout, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const SettingRow = ({ icon, label, subLabel, value, onValueChange, isSwitch, isDestructive, theme, isLast }: any) => (
@@ -35,7 +35,7 @@ const SettingRow = ({ icon, label, subLabel, value, onValueChange, isSwitch, isD
       </View>
       <View style={styles.labelBox}>
         <ThemedText style={[styles.rowLabel, isDestructive && { color: '#EF4444', fontWeight: '700' }]}>{label}</ThemedText>
-        {subLabel && <ThemedText style={styles.rowSubLabel}>{subLabel}</ThemedText>}
+        {subLabel && <ThemedText numberOfLines={1} style={styles.rowSubLabel}>{subLabel}</ThemedText>}
       </View>
     </View>
     <View style={styles.rowRight}>
@@ -222,30 +222,31 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    paddingHorizontal: 24,
+    paddingHorizontal: Layout.screenPadding,
     marginTop: 10,
-    marginBottom: 24,
+    marginBottom: Layout.spacingLg,
   },
   subtitle: {
     fontSize: 14,
     opacity: 0.6,
   },
   profileCard: {
-    marginHorizontal: 24,
-    borderRadius: 24,
-    padding: 20,
+    marginHorizontal: Layout.screenPadding,
+    borderRadius: Layout.borderRadius,
+    padding: Layout.cardPadding,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 32,
-    elevation: 2,
+    marginBottom: Layout.spacingLg,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
   },
   profileInfo: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
@@ -270,6 +271,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.5,
     marginTop: 2,
+    width: '100%',
   },
   badge: {
     flexDirection: 'row',
@@ -293,14 +295,13 @@ const styles = StyleSheet.create({
     opacity: 0.4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginHorizontal: 32,
+    marginHorizontal: Layout.screenPadding,
     marginBottom: 10,
   },
   groupContent: {
-    marginHorizontal: 24,
-    borderRadius: 24,
+    marginHorizontal: Layout.screenPadding,
+    borderRadius: Layout.borderRadius,
     borderWidth: 1,
-    overflow: 'hidden',
   },
   rowContainer: {
     flexDirection: 'row',
@@ -312,6 +313,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   rowLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
@@ -338,6 +340,7 @@ const styles = StyleSheet.create({
   rowRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 10,
   },
   syncRow: {
     flexDirection: 'row',
@@ -352,13 +355,13 @@ const styles = StyleSheet.create({
   },
   destructGroup: {
     marginTop: 10,
-    paddingHorizontal: 24,
+    paddingHorizontal: Layout.screenPadding,
     alignItems: 'center',
   },
   logoutBtn: {
     width: '100%',
     height: 56,
-    borderRadius: 18,
+    borderRadius: Layout.borderRadius,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',

@@ -66,3 +66,11 @@ export const Fonts = Platform.select({
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });
+export const Layout = {
+  screenPadding: 24,
+  cardPadding: 20,
+  borderRadius: 24,
+  radiusSm: 12,
+  spacingLg: 32,
+  spacingMd: 20,
+};

@@ -30,7 +30,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { StatusBadge, StatusType } from '@/components/StatusBadge';
-import { Colors } from '@/constants/theme';
+import { Colors, Layout, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { width, height } = Dimensions.get('window');
@@ -350,9 +350,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: Layout.screenPadding,
     marginTop: 10,
-    marginBottom: 20,
+    marginBottom: Layout.spacingMd,
   },
   subtitle: {
     fontSize: 14,
@@ -368,8 +368,8 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 20,
-    marginBottom: 24,
+    paddingHorizontal: Layout.screenPadding,
+    marginBottom: Layout.spacingMd,
   },
   searchBar: {
     flex: 1,
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: Layout.screenPadding,
     paddingBottom: 80,
   },
   row: {
@@ -402,14 +402,14 @@ const styles = StyleSheet.create({
   },
   nodeCard: {
     width: COLUMN_WIDTH,
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: Layout.borderRadius,
+    padding: Layout.cardPadding,
     borderWidth: 1,
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 12,
   },
   cardHeader: {
     flexDirection: 'row',
