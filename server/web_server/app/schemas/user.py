@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from enum import Enum
 
@@ -18,9 +18,7 @@ class UserRead(BaseModel):
     username: str
     role: UserRole
     is_active: bool
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None

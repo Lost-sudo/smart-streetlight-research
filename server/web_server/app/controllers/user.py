@@ -99,11 +99,8 @@ class UserController:
         Returns:
             True if the user was deleted successfully, False otherwise
         """
-        user = self.user_service.get_by_id(user_id)
-
-        if not user:
+        deleted = self.user_service.delete(user_id)
+        if not deleted:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-        self.user_service.delete(user_id)
         return True
 

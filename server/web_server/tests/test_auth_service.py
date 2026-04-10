@@ -155,3 +155,49 @@ def test_get_current_user_success(auth_service, sample_user):
         
         user = auth_service.get_current_user(access_token)
         assert user == sample_user
+
+def test_get_current_user_revoked_session(auth_service, sample_user):
+    """
+    Test that access tokens are rejected when their session is revoked.
+    """
+    access_token = "valid_access_token"
+    session_id = 456
+    payload = {
+        "user_id": sample_user.id,
+        "session_id": session_id,
+        "type": "access_token"
+    }
+
+    revoked_session = MagicMock(spec=RefreshToken)
+    revoked_session.is_revoked = True
+    revoked_session.expires_at = datetime.utcnow() + timedelta(hours=1)
+
+    with patch("jose.jwt.decode", return_value=payload), \
+         patch.object(auth_service.refresh_repo, "get_by_id", return_value=revoked_session):
+        with pytest.raises(HTTPException) as exc:
+            auth_service.get_current_user(access_token)
+
+        assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+def test_refresh_access_token_includes_user(auth_service, sample_user):
+    """
+    Test refresh flow returns user info for response model consistency.
+    """
+    refresh_token = "valid_refresh_token"
+    payload = {"user_id": sample_user.id, "type": "refresh_token"}
+
+    mock_db_token = MagicMock(spec=RefreshToken)
+    mock_db_token.token = "hashed_token"
+    mock_db_token.expires_at = datetime.utcnow() + timedelta(hours=1)
+    mock_db_token.is_revoked = False
+    mock_db_token.user = sample_user
+
+    with patch("jose.jwt.decode", return_value=payload), \
+         patch.object(auth_service.refresh_repo, "get_all_active_by_user", return_value=[mock_db_token]), \
+         patch("app.services.auth.AuthService._AuthService__verify_token", return_value=True), \
+         patch.object(auth_service.refresh_repo, "revoke") as _mock_revoke, \
+         patch.object(auth_service, "create_refresh_token", return_value=("new_refresh", datetime.utcnow() + timedelta(hours=1))), \
+         patch.object(auth_service, "save_refresh_token", return_value=MagicMock(id=999)):
+
+        tokens = auth_service.refresh_access_token(refresh_token)
+        assert tokens.user.username == sample_user.username

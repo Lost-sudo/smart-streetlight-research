@@ -215,7 +215,8 @@ class AuthService:
         return TokenServiceResponse(
             access_token=new_access_token,
             refresh_token=new_refresh_token,
-            token_type="bearer"
+            token_type="bearer",
+            user=UserRead.model_validate(user, from_attributes=True),
         )
 
 
@@ -276,7 +277,7 @@ class AuthService:
         """
         try:
             payload = jwt.decode(refresh_token, settings.REFRESH_SECRET_KEY, algorithms=[settings.REFRESH_ALGORITHM])
-        except:
+        except JWTError:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
         user_id = payload.get("user_id")
@@ -319,11 +320,16 @@ class AuthService:
 
             user_id: int = payload.get("user_id")
             token_type: str = payload.get("type")
+            session_id: int | None = payload.get("session_id")
 
-            if user_id is None or token_type != "access_token":
+            if user_id is None or token_type != "access_token" or session_id is None:
                 raise credentials_exception
 
         except JWTError:
+            raise credentials_exception
+
+        session = self.refresh_repo.get_by_id(session_id)
+        if session is None or session.is_revoked or session.expires_at < datetime.utcnow():
             raise credentials_exception
 
         user = self.user_repo.get_by_id(user_id)

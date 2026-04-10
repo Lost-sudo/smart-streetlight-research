@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserRead
 from app.schemas.auth import TokenResponse
 from app.services.auth import AuthService
+from app.core.config import settings
 
 class AuthController:
     def __init__(self, db: Session):
@@ -35,20 +36,17 @@ class AuthController:
         """
         user = self.auth_service.authenticate_user(username, password)
 
-        if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
-
         refresh_token, expires_at = self.auth_service.create_refresh_token(user)
         db_refresh_token = self.auth_service.save_refresh_token(refresh_token, user.id, expires_at)
         access_token = self.auth_service.create_access_token(user, db_refresh_token.id)
 
         response.set_cookie(
-            key="refresh_token",
+            key=settings.REFRESH_COOKIE_NAME,
             value=refresh_token,
             httponly=True,
-            secure=True,
-            samesite="strict",
-            max_age=86400,
+            secure=settings.COOKIE_SECURE,
+            samesite=settings.REFRESH_COOKIE_SAMESITE,
+            max_age=settings.REFRESH_COOKIE_MAX_AGE_SECONDS,
         )
 
         return TokenResponse(
@@ -68,14 +66,19 @@ class AuthController:
         Returns:
             A success message
         """
-        refresh_token = request.cookies.get("refresh_token")
+        refresh_token = request.cookies.get(settings.REFRESH_COOKIE_NAME)
 
         if not refresh_token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing")
 
         self.auth_service.logout(refresh_token)
 
-        response.delete_cookie("refresh_token", httponly=True, secure=True, samesite="strict")
+        response.delete_cookie(
+            settings.REFRESH_COOKIE_NAME,
+            httponly=True,
+            secure=settings.COOKIE_SECURE,
+            samesite=settings.REFRESH_COOKIE_SAMESITE,
+        )
 
         return {"message": "Logout successful"}
 

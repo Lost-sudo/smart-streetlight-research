@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     REFRESH_ALGORITHM: str
     REFRESH_TOKEN_EXPIRE_MINUTES: int
     CORS_ORIGINS: List[str]
+    COOKIE_SECURE: bool = True
+    REFRESH_COOKIE_NAME: str = "refresh_token"
+    REFRESH_COOKIE_SAMESITE: str = "strict"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -24,5 +27,9 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    @property
+    def REFRESH_COOKIE_MAX_AGE_SECONDS(self) -> int:
+        return int(self.REFRESH_TOKEN_EXPIRE_MINUTES) * 60
 
 settings = Settings()

@@ -3,6 +3,7 @@ from fastapi import HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 
 from app.services.auth import AuthService
+from app.core.config import settings
 
 class RefreshTokenController:
     def __init__(self, db: Session):
@@ -19,7 +20,7 @@ class RefreshTokenController:
         Returns:
             The new access token
         """
-        refresh_token = request.cookies.get("refresh_token")
+        refresh_token = request.cookies.get(settings.REFRESH_COOKIE_NAME)
 
         if not refresh_token:
             raise HTTPException(
@@ -29,15 +30,16 @@ class RefreshTokenController:
         tokens = self.auth_service.refresh_access_token(refresh_token)
 
         response.set_cookie(
-            key="refresh_token",
+            key=settings.REFRESH_COOKIE_NAME,
             value=tokens.refresh_token,
             httponly=True,
-            secure=True,
-            samesite="strict",
-            max_age=3600,
+            secure=settings.COOKIE_SECURE,
+            samesite=settings.REFRESH_COOKIE_SAMESITE,
+            max_age=settings.REFRESH_COOKIE_MAX_AGE_SECONDS,
         )
 
         return TokenResponse(
             access_token=tokens.access_token,
             token_type=tokens.token_type,
+            user=tokens.user,
         )

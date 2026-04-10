@@ -72,20 +72,26 @@ class RefreshTokenRepository:
             RefreshToken.is_revoked == False
         ).all()
 
-    def revoke(self, refresh_token: str):
+    def revoke_by_token_value(self, token_value: str):
         """
         Revoke a refresh token.
         
         Args:
-            refresh_token: The refresh token to revoke
+            token_value: The refresh token value to revoke (this should match what is stored)
             
         Returns:
             True if the refresh token was revoked successfully, False otherwise
         """
-        db_token = self.get_by_token(refresh_token)
+        db_token = self.get_by_token(token_value)
         if db_token:
             db_token.is_revoked = True
             self.db.commit()
+
+    def revoke(self, refresh_token: str):
+        """
+        Backwards-compatible alias for revoking a stored token value.
+        """
+        return self.revoke_by_token_value(refresh_token)
 
     def delete(self, refresh_token: str):
         """

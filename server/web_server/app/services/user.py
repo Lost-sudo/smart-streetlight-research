@@ -9,7 +9,7 @@ class UserService:
     def __init__(self, db: Session):
         self.user_repo = UserRepository(db)
 
-    def get_all_users(self) -> List[UserRead]:
+    def get_all_users(self) -> List[User]:
         """
         Get all users.
         
@@ -53,14 +53,12 @@ class UserService:
             The created user
         """
         hashed_password = hash_password(user_data.password)
-        new_user = User(
-            username=user_data.username,
-            hashed_password=hashed_password,
-            role=user_data.role
-        )
+        new_user = User(username=user_data.username, hashed_password=hashed_password)
+        if user_data.role is not None:
+            new_user.role = user_data.role
         return self.user_repo.create(new_user)
 
-    def update_user(self, user_id: int, user_data: UserUpdate) -> User:
+    def update_user(self, user_id: int, user_data: UserUpdate) -> Optional[User]:
         """
         Update a user.
         
@@ -79,7 +77,7 @@ class UserService:
             user.username = user_data.username
         if user_data.password:
             user.hashed_password = hash_password(user_data.password)
-        if user_data.role:
+        if user_data.role is not None:
             user.role = user_data.role
         if user_data.is_active is not None:
             user.is_active = user_data.is_active
