@@ -7,6 +7,7 @@ from app.models.repair_task import RepairTask, RepairTaskStatus, RepairTaskSourc
 from app.models.user import User, TechnicianAvailability, UserRole
 from app.models.streetlight import Alert, Streetlight, StreetlightStatus
 from app.schemas.repair_task import RepairTaskCreate
+from typing import Optional
 
 
 class RepairTaskRepository:
@@ -384,13 +385,10 @@ class RepairTaskRepository:
         """
         db_task = self.get_by_id(task_id)
         if not db_task:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Repair task not found",
-            )
+            return None
         self.db.delete(db_task)
         self.db.commit()
-        return {"message": "Repair task deleted successfully"}
+        return db_task
 
     def get_resolved_count_today(self):
         """

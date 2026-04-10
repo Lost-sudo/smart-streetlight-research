@@ -1,14 +1,14 @@
 from sqlalchemy.orm import Session
 from app.models.streetlight import PredictiveMaintenance
-from fastapi import HTTPException, status
-from app.schemas.streetlight import PredictiveMaintenanceCreate, PredictiveMaintenanceRead, PredictiveMaintenanceUpdate
+from app.schemas.streetlight import PredictiveMaintenanceCreate, PredictiveMaintenanceUpdate
 from datetime import datetime
+from typing import Optional, List
 
 class PredictiveMaintenanceRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, log: PredictiveMaintenanceCreate):
+    def create(self, log: PredictiveMaintenanceCreate) -> PredictiveMaintenance:
         """
         Create a new predictive maintenance log.
         
@@ -18,13 +18,13 @@ class PredictiveMaintenanceRepository:
         Returns:
             The created predictive maintenance log
         """
-        db_log = PredictiveMaintenance(**log.dict())
+        db_log = PredictiveMaintenance(**log.model_dump())
         self.db.add(db_log)
         self.db.commit()
         self.db.refresh(db_log)
         return db_log
 
-    def get_by_id(self, log_id: int):
+    def get_by_id(self, log_id: int) -> Optional[PredictiveMaintenance]:
         """
         Get a predictive maintenance log by its ID.
         
@@ -36,7 +36,7 @@ class PredictiveMaintenanceRepository:
         """
         return self.db.query(PredictiveMaintenance).filter(PredictiveMaintenance.id == log_id).first()
 
-    def get_by_streetlight_id(self, streetlight_id: int):
+    def get_by_streetlight_id(self, streetlight_id: int) -> Optional[PredictiveMaintenance]:
         """
         Get a predictive maintenance log by its streetlight ID.
         
@@ -48,7 +48,7 @@ class PredictiveMaintenanceRepository:
         """
         return self.db.query(PredictiveMaintenance).filter(PredictiveMaintenance.streetlight_id == streetlight_id).first()
 
-    def get_all(self):
+    def get_all(self) -> List[PredictiveMaintenance]:
         """
         Get all predictive maintenance logs.
         
@@ -57,7 +57,7 @@ class PredictiveMaintenanceRepository:
         """
         return self.db.query(PredictiveMaintenance).all()
 
-    def update(self, log_id: int, log: PredictiveMaintenanceUpdate):
+    def update(self, log_id: int, log: PredictiveMaintenanceUpdate) -> Optional[PredictiveMaintenance]:
         """
         Update a predictive maintenance log.
         
@@ -70,9 +70,9 @@ class PredictiveMaintenanceRepository:
         """
         db_log = self.get_by_id(log_id)
         if not db_log:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Predictive maintenance log not found")
+            return None
         
-        update_data = log.dict(exclude_unset=True)
+        update_data = log.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(db_log, key, value)
             
@@ -82,7 +82,7 @@ class PredictiveMaintenanceRepository:
         self.db.refresh(db_log)
         return db_log
 
-    def delete(self, log_id: int):
+    def delete(self, log_id: int) -> Optional[PredictiveMaintenance]:
         """
         Delete a predictive maintenance log.
         
@@ -94,7 +94,7 @@ class PredictiveMaintenanceRepository:
         """
         db_log = self.get_by_id(log_id)
         if not db_log:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Predictive maintenance log not found")
+            return None
         self.db.delete(db_log)
         self.db.commit()
-        return {"message": "Predictive maintenance log deleted successfully"}
+        return db_log

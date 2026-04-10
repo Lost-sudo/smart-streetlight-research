@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 from app.repositories.repair_task import RepairTaskRepository
-from app.schemas.repair_task import RepairTaskCreate, RepairTaskSchedule
+from app.schemas.repair_task import RepairTaskCreate, RepairTaskSchedule, RepairTaskSourceTypeEnum
 from app.models.repair_task import AssignedByType, RepairTaskSourceType, RepairTaskPriority
+from fastapi import HTTPException, status
 
 
 class RepairTaskService:
@@ -30,7 +31,10 @@ class RepairTaskService:
         Returns:
             The repair task with the given ID
         """
-        return self.repair_task_repo.get_by_id(task_id)
+        task = self.repair_task_repo.get_by_id(task_id)
+        if task is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repair task not found")
+        return task
 
     def get_all_repair_tasks(self):
         """
@@ -67,8 +71,8 @@ class RepairTaskService:
         task_create = RepairTaskCreate(
             alert_id=schedule.alert_id,
             description=schedule.description,
-            source_type="PREDICTIVE",
-            priority=schedule.priority.value if schedule.priority else "medium",
+            source_type=RepairTaskSourceTypeEnum.PREDICTIVE,
+            priority=schedule.priority,
             scheduled_at=schedule.scheduled_at,
         )
         return self.repair_task_repo.create(task_create)
@@ -202,7 +206,10 @@ class RepairTaskService:
         Returns:
             Success message
         """
-        return self.repair_task_repo.delete(task_id)
+        deleted = self.repair_task_repo.delete(task_id)
+        if deleted is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repair task not found")
+        return {"message": "Repair task deleted successfully"}
 
     def get_resolved_count_today(self):
         """

@@ -203,8 +203,7 @@ class RepairTaskController:
         Returns:
             A success message
         """
-        self.repair_task_service.delete_repair_task(task_id)
-        return "Repair task has been successfully deleted."
+        return self.repair_task_service.delete_repair_task(task_id)
 
     def get_resolved_count_today(self) -> int:
         """

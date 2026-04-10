@@ -6,8 +6,9 @@ from datetime import datetime
 
 from app.services.repair_task import RepairTaskService
 from app.schemas.repair_task import RepairTaskCreate
-from app.models.repair_task import RepairTask, RepairTaskStatus, TechnicianAvailability, AssignedByType
+from app.models.repair_task import RepairTask, RepairTaskStatus, AssignedByType
 from app.models.user import User, UserRole
+from app.models.user import TechnicianAvailability
 
 
 @pytest.fixture
@@ -241,11 +242,12 @@ def test_update_task_status_to_in_progress(repair_task_service, in_progress_task
         result = repair_task_service.update_task_status(
             task_id=1,
             new_status="in_progress",
-            technician_id=3,
+            user_id=3,
+            user_role="technician",
         )
 
         assert result.status == RepairTaskStatus.in_progress
-        mock_update.assert_called_once_with(1, "in_progress", 3)
+        mock_update.assert_called_once_with(1, "in_progress", 3, "technician", None)
 
 
 def test_update_task_status_to_completed(repair_task_service, completed_task):
@@ -253,12 +255,13 @@ def test_update_task_status_to_completed(repair_task_service, completed_task):
         result = repair_task_service.update_task_status(
             task_id=1,
             new_status="completed",
-            technician_id=3,
+            user_id=3,
+            user_role="technician",
         )
 
         assert result.status == RepairTaskStatus.completed
         assert result.completed_at is not None
-        mock_update.assert_called_once_with(1, "completed", 3)
+        mock_update.assert_called_once_with(1, "completed", 3, "technician", None)
 
 
 # ──────────────────────────────────────────────

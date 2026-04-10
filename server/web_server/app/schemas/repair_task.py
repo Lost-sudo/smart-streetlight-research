@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 from enum import Enum
@@ -61,8 +61,7 @@ class RepairTaskRead(BaseModel):
     scheduled_at: Optional[datetime] = None
     version: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RepairTaskSchedule(BaseModel):
@@ -95,5 +94,4 @@ class TechnicianRead(BaseModel):
     username: str
     availability: Optional[TechnicianAvailabilityEnum] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

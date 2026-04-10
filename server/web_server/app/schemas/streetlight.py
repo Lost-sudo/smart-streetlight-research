@@ -71,7 +71,7 @@ class AlertCreate(BaseModel):
 
 class AlertRead(BaseModel):
     id: int
-    streetlight_id: int
+    streetlight_id: Optional[int] = None
     alert_type: str
     type: str
     severity: str
@@ -120,7 +120,7 @@ class PredictiveMaintenanceCreate(BaseModel):
 
 class PredictiveMaintenanceRead(BaseModel):
     id: int
-    streetlight_id: int
+    streetlight_id: Optional[int] = None
     failure_probability: float
     predicted_failure_date: datetime
     urgency_level: str
