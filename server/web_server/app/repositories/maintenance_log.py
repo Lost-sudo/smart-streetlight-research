@@ -1,13 +1,13 @@
 from sqlalchemy.orm import Session
 from app.models.streetlight import MaintenanceLog
-from fastapi import HTTPException, status
 from app.schemas.streetlight import MaintenanceLogCreate, MaintenanceLogUpdate
+from typing import Optional, List
 
 class MaintenanceLogRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, log: MaintenanceLogCreate):
+    def create(self, log: MaintenanceLogCreate) -> MaintenanceLog:
         """
         Create a new maintenance log.
         
@@ -17,13 +17,13 @@ class MaintenanceLogRepository:
         Returns:
             The created maintenance log
         """
-        db_log = MaintenanceLog(**log.dict())
+        db_log = MaintenanceLog(**log.model_dump())
         self.db.add(db_log)
         self.db.commit()
         self.db.refresh(db_log)
         return db_log
 
-    def get_by_id(self, log_id: int):
+    def get_by_id(self, log_id: int) -> Optional[MaintenanceLog]:
         """
         Get a maintenance log by its ID.
         
@@ -35,7 +35,7 @@ class MaintenanceLogRepository:
         """
         return self.db.query(MaintenanceLog).filter(MaintenanceLog.id == log_id).first()
 
-    def get_all(self):
+    def get_all(self) -> List[MaintenanceLog]:
         """
         Get all maintenance logs.
         
@@ -44,7 +44,7 @@ class MaintenanceLogRepository:
         """
         return self.db.query(MaintenanceLog).all()
 
-    def update(self, log_id: int, log: MaintenanceLogUpdate):
+    def update(self, log_id: int, log: MaintenanceLogUpdate) -> Optional[MaintenanceLog]:
         """
         Update a maintenance log.
         
@@ -57,9 +57,9 @@ class MaintenanceLogRepository:
         """
         db_log = self.get_by_id(log_id)
         if not db_log:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance log not found")
+            return None
         
-        update_data = log.dict(exclude_unset=True)
+        update_data = log.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(db_log, key, value)
             
@@ -67,7 +67,7 @@ class MaintenanceLogRepository:
         self.db.refresh(db_log)
         return db_log
 
-    def delete(self, log_id: int):
+    def delete(self, log_id: int) -> Optional[MaintenanceLog]:
         """
         Delete a maintenance log.
         
@@ -79,7 +79,7 @@ class MaintenanceLogRepository:
         """
         db_log = self.get_by_id(log_id)
         if not db_log:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance log not found")
+            return None
         self.db.delete(db_log)
         self.db.commit()
-        return {"message": "Maintenance log deleted successfully"}
+        return db_log

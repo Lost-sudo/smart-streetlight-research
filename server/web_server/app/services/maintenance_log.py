@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.repositories.maintenance_log import MaintenanceLogRepository
 from app.schemas.streetlight import MaintenanceLogCreate, MaintenanceLogUpdate
+from fastapi import HTTPException, status
 
 class MaintenanceLogService:
     def __init__(self, db: Session):
@@ -28,7 +29,10 @@ class MaintenanceLogService:
         Returns:
             The maintenance log with the given ID
         """
-        return self.log_repo.get_by_id(log_id)
+        log = self.log_repo.get_by_id(log_id)
+        if log is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance log not found")
+        return log
 
     def get_all_logs(self):
         """
@@ -50,7 +54,10 @@ class MaintenanceLogService:
         Returns:
             The updated maintenance log
         """
-        return self.log_repo.update(log_id, log)
+        updated = self.log_repo.update(log_id, log)
+        if updated is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance log not found")
+        return updated
 
     def delete_log(self, log_id: int):
         """
@@ -62,4 +69,7 @@ class MaintenanceLogService:
         Returns:
             True if the maintenance log was deleted successfully, False otherwise
         """
-        return self.log_repo.delete(log_id)
+        deleted = self.log_repo.delete(log_id)
+        if deleted is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance log not found")
+        return {"message": "Maintenance log deleted successfully"}

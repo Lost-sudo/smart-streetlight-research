@@ -67,5 +67,4 @@ class MaintenanceLogController:
         Returns:
             A success message
         """
-        self.log_service.delete_log(log_id=log_id)
-        return "Maintenance log has been successfully deleted."
+        return self.log_service.delete_log(log_id=log_id)
