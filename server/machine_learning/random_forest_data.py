@@ -1,25 +1,4 @@
-"""
-random_forest_data.py
-=====================
-Generates synthetic streetlight sensor data for training the
-Random Forest Failure Prediction model.
-
-Problem Type: Supervised Classification (Failure Prediction)
-Target Variable: failure_status (0 = Normal, 1 = Faulty)
-
-Features (from ML Design Document §5):
-  - voltage (V)
-  - current (A)
-  - power_consumption (W)
-  - light_intensity (Lux)
-  - operating_hours (hours)
-
-Engineered Features (from ML Design Document §5.2):
-  - voltage_fluctuation  — simulated voltage deviation rate
-  - current_deviation     — deviation from baseline current
-  - power_trend           — rate of power change indicator
-  - fault_frequency       — count of recent minor faults
-"""
+"""Synthetic tabular streetlight sensor data for Random Forest training."""
 
 import numpy as np
 import pandas as pd
@@ -30,32 +9,11 @@ def generate_synthetic_dataset(
     faulty_ratio: float = 0.25,
     random_state: int = 42,
 ) -> pd.DataFrame:
-    """
-    Generates a synthetic streetlight sensor dataset.
-
-    Parameters
-    ----------
-    n_samples : int
-        Total number of samples to generate (default: 2000).
-    faulty_ratio : float
-        Proportion of samples labeled as Faulty (default: 0.25).
-    random_state : int
-        Seed for reproducibility.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with raw + engineered features and the target column
-        'failure_status' (0 = Normal, 1 = Faulty).
-    """
     rng = np.random.RandomState(random_state)
 
     n_faulty = int(n_samples * faulty_ratio)
     n_normal = n_samples - n_faulty
 
-    # ------------------------------------------------------------------ #
-    #  Normal operating conditions                                        #
-    # ------------------------------------------------------------------ #
     normal_data = {
         "voltage": rng.normal(loc=220.0, scale=5.0, size=n_normal),
         "current": rng.normal(loc=0.45, scale=0.05, size=n_normal),
@@ -69,9 +27,6 @@ def generate_synthetic_dataset(
         "failure_status": np.zeros(n_normal, dtype=int),
     }
 
-    # ------------------------------------------------------------------ #
-    #  Faulty / degraded operating conditions                             #
-    # ------------------------------------------------------------------ #
     faulty_data = {
         "voltage": rng.normal(loc=195.0, scale=15.0, size=n_faulty),
         "current": rng.normal(loc=0.70, scale=0.15, size=n_faulty),
@@ -85,7 +40,6 @@ def generate_synthetic_dataset(
         "failure_status": np.ones(n_faulty, dtype=int),
     }
 
-    # Combine, shuffle, and reset index
     df_normal = pd.DataFrame(normal_data)
     df_faulty = pd.DataFrame(faulty_data)
     df = pd.concat([df_normal, df_faulty], ignore_index=True)
@@ -94,9 +48,6 @@ def generate_synthetic_dataset(
     return df
 
 
-# --------------------------------------------------------------------- #
-#  CLI entry point — useful for quick inspection                         #
-# --------------------------------------------------------------------- #
 if __name__ == "__main__":
     df = generate_synthetic_dataset()
     print(f"Dataset shape: {df.shape}")

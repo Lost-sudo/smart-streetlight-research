@@ -5,27 +5,20 @@ import random
 import requests
 from datetime import datetime, timezone
 
-# Allow importing the schema directly from the web_server module
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.schemas.streetlight import IoTNodeLogCreate
 
-# --- Configuration ---
 API_URL = "http://localhost:8000"
 ENDPOINT = "/streetlight_log/telemetry"
-INTERVAL_SECONDS = 30  # Configurable time interval (30 seconds)
+INTERVAL_SECONDS = 30
 DEVICE_IDS = ["Node-1"]
-TEST_MODE = False       # Optional test mode: set to True for static valid values
+TEST_MODE = False
 
 def generate_data(device_id: str, test_mode: bool = False) -> dict:
-    """
-    Generates realistic sensor data. 
-    Occasionally creates anomalies to trigger ML alerts.
-    """
     current_time = datetime.now(timezone.utc).isoformat()
     
     if test_mode:
-        # Pre-known safe conditions for model testing
         return {
             "device_id": device_id,
             "voltage": 220.0,
@@ -36,7 +29,7 @@ def generate_data(device_id: str, test_mode: bool = False) -> dict:
         }
 
     # 10% chance to generate an anomaly (to trigger Alerts via ML Pipeline)
-    is_anomaly = random.random() < 0.90
+    is_anomaly = random.random() < 0.10
 
     if is_anomaly:
         return {
@@ -48,7 +41,6 @@ def generate_data(device_id: str, test_mode: bool = False) -> dict:
             "timestamp": current_time
         }
     else:
-        # Normal bounds representing a healthy streetlight
         return {
             "device_id": device_id,
             "voltage": round(random.uniform(215.0, 235.0), 2),
@@ -59,17 +51,11 @@ def generate_data(device_id: str, test_mode: bool = False) -> dict:
         }
 
 def validate_payload(data: dict) -> bool:
-    """
-    Pre-validation step mimicking ML model strictness.
-    Verifies payload properties matching Python base models.
-    """
     try:
-        validated_schema = IoTNodeLogCreate(**data)
-        # We enforce types correctly via the Pydantic instance serialization
-        print(f"[\u2714 Validation Passed] Data schema is strictly aligned to expectations.")
+        IoTNodeLogCreate(**data)
         return True
     except Exception as e:
-        print(f"[\u2716 Validation Failed] Corrupt values or schema mismatch detected!\nException: {e}")
+        print(f"[Validation Failed] {e}")
         return False
 
 def simulate_iot_devices():
@@ -80,15 +66,11 @@ def simulate_iot_devices():
 
     while True:
         for device_id in DEVICE_IDS:
-            print(f"--- Generating Telemetry for {device_id} ---")
-            
             payload = generate_data(device_id, test_mode=TEST_MODE)
             
-            # Pre-validation block
             if not validate_payload(payload):
                 continue
             
-            # Post validated request
             try:
                 response = requests.post(f"{API_URL}{ENDPOINT}", json=payload, timeout=10)
                 

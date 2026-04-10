@@ -1,20 +1,40 @@
-import os
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
 import joblib
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-from app.schemas.streetlight import IoTNodeLogCreate
-
 import torch
 import torch.nn as nn
 
-# Define paths relative to this file to the models directory
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MODELS_DIR = os.path.join(BASE_DIR, "machine_learning", "models")
-RF_MODEL_PATH = os.path.join(MODELS_DIR, "random_forest_model.joblib")
-RF_SCALER_PATH = os.path.join(MODELS_DIR, "random_forest_scaler.joblib")
-LSTM_MODEL_PATH = os.path.join(MODELS_DIR, "lstm_model.pt")
-LSTM_SCALER_PATH = os.path.join(MODELS_DIR, "lstm_scaler.joblib")
+from app.schemas.streetlight import IoTNodeLogCreate
+
+logger = logging.getLogger(__name__)
+
+RF_FEATURES = [
+    "voltage",
+    "current",
+    "power_consumption",
+    "light_intensity",
+    "operating_hours",
+    "voltage_fluctuation",
+    "current_deviation",
+    "power_trend",
+    "fault_frequency",
+]
+
+LSTM_FEATURES = ["voltage", "current", "power_consumption", "light_intensity"]
+
+# server/web_server/app/services -> server
+SERVER_DIR = Path(__file__).resolve().parents[3]
+MODELS_DIR = SERVER_DIR / "machine_learning" / "models"
+RF_MODEL_PATH = MODELS_DIR / "random_forest_model.joblib"
+RF_SCALER_PATH = MODELS_DIR / "random_forest_scaler.joblib"
+LSTM_MODEL_PATH = MODELS_DIR / "lstm_model.pt"
+LSTM_SCALER_PATH = MODELS_DIR / "lstm_scaler.joblib"
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size: int, hidden_size: int = 64, dropout: float = 0.2):
@@ -38,6 +58,14 @@ class LSTMModel(nn.Module):
         out = self.fc2(out)
         return out.squeeze(-1)
 
+
+def _torch_load_state_dict(path: Path) -> dict[str, Any]:
+    try:
+        return torch.load(path, map_location="cpu", weights_only=True)
+    except TypeError:
+        return torch.load(path, map_location="cpu")
+
+
 class MLPredictionService:
     def __init__(self, use_lstm: bool = True):
         self.use_lstm = use_lstm
@@ -49,28 +77,25 @@ class MLPredictionService:
 
     def _load_artifacts(self):
         try:
-            if os.path.exists(RF_MODEL_PATH) and os.path.exists(RF_SCALER_PATH):
+            if RF_MODEL_PATH.exists() and RF_SCALER_PATH.exists():
                 self.rf_model = joblib.load(RF_MODEL_PATH)
                 self.rf_scaler = joblib.load(RF_SCALER_PATH)
-                print(f"[MLPredictionService] Loaded Random Forest model.")
+                logger.info("Loaded Random Forest model artifacts.")
             else:
-                print(f"[MLPredictionService] Warning: Random Forest model or scaler not found.")
+                logger.warning("Random Forest model/scaler not found; using mock fault detection.")
                 
-            if os.path.exists(LSTM_MODEL_PATH) and os.path.exists(LSTM_SCALER_PATH):
-                self.lstm_model = LSTMModel(input_size=4)
-                self.lstm_model.load_state_dict(torch.load(LSTM_MODEL_PATH, weights_only=True))
-                self.lstm_model.eval() # Set to evaluation mode
+            if LSTM_MODEL_PATH.exists() and LSTM_SCALER_PATH.exists():
+                self.lstm_model = LSTMModel(input_size=len(LSTM_FEATURES))
+                self.lstm_model.load_state_dict(_torch_load_state_dict(LSTM_MODEL_PATH))
+                self.lstm_model.eval()
                 self.lstm_scaler = joblib.load(LSTM_SCALER_PATH)
-                print(f"[MLPredictionService] Loaded LSTM model.")
+                logger.info("Loaded LSTM model artifacts.")
             else:
-                print(f"[MLPredictionService] Warning: LSTM model or scaler not found.")
+                logger.warning("LSTM model/scaler not found; using mock predictive maintenance.")
         except Exception as e:
-            print(f"[MLPredictionService] Error loading artifacts: {e}. Falling back to mock prediction.")
+            logger.exception("Error loading ML artifacts; using mock predictions.")
 
     def detect_fault(self, iot_log: IoTNodeLogCreate):
-        """
-        Uses Random Forest to detect if the streetlight is CURRENTLY faulty.
-        """
         if not self.rf_model or not self.rf_scaler:
             return self._mock_detect_fault(iot_log)
 
@@ -80,27 +105,29 @@ class MLPredictionService:
         power_trend = 0.0
         fault_frequency = 0.0
 
-        features_dict = {
-            "voltage": [iot_log.voltage],
-            "current": [iot_log.current],
-            "power_consumption": [iot_log.power_consumption],
-            "light_intensity": [iot_log.light_intensity],
-            "operating_hours": [operating_hours],
-            "voltage_fluctuation": [voltage_fluctuation],
-            "current_deviation": [current_deviation],
-            "power_trend": [power_trend],
-            "fault_frequency": [fault_frequency]
-        }
-        df = pd.DataFrame(features_dict)
-        
-        cols = list(features_dict.keys())
-        df[cols] = self.rf_scaler.transform(df[cols])
+        df = pd.DataFrame(
+            [
+                {
+                    "voltage": iot_log.voltage,
+                    "current": iot_log.current,
+                    "power_consumption": iot_log.power_consumption,
+                    "light_intensity": iot_log.light_intensity,
+                    "operating_hours": operating_hours,
+                    "voltage_fluctuation": voltage_fluctuation,
+                    "current_deviation": current_deviation,
+                    "power_trend": power_trend,
+                    "fault_frequency": fault_frequency,
+                }
+            ]
+        )
+
+        df[RF_FEATURES] = self.rf_scaler.transform(df[RF_FEATURES])
 
         try:
             probas = self.rf_model.predict_proba(df)
             failure_prob = float(probas[0][1]) if probas.shape[1] > 1 else float(self.rf_model.predict(df)[0])
         except Exception as e:
-            print(f"[MLPredictionService] RF Prediction error {e}. Falling back to mock fault detection.")
+            logger.exception("Random Forest prediction error; using mock fault detection.")
             return self._mock_detect_fault(iot_log)
 
         is_faulty = failure_prob > 0.5
@@ -111,19 +138,12 @@ class MLPredictionService:
         }
 
     def predict_failure(self, iot_log: IoTNodeLogCreate, historical_logs=None):
-        """
-        Uses LSTM to forecast PREDICTIVE MAINTENANCE needs (future failure).
-        """
         if not self.use_lstm or not self.lstm_model or not self.lstm_scaler:
             return self._mock_prediction(iot_log)
 
         if not historical_logs or len(historical_logs) < 9:
-            # Not enough history for sequence prediction. Fallback to a mock trend.
             return self._mock_prediction(iot_log)
             
-        features = ["voltage", "current", "power_consumption", "light_intensity"]
-        
-        # Chronological order of previous logs
         latest_history = historical_logs[-9:]
         
         sequence_data = []
@@ -142,14 +162,13 @@ class MLPredictionService:
             iot_log.light_intensity
         ])
         
-        df = pd.DataFrame(sequence_data, columns=features)
+        df = pd.DataFrame(sequence_data, columns=LSTM_FEATURES)
         scaled_data = self.lstm_scaler.transform(df.values)
         input_tensor = torch.FloatTensor(scaled_data).unsqueeze(0)
         
         with torch.no_grad():
             predicted_power_consumption = self.lstm_model(input_tensor).item()
         
-        # MAPPING LSTM PREDICTION TO FAILURE PROBABILITY
         base_probability = 0.1
         if predicted_power_consumption > 150:
             failure_prob = 0.95
