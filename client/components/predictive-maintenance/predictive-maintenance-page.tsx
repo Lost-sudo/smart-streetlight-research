@@ -143,7 +143,12 @@ export function PredictiveMaintenancePage() {
       <NotificationBanner notification={notification} />
       <PageHeader />
 
-      <SummaryCards criticalCount={criticalCount} warningCount={warningCount} scheduledCount={scheduledCount} />
+      <SummaryCards 
+        criticalCount={criticalCount} 
+        warningCount={warningCount} 
+        scheduledCount={scheduledCount} 
+        completedCount={enhancedMaintenanceLogs.length} 
+      />
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
         <div className="xl:col-span-7 space-y-8">

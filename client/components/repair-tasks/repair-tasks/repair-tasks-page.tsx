@@ -60,12 +60,11 @@ export function RepairTasksPage() {
     });
   }, [enrichedTasks, search, filterType, filterStatus]);
 
-  const { totalFault, totalPredictive, totalCompleted } = useMemo(() => {
+  const { totalCompleted, uncompleteTasks } = useMemo(() => {
     const tasks = allTasks as RepairTask[];
     return {
-      totalFault: tasks.filter((t) => t.source_type === "FAULT").length,
-      totalPredictive: tasks.filter((t) => t.source_type === "PREDICTIVE").length,
       totalCompleted: tasks.filter((t) => t.status === "completed").length,
+      uncompleteTasks: tasks.filter((t) => t.status !== "completed").length,
     };
   }, [allTasks]);
 
@@ -91,9 +90,8 @@ export function RepairTasksPage() {
 
       <StatsCards
         totalTasks={(allTasks as RepairTask[]).length}
-        faultTasks={totalFault}
-        predictiveTasks={totalPredictive}
         completedTasks={totalCompleted}
+        uncompleteTasks={uncompleteTasks}
       />
 
       <FilterBar

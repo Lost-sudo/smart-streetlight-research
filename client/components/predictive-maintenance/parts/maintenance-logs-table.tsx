@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle2, Factory } from "lucide-react";
 import type { MaintenanceLog } from "@/lib/redux/api/maintenanceLogApi";
-import type { Streetlight } from "@/lib/redux/api/streetlightApi";
 
 export type EnhancedMaintenanceLog = MaintenanceLog & { nodeName: string };
 

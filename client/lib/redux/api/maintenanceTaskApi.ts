@@ -26,6 +26,17 @@ export interface MaintenanceTaskComplete {
   notes?: string;
 }
 
+export interface MaintenanceTaskCreate {
+  predictive_alert_id?: number | null;
+  streetlight_id: number;
+  technician_id?: number | null;
+  status?: string;
+  priority: "critical" | "high" | "medium" | "low";
+  description?: string | null;
+  scheduled_date?: string | null;
+}
+
+
 export const maintenanceTaskApi = createApi({
   reducerPath: "maintenanceTaskApi",
   baseQuery: baseQueryWithReauth,
@@ -47,7 +58,7 @@ export const maintenanceTaskApi = createApi({
       query: (taskId) => `/maintenance-tasks/${taskId}`,
       providesTags: (result, error, id) => [{ type: "MaintenanceTask", id }],
     }),
-    createTask: builder.mutation<MaintenanceTask, any>({
+    createTask: builder.mutation<MaintenanceTask, MaintenanceTaskCreate>({
       query: (body) => ({
         url: "/maintenance-tasks/",
         method: "POST",
