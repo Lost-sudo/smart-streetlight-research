@@ -34,12 +34,12 @@ export function MyAssignedTasksPage() {
 
   const enrichedTasks: EnrichedTask[] = useMemo(() => {
     return (myTasks as RepairTask[]).map((task) => {
-      const alert = alertById.get(task.alert_id);
-      const sl = alert?.streetlight_id ? streetlightById.get(alert.streetlight_id) : undefined;
+      const alert = task.alert_id ? alertById.get(task.alert_id) : undefined;
+      const sl = streetlightById.get(task.streetlight_id);
       return {
         ...task,
         nodeName: sl?.name || "Unknown Node",
-        alertType: alert?.type || "General Alert",
+        alertType: alert?.type || (task.source_type === "PREDICTIVE" ? "Predictive maintenance" : "General Alert"),
       };
     });
   }, [myTasks, alertById, streetlightById]);

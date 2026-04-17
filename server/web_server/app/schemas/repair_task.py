@@ -38,7 +38,8 @@ class AssignedByTypeEnum(str, Enum):
 # --- Repair Task Schemas ---
 
 class RepairTaskCreate(BaseModel):
-    alert_id: int
+    streetlight_id: int
+    alert_id: Optional[int] = None
     description: Optional[str] = None
     source_type: RepairTaskSourceTypeEnum = RepairTaskSourceTypeEnum.FAULT
     priority: RepairTaskPriorityEnum = RepairTaskPriorityEnum.high
@@ -47,7 +48,8 @@ class RepairTaskCreate(BaseModel):
 
 class RepairTaskRead(BaseModel):
     id: int
-    alert_id: int
+    streetlight_id: int
+    alert_id: Optional[int] = None
     technician_id: Optional[int] = None
     assigned_by_user_id: Optional[int] = None
     assigned_by_type: Optional[AssignedByTypeEnum] = None
@@ -66,7 +68,8 @@ class RepairTaskRead(BaseModel):
 
 class RepairTaskSchedule(BaseModel):
     """Used by admin to create a predictive maintenance repair task."""
-    alert_id: int
+    streetlight_id: int
+    alert_id: Optional[int] = None
     description: Optional[str] = None
     priority: RepairTaskPriorityEnum = RepairTaskPriorityEnum.medium
     scheduled_at: Optional[datetime] = None

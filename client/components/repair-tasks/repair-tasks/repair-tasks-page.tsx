@@ -26,15 +26,15 @@ export function RepairTasksPage() {
 
   const enrichedTasks: RepairTaskRow[] = useMemo(() => {
     return (allTasks as RepairTask[]).map((task) => {
-      const alert = alertById.get(task.alert_id);
-      const sl = alert?.streetlight_id ? streetlightById.get(alert.streetlight_id) : undefined;
+      const alert = task.alert_id ? alertById.get(task.alert_id) : undefined;
+      const sl = streetlightById.get(task.streetlight_id);
       return {
         id: task.id,
         nodeName: sl?.name || "Unknown Node",
         deviceId: sl?.device_id || "N/A",
         alertMessage: alert?.message || "",
-        alertType: alert?.type || "",
-        alertSeverity: alert?.severity || "",
+        alertType: alert?.type || (task.source_type === "PREDICTIVE" ? "Predictive maintenance scheduled" : ""),
+        alertSeverity: alert?.severity || (task.source_type === "PREDICTIVE" ? "medium" : ""),
         description: task.description,
         created_at: task.created_at,
         scheduled_at: task.scheduled_at,

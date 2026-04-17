@@ -12,7 +12,6 @@ class StreetlightStatus(str, PyEnum):
 
 class AlertType(str, PyEnum):
     FAULT = "FAULT"
-    PREDICTIVE = "PREDICTIVE"
 
 class AlertSeverity(str, PyEnum):
     low = "low"

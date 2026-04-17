@@ -9,8 +9,8 @@ class StreetlightCreate(BaseModel):
     device_id: Optional[str] = None
     latitude: float
     longitude: float
-    model_info: str
-    installation_date: datetime
+    model_info: Optional[str] = None
+    installation_date: Optional[datetime] = None
     status: str
     is_on: bool
 
@@ -32,8 +32,8 @@ class StreetlightRead(BaseModel):
     device_id: Optional[str] = None
     latitude: float
     longitude: float
-    model_info: str
-    installation_date: datetime
+    model_info: Optional[str] = None
+    installation_date: Optional[datetime] = None
     status: str
     is_on: bool
     created_at: datetime

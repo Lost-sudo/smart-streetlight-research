@@ -3,7 +3,8 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 
 export interface RepairTask {
   id: number;
-  alert_id: number;
+  streetlight_id: number;
+  alert_id: number | null;
   technician_id: number | null;
   assigned_by_user_id: number | null;
   assigned_by_type: string | null;
@@ -25,7 +26,8 @@ export interface Technician {
 }
 
 export interface ScheduleTaskPayload {
-  alert_id: number;
+  streetlight_id: number;
+  alert_id?: number;
   description?: string;
   priority?: "critical" | "high" | "medium" | "low";
   scheduled_at?: string;

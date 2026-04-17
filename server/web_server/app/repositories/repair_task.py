@@ -16,36 +16,34 @@ class RepairTaskRepository:
 
     def create(self, task: RepairTaskCreate):
         """
-        Create a new repair task linked to an alert.
-
-        Args:
-            task: The repair task data to create
-
-        Returns:
-            The created repair task
+        Create a new repair task.
         """
-        # Verify alert exists
-        alert = self.db.query(Alert).filter(Alert.id == task.alert_id).first()
-        if not alert:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Alert not found",
-            )
+        # If alert_id is provided, verify it exists and populate streetlight_id if missing
+        streetlight_id = task.streetlight_id
+        if task.alert_id:
+            alert = self.db.query(Alert).filter(Alert.id == task.alert_id).first()
+            if not alert:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Alert not found",
+                )
+            streetlight_id = alert.streetlight_id
 
-        # Prevent duplicate tasks for the same alert
-        existing = (
-            self.db.query(RepairTask)
-            .filter(RepairTask.alert_id == task.alert_id)
-            .first()
-        )
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A repair task already exists for this alert",
+            # Prevent duplicate tasks for the same alert
+            existing = (
+                self.db.query(RepairTask)
+                .filter(RepairTask.alert_id == task.alert_id)
+                .first()
             )
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A repair task already exists for this alert",
+                )
 
         db_task = RepairTask(
             alert_id=task.alert_id,
+            streetlight_id=streetlight_id,
             description=task.description,
             status=RepairTaskStatus.pending,
             source_type=RepairTaskSourceType(task.source_type.value) if task.source_type else RepairTaskSourceType.FAULT,
@@ -93,16 +91,17 @@ class RepairTaskRepository:
 
     def get_active_unresolved(self):
         """
-        Get all repair tasks linked to unresolved alerts (for admin/operator view).
-
-        Returns:
-            A list of active repair tasks requiring attention
+        Get all repair tasks requiring attention.
+        For fault tasks, check unresolved alerts. For predictive tasks, check non-completed status.
         """
         return (
             self.db.query(RepairTask)
-            .join(Alert, RepairTask.alert_id == Alert.id)
+            .outerjoin(Alert, RepairTask.alert_id == Alert.id)
             .filter(
-                Alert.is_resolved == False,
+                or_(
+                    Alert.is_resolved == False,
+                    RepairTask.alert_id == None
+                ),
                 RepairTask.status != RepairTaskStatus.completed,
             )
             .all()
@@ -120,14 +119,12 @@ class RepairTaskRepository:
 
     def get_active_by_streetlight_id(self, streetlight_id: int, source_type: str = None):
         """
-        Get the active (non-completed) repair task for a streetlight, optionally filtered by source_type.
-        Used for escalation logic.
+        Get the active (non-completed) repair task for a streetlight.
         """
         query = (
             self.db.query(RepairTask)
-            .join(Alert, RepairTask.alert_id == Alert.id)
             .filter(
-                Alert.streetlight_id == streetlight_id,
+                RepairTask.streetlight_id == streetlight_id,
                 RepairTask.status != RepairTaskStatus.completed,
             )
         )
@@ -135,19 +132,7 @@ class RepairTaskRepository:
             query = query.filter(RepairTask.source_type == source_type)
         return query.first()
 
-    def escalate_predictive_task(self, task_id: int, new_priority: str):
-        """
-        Escalate a predictive task to a higher priority (e.g., when a fault occurs on the same node).
-        Changes source_type to FAULT and updates priority.
-        """
-        db_task = self.get_by_id(task_id)
-        if not db_task:
-            return None
-        db_task.source_type = RepairTaskSourceType.FAULT
-        db_task.priority = RepairTaskPriority(new_priority)
-        self.db.commit()
-        self.db.refresh(db_task)
-        return db_task
+
 
     def get_by_technician(self, technician_id: int):
         """

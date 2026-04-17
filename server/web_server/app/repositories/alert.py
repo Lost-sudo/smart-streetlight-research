@@ -58,20 +58,11 @@ class AlertRepository:
 
     def get_by_alert_type(self, alert_type: str) -> List[Alert]:
         """
-        Get all alerts filtered by alert_type (FAULT or PREDICTIVE).
+        Get all alerts filtered by alert_type.
         """
         return self.db.query(Alert).filter(Alert.alert_type == alert_type).all()
 
-    def get_unresolved_by_streetlight_and_alert_type(self, streetlight_id: int, alert_type: str):
-        """
-        Get the first unresolved alert for a streetlight filtered by alert_type.
-        Used for dedup checks during predictive alert creation.
-        """
-        return self.db.query(Alert).filter(
-            Alert.streetlight_id == streetlight_id,
-            Alert.alert_type == alert_type,
-            Alert.is_resolved == False
-        ).first()
+
 
     def update(self, alert_id: int, alert: AlertUpdate) -> Optional[Alert]:
         """

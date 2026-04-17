@@ -32,7 +32,8 @@ class RepairTask(Base):
     __tablename__ = "repair_tasks"
 
     id = Column(Integer, primary_key=True, index=True)
-    alert_id = Column(Integer, ForeignKey("alerts.id"), nullable=False, unique=True)
+    alert_id = Column(Integer, ForeignKey("alerts.id"), nullable=True, unique=True)
+    streetlight_id = Column(Integer, ForeignKey("streetlights.id"), nullable=False)
     technician_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     assigned_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     assigned_by_type = Column(
@@ -65,6 +66,7 @@ class RepairTask(Base):
 
     # Relationships
     alert = relationship("Alert", back_populates="repair_task")
+    streetlight = relationship("Streetlight", backref="repair_tasks")
     technician = relationship(
         "User",
         foreign_keys=[technician_id],
