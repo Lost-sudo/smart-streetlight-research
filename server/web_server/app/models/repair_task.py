@@ -79,3 +79,4 @@ class RepairTask(Base):
         foreign_keys=[assigned_by_user_id],
         back_populates="created_repair_assignments",
     )
+    repair_log = relationship("RepairLog", back_populates="repair_task", uselist=False)

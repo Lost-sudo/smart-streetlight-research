@@ -9,11 +9,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useGetStreetlightsQuery, type Streetlight } from "@/lib/redux/api/streetlightApi";
 import { useGetAlertsQuery, type Alert } from "@/lib/redux/api/alertApi";
 import { useGetMyTasksQuery, useUpdateTaskStatusMutation, type RepairTask } from "@/lib/redux/api/repairTaskApi";
+import { useCreateRepairLogMutation } from "@/lib/redux/api/repairLogApi";
 import { showNotification } from "@/lib/utils/notifications";
 
 import { ActiveTasksTable, type ActiveTaskRow } from "@/components/repair-tasks/my-assigned-tasks/parts/active-tasks-table";
 import { CompletedTasks } from "@/components/repair-tasks/my-assigned-tasks/parts/completed-tasks";
-import { CompleteRepairDialog } from "@/components/repair-tasks/my-assigned-tasks/parts/complete-repair-dialog";
+import {
+  CompleteRepairDialog,
+  emptyRepairLogForm,
+  type RepairLogFormData,
+} from "@/components/repair-tasks/my-assigned-tasks/parts/complete-repair-dialog";
 import { indexAlertsById, indexStreetlightsById } from "@/components/repair-tasks/my-assigned-tasks/utils";
 
 type EnrichedTask = RepairTask & { nodeName: string; alertType: string };
@@ -24,10 +29,11 @@ export function MyAssignedTasksPage() {
   const { data: streetlights = [] } = useGetStreetlightsQuery(undefined, { pollingInterval: 30000 });
 
   const [updateStatus, { isLoading: isUpdating }] = useUpdateTaskStatusMutation();
+  const [createRepairLog, { isLoading: isCreatingLog }] = useCreateRepairLogMutation();
 
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-  const [repairNotes, setRepairNotes] = useState("");
+  const [repairForm, setRepairForm] = useState<RepairLogFormData>(emptyRepairLogForm);
 
   const alertById = useMemo(() => indexAlertsById(alerts as Alert[]), [alerts]);
   const streetlightById = useMemo(() => indexStreetlightsById(streetlights as Streetlight[]), [streetlights]);
@@ -44,24 +50,56 @@ export function MyAssignedTasksPage() {
     });
   }, [myTasks, alertById, streetlightById]);
 
-  const handleStatusChange = async (taskId: number, status: string, notes?: string) => {
+  const handleStartRepair = async (taskId: number) => {
     try {
-      await updateStatus({ taskId, status, description: notes }).unwrap();
-      const action = status === "in_progress" ? "started" : "completed";
-      showNotification(`Repair ${action} successfully!`, "success");
-      if (status === "completed") {
-        setCompleteDialogOpen(false);
-        setRepairNotes("");
-      }
+      await updateStatus({ taskId, status: "in_progress" }).unwrap();
+      showNotification("Repair started successfully!", "success");
     } catch (e) {
-      showNotification("Failed to update status. Please try again.", "info");
+      showNotification("Failed to start repair. Please try again.", "info");
       console.error(e);
     }
   };
 
   const openCompleteDialog = (taskId: number) => {
     setSelectedTaskId(taskId);
+    setRepairForm(emptyRepairLogForm);
     setCompleteDialogOpen(true);
+  };
+
+  const handleFormChange = (field: keyof RepairLogFormData, value: string) => {
+    setRepairForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFinalizeRepair = async () => {
+    if (!selectedTaskId) return;
+
+    try {
+      // 1. Update the task status to completed (this also sets streetlight status to active)
+      await updateStatus({
+        taskId: selectedTaskId,
+        status: "completed",
+        description: repairForm.diagnosis,
+      }).unwrap();
+
+      // 2. Create the repair log
+      await createRepairLog({
+        repair_task_id: selectedTaskId,
+        diagnosis: repairForm.diagnosis || undefined,
+        action_taken: repairForm.action_taken || undefined,
+        parts_replaced: repairForm.parts_replaced || undefined,
+        repair_duration_minutes: repairForm.repair_duration_minutes
+          ? parseFloat(repairForm.repair_duration_minutes)
+          : undefined,
+        notes: repairForm.notes || undefined,
+      }).unwrap();
+
+      showNotification("Repair completed and log created successfully!", "success");
+      setCompleteDialogOpen(false);
+      setRepairForm(emptyRepairLogForm);
+    } catch (e) {
+      showNotification("Failed to complete repair. Please try again.", "info");
+      console.error(e);
+    }
   };
 
   if (tasksLoading) {
@@ -83,6 +121,8 @@ export function MyAssignedTasksPage() {
     status: t.status,
     source_type: t.source_type,
   }));
+
+  const isBusy = isUpdating || isCreatingLog;
 
   return (
     <div className="flex-1 space-y-8 p-8 pt-6">
@@ -109,8 +149,8 @@ export function MyAssignedTasksPage() {
           <CardContent className="p-0">
             <ActiveTasksTable
               tasks={activeRows}
-              isUpdating={isUpdating}
-              onStartRepair={(id) => handleStatusChange(id, "in_progress")}
+              isUpdating={isBusy}
+              onStartRepair={handleStartRepair}
               onCompleteRepair={openCompleteDialog}
             />
           </CardContent>
@@ -122,12 +162,11 @@ export function MyAssignedTasksPage() {
       <CompleteRepairDialog
         open={completeDialogOpen}
         onOpenChange={setCompleteDialogOpen}
-        notes={repairNotes}
-        onNotesChange={setRepairNotes}
-        isUpdating={isUpdating}
-        onFinalize={() => selectedTaskId && handleStatusChange(selectedTaskId, "completed", repairNotes)}
+        formData={repairForm}
+        onFormChange={handleFormChange}
+        isUpdating={isBusy}
+        onFinalize={handleFinalizeRepair}
       />
     </div>
   );
 }
-
