@@ -1,8 +1,9 @@
 "use client";
 
 import { Lightbulb } from "lucide-react";
-
 import { NodeStatusCard } from "@/components/dashboard/overview/parts/node-status-card";
+import { type Streetlight } from "@/lib/redux/api/streetlightApi";
+import { type PredictiveMaintenanceLog } from "@/lib/redux/api/predictiveMaintenanceApi";
 
 const ONLINE_WINDOW_MS = 120_000;
 
@@ -19,8 +20,8 @@ export function NodeStatusGrid({
   pmByStreetlightId,
   nowTick,
 }: {
-  streetlights: any[];
-  pmByStreetlightId: Map<number, any>;
+  streetlights: Streetlight[];
+  pmByStreetlightId: Map<number, PredictiveMaintenanceLog>;
   nowTick: number;
 }) {
   return (

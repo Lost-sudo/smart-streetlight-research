@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { useGetUsersQuery, useCreateUserMutation } from "@/lib/redux/api/userApi";
-import type { UserCreate } from "@/types/auth";
+import type { User, UserCreate } from "@/types/auth";
 
 import { AddUserDialog } from "@/components/users/management/parts/add-user-dialog";
 import { RegistryHeader } from "@/components/users/management/parts/registry-header";
@@ -19,12 +19,12 @@ export function UserManagementPage() {
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
 
   const filteredUsers = useMemo(
-    () => users.filter((user: any) => user.username.toLowerCase().includes(search.toLowerCase())),
+    () => users.filter((user: User) => user.username.toLowerCase().includes(search.toLowerCase())),
     [users, search]
   );
 
-  const adminCount = useMemo(() => users.filter((u: any) => u.role === "admin").length, [users]);
-  const activeCount = useMemo(() => users.filter((u: any) => u.is_active).length, [users]);
+  const adminCount = useMemo(() => users.filter((u: User) => u.role === "admin").length, [users]);
+  const activeCount = useMemo(() => users.filter((u: User) => u.is_active).length, [users]);
 
   const onAddUserSubmit = async (data: UserCreate) => {
     try {

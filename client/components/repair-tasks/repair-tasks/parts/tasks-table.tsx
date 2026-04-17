@@ -80,12 +80,12 @@ export function TasksTable({ tasks }: { tasks: RepairTaskRow[] }) {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-0.5 text-xs">
-                        <div className="flex items-center gap-1 text-muted-foreground">
+                        <div className="flex items-center gap-1 text-muted-foreground" suppressHydrationWarning>
                           <Clock className="h-3 w-3" />
                           {new Date(task.created_at).toLocaleDateString()}
                         </div>
                         {task.scheduled_at && (
-                          <div className="flex items-center gap-1 text-violet-500">
+                          <div className="flex items-center gap-1 text-violet-500" suppressHydrationWarning>
                             <Wrench className="h-3 w-3" />
                             {new Date(task.scheduled_at).toLocaleDateString()}
                           </div>
@@ -108,4 +108,5 @@ export function TasksTable({ tasks }: { tasks: RepairTaskRow[] }) {
     </div>
   );
 }
+
 

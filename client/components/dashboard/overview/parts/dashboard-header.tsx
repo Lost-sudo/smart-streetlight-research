@@ -14,7 +14,7 @@ export function DashboardHeader({ today }: { today: string }) {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <div className="text-sm font-medium">{today}</div>
+        <div className="text-sm font-medium" suppressHydrationWarning>{today}</div>
       </div>
     </div>
   );

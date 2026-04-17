@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { useGetStreetlightsQuery } from "@/lib/redux/api/streetlightApi";
-import { useGetPredictiveMaintenanceLogsQuery } from "@/lib/redux/api/predictiveMaintenanceApi";
+import { useGetStreetlightsQuery, type Streetlight } from "@/lib/redux/api/streetlightApi";
+import { useGetPredictiveMaintenanceLogsQuery, type PredictiveMaintenanceLog } from "@/lib/redux/api/predictiveMaintenanceApi";
 import { isOfflineFromLastUpdated, parsePossiblyNaiveUtc } from "@/components/analytics/predictive-analytics/utils";
 import { FilterChips, type AnalyticsFilter } from "@/components/analytics/predictive-analytics/parts/filter-chips";
 import { SummaryCards } from "@/components/analytics/predictive-analytics/parts/summary-cards";
@@ -35,15 +35,15 @@ export function PredictiveAnalyticsPage() {
   }, []);
 
   const pmByStreetlightId = useMemo(() => {
-    const m = new Map<number, any>();
-    for (const log of pmLogs as any[]) {
+    const m = new Map<number, PredictiveMaintenanceLog>();
+    for (const log of (pmLogs as PredictiveMaintenanceLog[])) {
       if (log && typeof log.streetlight_id === "number") m.set(log.streetlight_id, log);
     }
     return m;
   }, [pmLogs]);
 
   const mergedNodes = useMemo(() => {
-    return (streetlights as any[])
+    return (streetlights as Streetlight[])
       .map((light) => {
         const pm = pmByStreetlightId.get(light.id) ?? null;
         const isOffline = isOfflineFromLastUpdated(pm?.last_updated, nowTick);
@@ -65,12 +65,12 @@ export function PredictiveAnalyticsPage() {
   }, [streetlights, pmByStreetlightId, filter, nowTick]);
 
   const { totalNodes, offlineC, warningC, criticalC, normalC } = useMemo(() => {
-    const total = (streetlights as any[]).length;
+    const total = (streetlights as Streetlight[]).length;
     let offline = 0;
     let warning = 0;
     let critical = 0;
 
-    for (const l of streetlights as any[]) {
+    for (const l of (streetlights as Streetlight[])) {
       const pm = pmByStreetlightId.get(l.id);
       const isOffline = isOfflineFromLastUpdated(pm?.last_updated, nowTick);
       if (isOffline) {

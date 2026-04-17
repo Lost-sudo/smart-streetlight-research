@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-import { useGetStreetlightsQuery } from "@/lib/redux/api/streetlightApi";
-import { useGetPredictiveMaintenanceLogsQuery } from "@/lib/redux/api/predictiveMaintenanceApi";
+import { useGetStreetlightsQuery, type Streetlight } from "@/lib/redux/api/streetlightApi";
+import { useGetPredictiveMaintenanceLogsQuery, type PredictiveMaintenanceLog } from "@/lib/redux/api/predictiveMaintenanceApi";
 import { DashboardHeader } from "@/components/dashboard/overview/parts/dashboard-header";
 import { SummaryCards } from "@/components/dashboard/overview/parts/summary-cards";
 import { NodeStatusGrid } from "@/components/dashboard/overview/parts/node-status-grid";
@@ -34,8 +34,8 @@ export function DashboardOverview() {
   }, []);
 
   const pmByStreetlightId = useMemo(() => {
-    const m = new Map<number, any>();
-    for (const log of pmLogs as any[]) {
+    const m = new Map<number, PredictiveMaintenanceLog>();
+    for (const log of (pmLogs as PredictiveMaintenanceLog[])) {
       if (log && typeof log.streetlight_id === "number") {
         m.set(log.streetlight_id, log);
       }
@@ -49,7 +49,7 @@ export function DashboardOverview() {
     let faulty = 0;
     let maintenance = 0;
 
-    for (const n of streetlights as any[]) {
+    for (const n of (streetlights as Streetlight[])) {
       const pm = pmByStreetlightId.get(n.id);
       const isOnline = getOnlineStatus(pm?.last_updated, nowTick);
 
@@ -64,19 +64,17 @@ export function DashboardOverview() {
       inactiveNodes: inactive,
       faultyNodes: faulty,
       maintenanceNodes: maintenance,
-      totalNodes: (streetlights as any[]).length,
+      totalNodes: (streetlights as Streetlight[]).length,
     };
   }, [streetlights, pmByStreetlightId, nowTick]);
 
-  const today = useMemo(
-    () =>
-      new Date().toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
-    []
-  );
+  const today = useMemo(() => {
+    return new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }, []);
 
   if (isStreetlightsLoading || isLogsLoading) {
     return (
@@ -91,7 +89,7 @@ export function DashboardOverview() {
     <div className="flex-1 space-y-8 p-8 pt-6">
       <DashboardHeader today={today} />
       <SummaryCards {...metrics} />
-      <NodeStatusGrid streetlights={streetlights as any[]} pmByStreetlightId={pmByStreetlightId} nowTick={nowTick} />
+      <NodeStatusGrid streetlights={streetlights as Streetlight[]} pmByStreetlightId={pmByStreetlightId} nowTick={nowTick} />
     </div>
   );
 }

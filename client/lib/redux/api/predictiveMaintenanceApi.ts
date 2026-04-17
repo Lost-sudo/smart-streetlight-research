@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
-import { baseQuery } from "./baseQuery";
+import { baseQueryWithReauth } from "./baseQuery";
 
 export interface PredictiveMaintenanceLog {
   id: number;
@@ -12,7 +12,7 @@ export interface PredictiveMaintenanceLog {
 
 export const predictiveMaintenanceApi = createApi({
   reducerPath: "predictiveMaintenanceApi",
-  baseQuery: baseQuery,
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["PredictiveMaintenance"],
   endpoints: (builder) => ({
     getPredictiveMaintenanceLogs: builder.query<PredictiveMaintenanceLog[], void>({

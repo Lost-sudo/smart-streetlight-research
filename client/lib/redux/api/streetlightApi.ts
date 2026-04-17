@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
-import { baseQuery } from "./baseQuery";
+import { baseQueryWithReauth } from "./baseQuery";
 
 export interface Streetlight {
   id: number;
@@ -49,7 +49,7 @@ export interface StreetlightLog {
 
 export const streetlightApi = createApi({
   reducerPath: "streetlightApi",
-  baseQuery: baseQuery,
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["Streetlight", "StreetlightLog"],
   endpoints: (builder) => ({
     getStreetlights: builder.query<Streetlight[], void>({

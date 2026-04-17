@@ -9,11 +9,13 @@ import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
 import { roleColors, roleIcons } from "@/components/users/management/utils";
 
+import { type User } from "@/types/auth";
+
 export function RegistryDesktop({
   users,
   isFetching,
 }: {
-  users: any[];
+  users: User[];
   isFetching: boolean;
 }) {
   return (

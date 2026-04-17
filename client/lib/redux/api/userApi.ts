@@ -1,6 +1,6 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { User, UserCreate } from "@/types/auth";
-import { baseQuery } from "./baseQuery";
+import { baseQueryWithReauth } from "./baseQuery";
 
 
 // Note: UserUpdate can be partially defined or inferred
@@ -8,7 +8,7 @@ export type UserUpdate = Partial<UserCreate> & { is_active?: boolean };
 
 export const userApi = createApi({
   reducerPath: "userApi",
-  baseQuery: baseQuery,
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["User"],
   endpoints: (builder) => ({
     getUsers: builder.query<User[], void>({

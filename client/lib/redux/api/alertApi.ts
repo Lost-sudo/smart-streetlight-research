@@ -1,4 +1,4 @@
-import { baseQuery } from "./baseQuery";
+import { baseQueryWithReauth } from "./baseQuery";
 import { createApi } from "@reduxjs/toolkit/query/react";
 
 export interface Alert {
@@ -14,7 +14,7 @@ export interface Alert {
 
 export const alertApi = createApi({
   reducerPath: "alertApi",
-  baseQuery: baseQuery,
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["Alert"],
   endpoints: (builder) => ({
     getAlerts: builder.query<Alert[], void>({

@@ -19,9 +19,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { RoleGate } from "@/components/auth/role-gate";
 import { cn } from "@/lib/utils";
-import { useGetStreetlightsQuery, useDeleteStreetlightMutation } from "@/lib/redux/api/streetlightApi";
-import { useGetPredictiveMaintenanceLogsQuery } from "@/lib/redux/api/predictiveMaintenanceApi";
-import type { Streetlight } from "@/lib/redux/api/streetlightApi";
+import { useGetStreetlightsQuery, useDeleteStreetlightMutation, type Streetlight } from "@/lib/redux/api/streetlightApi";
+import { useGetPredictiveMaintenanceLogsQuery, type PredictiveMaintenanceLog } from "@/lib/redux/api/predictiveMaintenanceApi";
 
 import { CreateNodeDialog } from "../CreateNodeDialog";
 import { EditNodeDialog } from "../EditNodeDialog";
@@ -59,8 +58,8 @@ export function NodeMonitoringPage() {
   }, []);
 
   const pmByStreetlightId = useMemo(() => {
-    const m = new Map<number, any>();
-    for (const log of pmLogs as any[]) {
+    const m = new Map<number, PredictiveMaintenanceLog>();
+    for (const log of (pmLogs as PredictiveMaintenanceLog[])) {
       if (log && typeof log.streetlight_id === "number") {
         m.set(log.streetlight_id, log);
       }

@@ -1,4 +1,4 @@
-import { baseQuery } from "./baseQuery";
+import { baseQueryWithReauth } from "./baseQuery";
 import { createApi } from "@reduxjs/toolkit/query/react";
 
 export interface RepairTask {
@@ -33,7 +33,7 @@ export interface ScheduleTaskPayload {
 
 export const repairTaskApi = createApi({
   reducerPath: "repairTaskApi",
-  baseQuery: baseQuery,
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["RepairTask", "Technician"],
   endpoints: (builder) => ({
     getUnassignedTasks: builder.query<RepairTask[], void>({
