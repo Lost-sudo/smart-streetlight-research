@@ -5,7 +5,9 @@ from datetime import datetime
 from typing import Optional, List
 
 from app.models.maintenance_task import MaintenanceTask, MaintenanceTaskStatus, MaintenanceTaskPriority
-from app.models.streetlight import MaintenanceLog, MaintenanceStatus, PredictiveAlert, Streetlight, StreetlightStatus
+from app.models.maintenance_log import MaintenanceLog, MaintenanceStatus
+from app.models.predictive_maintenance_alert import PredictiveMaintenanceAlert
+from app.models.streetlight import Streetlight, StreetlightStatus
 from app.models.user import User, TechnicianAvailability, UserRole
 from app.schemas.maintenance_task import MaintenanceTaskCreate, MaintenanceTaskComplete
 
@@ -140,7 +142,11 @@ class MaintenanceTaskRepository:
                     technician.availability = TechnicianAvailability.available
             # Resolve the predictive alert
             if db_task.predictive_alert_id:
-                alert = self.db.query(PredictiveAlert).filter(PredictiveAlert.id == db_task.predictive_alert_id).first()
+                alert = (
+                    self.db.query(PredictiveMaintenanceAlert)
+                    .filter(PredictiveMaintenanceAlert.id == db_task.predictive_alert_id)
+                    .first()
+                )
                 if alert:
                     alert.is_resolved = True
             # Reset streetlight to active

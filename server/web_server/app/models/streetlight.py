@@ -26,5 +26,5 @@ class Streetlight(Base):
     logs = relationship("StreetlightLog", back_populates="streetlight")
     maintenance_logs = relationship("MaintenanceLog", back_populates="streetlight")
     alerts = relationship("Alert", back_populates="streetlight")
-    predictive_alerts = relationship("PredictiveAlert", back_populates="streetlight")
-    predictive_maintenance = relationship("PredictiveMaintenance", back_populates="streetlight", uselist=False)
+    predictive_alerts = relationship("PredictiveMaintenanceAlert", back_populates="streetlight")
+    predictive_maintenance = relationship("PredictiveMaintenanceLog", back_populates="streetlight", uselist=False)

@@ -67,7 +67,7 @@ class RepairTask(Base):
 
     # Relationships
     alert = relationship("Alert", back_populates="repair_task")
-    predictive_alert = relationship("PredictiveAlert", back_populates="repair_task")
+    predictive_alert = relationship("PredictiveMaintenanceAlert", back_populates="repair_task")
     streetlight = relationship("Streetlight", backref="repair_tasks")
     technician = relationship(
         "User",

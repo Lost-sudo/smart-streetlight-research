@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 from app.repositories.predictive_alert import PredictiveAlertRepository
 from app.schemas.predictive_alert import PredictiveAlertCreate, PredictiveAlertUpdate
-from app.models.streetlight import UrgencyLevel
 from fastapi import HTTPException, status
 
 class PredictiveAlertService:

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
-from app.models.streetlight import UrgencyLevel
+from app.models.predictive_maintenance_alert import UrgencyLevel
 
 class PredictiveAlertBase(BaseModel):
     streetlight_id: int

@@ -3,7 +3,7 @@ from app.repositories.predictive_maintenance_log import PredictiveMaintenanceRep
 from app.schemas.streetlight import PredictiveMaintenanceCreate, PredictiveMaintenanceRead, PredictiveMaintenanceUpdate
 from app.services.predictive_alert import PredictiveAlertService
 from app.schemas.predictive_alert import PredictiveAlertCreate
-from app.models.streetlight import UrgencyLevel
+from app.models.predictive_maintenance_alert import UrgencyLevel
 from app.repositories.streetlight_log import StreetlightLogRepository
 from app.services.ml_prediction import MLPredictionService
 from fastapi import HTTPException, status

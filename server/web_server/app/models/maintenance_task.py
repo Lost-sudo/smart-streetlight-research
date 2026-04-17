@@ -49,7 +49,7 @@ class MaintenanceTask(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    predictive_alert = relationship("PredictiveAlert", backref="maintenance_task")
+    predictive_alert = relationship("PredictiveMaintenanceAlert", backref="maintenance_task")
     streetlight = relationship("Streetlight", backref="maintenance_tasks")
     technician = relationship("User", backref="maintenance_tasks")
     maintenance_log = relationship("MaintenanceLog", back_populates="maintenance_task", uselist=False)

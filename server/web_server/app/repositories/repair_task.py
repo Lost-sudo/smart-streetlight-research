@@ -5,7 +5,8 @@ from datetime import datetime
 
 from app.models.repair_task import RepairTask, RepairTaskStatus, RepairTaskSourceType, RepairTaskPriority
 from app.models.user import User, TechnicianAvailability, UserRole
-from app.models.streetlight import Alert, Streetlight, StreetlightStatus
+from app.models.alert import Alert
+from app.models.streetlight import Streetlight, StreetlightStatus
 from app.schemas.repair_task import RepairTaskCreate
 from typing import Optional
 
