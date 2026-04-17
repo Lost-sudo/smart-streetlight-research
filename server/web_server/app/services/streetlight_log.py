@@ -53,32 +53,40 @@ class StreetlightLogService:
                 if streetlight.status != "maintenance":
                     self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))
                 
-                fault_priority = "critical" if fault_result["confidence"] >= 0.8 else "high"
+                confidence = fault_result.get("confidence", 0.0)
+                if confidence >= 0.8:
+                    fault_priority = "critical"
+                elif confidence >= 0.7:
+                    fault_priority = "high"
+                else:
+                    fault_priority = "medium"
 
-                # Avoid spamming duplicate hardware fault alerts, BUT allow if previous was resolved
-                existing_active_fault = self.alert_repo.get_unresolved_by_streetlight_id(
-                    streetlight.id, alert_type="hardware_fault_alert"
-                )
-                
-                if not existing_active_fault:
-                    alert_create = AlertCreate(
-                        streetlight_id=streetlight.id,
-                        alert_type="FAULT",
-                        type="hardware_fault_alert",
-                        severity=fault_priority,
-                        message=f"Immediate hardware fault detected ({fault_result['confidence']*100:.1f}% confidence).",
-                        is_resolved=False,
-                        created_at=datetime.utcnow()
+                # Filter alerts: only store high and critical priority faults as alerts
+                if fault_priority in ["high", "critical"]:
+                    # Avoid spamming duplicate hardware fault alerts, BUT allow if previous was resolved
+                    existing_active_fault = self.alert_repo.get_unresolved_by_streetlight_id(
+                        streetlight.id, alert_type="hardware_fault_alert"
                     )
-                    db_alert = self.alert_repo.create(alert_create)
+                    
+                    if not existing_active_fault:
+                        alert_create = AlertCreate(
+                            streetlight_id=streetlight.id,
+                            alert_type="FAULT",
+                            type="hardware_fault_alert",
+                            severity=fault_priority,
+                            message=f"Immediate hardware fault detected ({confidence*100:.1f}% confidence).",
+                            is_resolved=False,
+                            created_at=datetime.utcnow()
+                        )
+                        db_alert = self.alert_repo.create(alert_create)
 
-                    self.repair_task_repo.create(RepairTaskCreate(
-                        streetlight_id=streetlight.id,
-                        alert_id=db_alert.id, 
-                        description="Hardware fault auto-detected. Requires emergency field intervention.",
-                        source_type="FAULT",
-                        priority=fault_priority
-                    ))
+                        self.repair_task_repo.create(RepairTaskCreate(
+                            streetlight_id=streetlight.id,
+                            alert_id=db_alert.id, 
+                            description="Hardware fault auto-detected. Requires emergency field intervention.",
+                            source_type="FAULT",
+                            priority=fault_priority
+                        ))
         except Exception as e:
             logger.exception("Error during Fault Detection flow")
 
