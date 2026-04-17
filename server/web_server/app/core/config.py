@@ -1,5 +1,11 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+from pathlib import Path
+from urllib.parse import quote_plus
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 class Settings(BaseSettings):
     POSTGRES_USER: str
@@ -19,14 +25,16 @@ class Settings(BaseSettings):
     REFRESH_COOKIE_SAMESITE: str = "strict"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore"
     )
 
     @property
     def DATABASE_URL(self) -> str:
-        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        user = quote_plus(self.POSTGRES_USER)
+        password = quote_plus(self.POSTGRES_PASSWORD)
+        return f"postgresql+psycopg2://{user}:{password}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     @property
     def REFRESH_COOKIE_MAX_AGE_SECONDS(self) -> int:
