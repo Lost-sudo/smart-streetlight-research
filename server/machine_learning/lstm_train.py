@@ -1,16 +1,16 @@
 """
 lstm_train.py
 =============
-Training pipeline for the LSTM Degradation Trend Forecasting model.
+Training pipeline for the LSTM Time-to-Failure Prediction model.
 
 Problem Type : Time-Series Regression
 Algorithm    : Long Short-Term Memory (LSTM) via PyTorch
-Target       : Next-step power consumption prediction
+Target       : time_to_failure (number of timesteps until failure)
 
 Follows the ML Design Document:
-  §7.3  — LSTM for degradation trend forecasting
-  §8    — Model Training Strategy (70 / 15 / 15 split)
-  §9    — Evaluation Metric: Mean Absolute Error (MAE)
+  7.3  - LSTM for degradation trend forecasting
+  8    - Model Training Strategy (70 / 15 / 15 split)
+  9    - Evaluation Metrics: MSE, MAE, R-squared
 
 Note: TensorFlow is not available for Python 3.14, so PyTorch is used instead.
       The model is exported as a .pt file.
@@ -28,7 +28,7 @@ MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 
 
 # ------------------------------------------------------------------ #
-#  Data splitting (§8.2) — adapted for time-series                    #
+#  Data splitting (70 / 15 / 15)                                      #
 # ------------------------------------------------------------------ #
 
 def split_sequences(
@@ -42,30 +42,13 @@ def split_sequences(
     """
     Splits sequence data into Training (70%), Validation (15%),
     and Test (15%) sets.
-
-    Parameters
-    ----------
-    X : np.ndarray
-        Input sequences of shape (n_samples, lookback, n_features).
-    y : np.ndarray
-        Target values of shape (n_samples,).
-    train_ratio, val_ratio, test_ratio : float
-        Split proportions (must sum to 1.0).
-    random_state : int
-        Seed for reproducibility.
-
-    Returns
-    -------
-    tuple of (X_train, X_val, X_test, y_train, y_val, y_test)
     """
     assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6
 
-    # First split: separate test set
     X_temp, X_test, y_temp, y_test = train_test_split(
         X, y, test_size=test_ratio, random_state=random_state
     )
 
-    # Second split: separate train and validation
     relative_val = val_ratio / (train_ratio + val_ratio)
     X_train, X_val, y_train, y_val = train_test_split(
         X_temp, y_temp, test_size=relative_val, random_state=random_state
@@ -76,15 +59,15 @@ def split_sequences(
 
 
 # ------------------------------------------------------------------ #
-#  LSTM Model definition (§7.3)                                       #
+#  LSTM Model definition                                              #
 # ------------------------------------------------------------------ #
 
 class LSTMModel(nn.Module):
     """
-    PyTorch LSTM model for time-series regression.
+    PyTorch LSTM model for time-series regression (time-to-failure).
 
     Architecture:
-      LSTM (64 units) → Dropout (0.2) → Linear (32) → ReLU → Linear (1)
+      LSTM (64 units) -> Dropout (0.2) -> Linear (32) -> ReLU -> Linear (1)
     """
 
     def __init__(self, input_size: int, hidden_size: int = 64, dropout: float = 0.2):
@@ -117,23 +100,7 @@ def build_lstm_model(
     hidden_size: int = 64,
     dropout: float = 0.2,
 ) -> LSTMModel:
-    """
-    Builds a PyTorch LSTM model for time-series regression.
-
-    Parameters
-    ----------
-    input_size : int
-        Number of input features per timestep.
-    hidden_size : int
-        Number of LSTM hidden units (default: 64).
-    dropout : float
-        Dropout rate for regularization (default: 0.2).
-
-    Returns
-    -------
-    LSTMModel
-        The constructed (untrained) model.
-    """
+    """Builds a PyTorch LSTM model for time-to-failure regression."""
     model = LSTMModel(input_size, hidden_size, dropout)
     print(f"[build] LSTM model built: input_size={input_size}, hidden={hidden_size}")
     print(model)
@@ -157,31 +124,7 @@ def train_model(
     learning_rate: float = 0.001,
     patience: int = 5,
 ) -> dict:
-    """
-    Trains the LSTM model with early stopping.
-
-    Parameters
-    ----------
-    model : LSTMModel
-        The PyTorch LSTM model.
-    X_train, y_train : np.ndarray
-        Training data.
-    X_val, y_val : np.ndarray
-        Validation data for early stopping.
-    epochs : int
-        Maximum training epochs (default: 50).
-    batch_size : int
-        Batch size (default: 32).
-    learning_rate : float
-        Adam optimizer learning rate (default: 0.001).
-    patience : int
-        Early stopping patience (default: 5).
-
-    Returns
-    -------
-    dict
-        Training history with 'train_loss' and 'val_loss' per epoch.
-    """
+    """Trains the LSTM model with early stopping using MSE loss."""
     # Convert numpy arrays to PyTorch tensors
     X_train_t = torch.FloatTensor(X_train)
     y_train_t = torch.FloatTensor(y_train)
@@ -192,7 +135,7 @@ def train_model(
     train_dataset = TensorDataset(X_train_t, y_train_t)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-    # Loss and optimizer
+    # MSE loss for regression (predicting continuous time-to-failure)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -226,7 +169,7 @@ def train_model(
         history["train_loss"].append(avg_train_loss)
         history["val_loss"].append(val_loss)
 
-        print(f"  Epoch {epoch:3d}/{epochs} — Train Loss: {avg_train_loss:.6f} | Val Loss: {val_loss:.6f}")
+        print(f"  Epoch {epoch:3d}/{epochs} - Train Loss: {avg_train_loss:.4f} | Val Loss: {val_loss:.4f}")
 
         # --- Early stopping check ---
         if val_loss < best_val_loss:
@@ -243,14 +186,14 @@ def train_model(
     # Restore best weights
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
-        print(f"[train] Restored best model weights (val_loss={best_val_loss:.6f})")
+        print(f"[train] Restored best model weights (val_loss={best_val_loss:.4f})")
 
     print(f"[train] LSTM training completed after {len(history['train_loss'])} epochs.")
     return history
 
 
 # ------------------------------------------------------------------ #
-#  Model evaluation (§9 — MAE)                                       #
+#  Model evaluation                                                   #
 # ------------------------------------------------------------------ #
 
 def evaluate_model(
@@ -260,8 +203,7 @@ def evaluate_model(
     split_name: str = "Test",
 ) -> dict:
     """
-    Evaluates the LSTM model using Mean Absolute Error (MAE)
-    as specified in ML Document §9.
+    Evaluates the LSTM model using MSE, MAE, and R-squared.
 
     Parameters
     ----------
@@ -270,14 +212,14 @@ def evaluate_model(
     X : np.ndarray
         Input sequences.
     y : np.ndarray
-        True target values.
+        True target values (time_to_failure).
     split_name : str
-        Label for display (e.g., "Test", "Validation").
+        Label for display.
 
     Returns
     -------
     dict
-        Dictionary with 'loss_mse' and 'mae' values.
+        Dictionary with 'mse', 'mae', and 'r2' values.
     """
     model.eval()
     X_t = torch.FloatTensor(X)
@@ -285,17 +227,23 @@ def evaluate_model(
 
     with torch.no_grad():
         predictions = model(X_t)
-        mse_loss = nn.MSELoss()(predictions, y_t).item()
+        mse = nn.MSELoss()(predictions, y_t).item()
         mae = nn.L1Loss()(predictions, y_t).item()
 
-    metrics = {"loss_mse": mse_loss, "mae": mae}
+        # R-squared
+        ss_res = ((predictions - y_t) ** 2).sum().item()
+        ss_tot = ((y_t - y_t.mean()) ** 2).sum().item()
+        r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
-    print(f"\n{'=' * 50}")
-    print(f"  {split_name} Set Evaluation (LSTM)")
-    print(f"{'=' * 50}")
-    print(f"  Loss (MSE)          : {mse_loss:.6f}")
-    print(f"  Mean Absolute Error : {mae:.6f}")
-    print(f"{'=' * 50}\n")
+    metrics = {"mse": mse, "mae": mae, "r2": r2}
+
+    print(f"\n{'=' * 55}")
+    print(f"  {split_name} Set Evaluation (LSTM Time-to-Failure)")
+    print(f"{'=' * 55}")
+    print(f"  MSE (Mean Squared Error)  : {mse:.4f}")
+    print(f"  MAE (Mean Absolute Error) : {mae:.4f}")
+    print(f"  R-squared                 : {r2:.4f}")
+    print(f"{'=' * 55}\n")
 
     return metrics
 
@@ -308,14 +256,7 @@ def save_model(
     model: LSTMModel,
     model_filename: str = "lstm_model.pt",
 ) -> str:
-    """
-    Saves the trained PyTorch LSTM model to disk.
-
-    Returns
-    -------
-    str
-        Absolute path to the saved model file.
-    """
+    """Saves the trained PyTorch LSTM model to disk."""
     os.makedirs(MODELS_DIR, exist_ok=True)
     model_path = os.path.join(MODELS_DIR, model_filename)
     torch.save(model.state_dict(), model_path)

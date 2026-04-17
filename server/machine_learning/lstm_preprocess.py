@@ -1,7 +1,7 @@
 """
 lstm_preprocess.py
 ==================
-Preprocessing pipeline for the LSTM Degradation Trend Forecasting model.
+Preprocessing pipeline for the LSTM Time-to-Failure Prediction model.
 
 Handles:
   - MinMaxScaler normalization (standard for neural networks)
@@ -9,6 +9,7 @@ Handles:
   - Scaler persistence for inference-time reuse
 
 The LSTM expects input shaped as (samples, timesteps, features).
+Target: time_to_failure (regression - how many timesteps until failure)
 """
 
 import os
@@ -34,10 +35,6 @@ def scale_features(
 ) -> tuple:
     """
     Applies MinMaxScaler to the LSTM feature columns.
-
-    MinMaxScaler is preferred over StandardScaler for LSTM/neural networks
-    because it bounds values between 0 and 1, which helps with sigmoid/tanh
-    activation functions.
 
     Parameters
     ----------
@@ -81,25 +78,24 @@ def scale_features(
 
 def create_sequences(
     data: np.ndarray,
+    target_data: np.ndarray,
     lookback: int = 10,
-    target_col_index: int = None,
 ) -> tuple:
     """
     Creates sliding-window sequences for LSTM training.
 
-    Given a 2D array of shape (timesteps, features), produces:
-      X : (n_samples, lookback, features)   — input sequences
-      y : (n_samples,)                      — next-step target value
+    Given a 2D array of shape (timesteps, features) and a 1D target array, produces:
+      X : (n_samples, lookback, features)   - input sequences
+      y : (n_samples,)                      - target value at the end of the window
 
     Parameters
     ----------
     data : np.ndarray
         Scaled 2D array of shape (timesteps, features).
+    target_data : np.ndarray
+        1D array of shape (timesteps,) with time_to_failure values.
     lookback : int
         Number of past time steps to use as input (default: 10).
-    target_col_index : int or None
-        Column index for the target variable in `data`.
-        If None, defaults to the `power_consumption` column index.
 
     Returns
     -------
@@ -107,15 +103,11 @@ def create_sequences(
         X: np.ndarray of shape (n_samples, lookback, n_features)
         y: np.ndarray of shape (n_samples,)
     """
-    if target_col_index is None:
-        # power_consumption is the 3rd column (index 2) in LSTM_FEATURES
-        target_col_index = LSTM_FEATURES.index(LSTM_TARGET)
-
     X, y = [], []
 
     for i in range(lookback, len(data)):
-        X.append(data[i - lookback : i])           # past `lookback` steps
-        y.append(data[i, target_col_index])         # next-step target
+        X.append(data[i - lookback : i])          # past `lookback` steps as features
+        y.append(target_data[i])                   # time_to_failure at current step
 
     return np.array(X), np.array(y)
 
@@ -156,14 +148,16 @@ def preprocess_pipeline(
     # Build a temporary DataFrame with node_id for grouping
     df_scaled = pd.DataFrame(scaled_data, columns=LSTM_FEATURES)
     df_scaled["node_id"] = df["node_id"].values
+    df_scaled[LSTM_TARGET] = df[LSTM_TARGET].values
 
     # Create sequences per node (to avoid cross-node contamination)
     all_X, all_y = [], []
 
     for node_id, group in df_scaled.groupby("node_id"):
         node_data = group[LSTM_FEATURES].values
+        node_target = group[LSTM_TARGET].values
         if len(node_data) > lookback:
-            X_node, y_node = create_sequences(node_data, lookback=lookback)
+            X_node, y_node = create_sequences(node_data, node_target, lookback=lookback)
             all_X.append(X_node)
             all_y.append(y_node)
 
@@ -171,4 +165,5 @@ def preprocess_pipeline(
     y = np.concatenate(all_y, axis=0)
 
     print(f"[lstm_preprocess] Sequences created: X={X.shape}, y={y.shape}")
+    print(f"[lstm_preprocess] Target (time_to_failure) range: [{y.min():.1f}, {y.max():.1f}]")
     return X, y

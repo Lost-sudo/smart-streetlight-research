@@ -26,7 +26,8 @@ RF_FEATURES = [
     "fault_frequency",
 ]
 
-LSTM_FEATURES = ["voltage", "current", "power_consumption", "light_intensity"]
+# LSTM features now include timestep for temporal awareness
+LSTM_FEATURES = ["timestep", "voltage", "current", "power_consumption", "light_intensity"]
 
 # server/web_server/app/services -> server
 SERVER_DIR = Path(__file__).resolve().parents[3]
@@ -35,6 +36,10 @@ RF_MODEL_PATH = MODELS_DIR / "random_forest_model.joblib"
 RF_SCALER_PATH = MODELS_DIR / "random_forest_scaler.joblib"
 LSTM_MODEL_PATH = MODELS_DIR / "lstm_model.pt"
 LSTM_SCALER_PATH = MODELS_DIR / "lstm_scaler.joblib"
+
+# Maximum time-to-failure from training (n_timesteps * 0.95)
+# This is used to normalize the LSTM output into a probability
+MAX_TTF = 142.0  # 150 * 0.95 = 142 max timesteps to failure in training data
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size: int, hidden_size: int = 64, dropout: float = 0.2):
@@ -96,6 +101,7 @@ class MLPredictionService:
             logger.exception("Error loading ML artifacts; using mock predictions.")
 
     def detect_fault(self, iot_log: IoTNodeLogCreate):
+        """Use Random Forest to detect if the streetlight is currently in a fault state."""
         if not self.rf_model or not self.rf_scaler:
             return self._mock_detect_fault(iot_log)
 
@@ -138,6 +144,15 @@ class MLPredictionService:
         }
 
     def predict_failure(self, iot_log: IoTNodeLogCreate, historical_logs=None):
+        """
+        Use LSTM to predict time-to-failure.
+        
+        The LSTM outputs a raw time_to_failure value (in timesteps).
+        We convert this to:
+          - failure_probability: higher when time_to_failure is low
+          - predicted_failure_date: estimated date based on time_to_failure
+          - urgency_level: low/medium/high based on probability
+        """
         if not self.use_lstm or not self.lstm_model or not self.lstm_scaler:
             return self._mock_prediction(iot_log)
 
@@ -146,9 +161,11 @@ class MLPredictionService:
             
         latest_history = historical_logs[-9:]
         
+        # Build the sequence with timestep included as a feature
         sequence_data = []
-        for log in latest_history:
+        for i, log in enumerate(latest_history):
             sequence_data.append([
+                float(i),  # timestep (relative position in sequence)
                 getattr(log, "voltage", 220.0),
                 getattr(log, "current", 0.45),
                 getattr(log, "power_consumption", 100.0),
@@ -156,6 +173,7 @@ class MLPredictionService:
             ])
             
         sequence_data.append([
+            float(len(latest_history)),  # current timestep
             iot_log.voltage,
             iot_log.current,
             iot_log.power_consumption,
@@ -167,20 +185,23 @@ class MLPredictionService:
         input_tensor = torch.FloatTensor(scaled_data).unsqueeze(0)
         
         with torch.no_grad():
-            predicted_power_consumption = self.lstm_model(input_tensor).item()
+            predicted_ttf = self.lstm_model(input_tensor).item()
         
-        base_probability = 0.1
-        if predicted_power_consumption > 150:
-            failure_prob = 0.95
-        elif predicted_power_consumption > 130:
-            failure_prob = 0.5 + (predicted_power_consumption - 130) * 0.02
-        else:
-            failure_prob = base_probability
-            
+        # Clamp to valid range
+        predicted_ttf = max(predicted_ttf, 0.0)
+        
+        # Convert time-to-failure to failure probability
+        # Lower TTF = higher probability of failure
+        # TTF of 0 = 100% failure, TTF of MAX_TTF+ = low probability
+        failure_prob = 1.0 - min(predicted_ttf / MAX_TTF, 1.0)
         failure_prob = min(max(failure_prob, 0.0), 1.0)
         
         urgency_level = self._map_urgency(failure_prob)
-        predicted_failure_date = datetime.utcnow() + timedelta(days=int((1 - failure_prob) * 365))
+        
+        # Each timestep approximates ~6 hours in a real deployment
+        # So predicted_ttf * 6 hours = predicted time until failure
+        hours_to_failure = predicted_ttf * 6.0
+        predicted_failure_date = datetime.utcnow() + timedelta(hours=hours_to_failure)
 
         return {
             "failure_probability": round(failure_prob, 4),

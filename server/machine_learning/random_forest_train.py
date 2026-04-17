@@ -1,22 +1,18 @@
 """
 random_forest_train.py
 ======================
-Training pipeline for the Random Forest Failure Prediction model.
+Training pipeline for the Random Forest Fault Detection model.
 
-Problem Type: Supervised Classification
-Algorithm  : Random Forest Classifier (scikit-learn)
+Problem Type : Binary Classification (is this streetlight currently faulty?)
+Algorithm    : Random Forest Classifier via scikit-learn
+Target       : failure_status (0 = normal, 1 = fault)
 
-Follows the ML Design Document:
-  §7.1  — Random Forest Classifier for failure prediction
-  §8    — Model Training Strategy
-           - 70 % Training / 15 % Validation / 15 % Test split
-  §9    — Evaluation Metrics: Accuracy, Precision, Recall, F1, ROC-AUC
+Evaluation Metrics: Accuracy, Precision, Recall, F1-Score, AUC-ROC
 """
 
 import os
 import joblib
 import numpy as np
-import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
@@ -29,52 +25,31 @@ from sklearn.metrics import (
     confusion_matrix,
 )
 
-from random_forest_preprocess import ALL_FEATURES, TARGET_COLUMN
-
-# Directory where model artifacts are persisted
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 
 
 # ------------------------------------------------------------------ #
-#  Data splitting (§8.2)                                              #
+#  Data splitting                                                     #
 # ------------------------------------------------------------------ #
 
-def split_dataset(
-    df: pd.DataFrame,
+def split_data(
+    X: np.ndarray,
+    y: np.ndarray,
     train_ratio: float = 0.70,
     val_ratio: float = 0.15,
     test_ratio: float = 0.15,
     random_state: int = 42,
-):
-    """
-    Splits the dataset into Training (70 %), Validation (15 %), and
-    Test (15 %) sets as specified in ML Design Document §8.2.
+) -> tuple:
+    """Splits data into Train (70%), Validation (15%), Test (15%) sets."""
+    assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6
 
-    Returns
-    -------
-    tuple of (X_train, X_val, X_test, y_train, y_val, y_test)
-    """
-    assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6, \
-        "Ratios must sum to 1.0"
-
-    X = df[ALL_FEATURES]
-    y = df[TARGET_COLUMN]
-
-    # First split: separate the test set
     X_temp, X_test, y_temp, y_test = train_test_split(
-        X, y,
-        test_size=test_ratio,
-        random_state=random_state,
-        stratify=y,
+        X, y, test_size=test_ratio, random_state=random_state, stratify=y
     )
 
-    # Second split: separate training and validation from the remainder
-    relative_val_ratio = val_ratio / (train_ratio + val_ratio)
+    relative_val = val_ratio / (train_ratio + val_ratio)
     X_train, X_val, y_train, y_val = train_test_split(
-        X_temp, y_temp,
-        test_size=relative_val_ratio,
-        random_state=random_state,
-        stratify=y_temp,
+        X_temp, y_temp, test_size=relative_val, random_state=random_state, stratify=y_temp
     )
 
     print(f"[split] Train: {len(X_train)}  |  Val: {len(X_val)}  |  Test: {len(X_test)}")
@@ -82,138 +57,98 @@ def split_dataset(
 
 
 # ------------------------------------------------------------------ #
-#  Model training (§7.1)                                              #
+#  Model building                                                     #
 # ------------------------------------------------------------------ #
 
-def train_model(
-    X_train: pd.DataFrame,
-    y_train: pd.Series,
+def build_model(
     n_estimators: int = 100,
+    max_depth: int = 15,
     random_state: int = 42,
 ) -> RandomForestClassifier:
-    """
-    Trains a Random Forest Classifier.
-
-    Parameters
-    ----------
-    X_train : pd.DataFrame
-        Training features.
-    y_train : pd.Series
-        Training labels.
-    n_estimators : int
-        Number of trees in the forest (default 100).
-    random_state : int
-        Seed for reproducibility.
-
-    Returns
-    -------
-    RandomForestClassifier
-        The fitted model.
-    """
+    """Builds a Random Forest classifier for fault detection."""
     model = RandomForestClassifier(
         n_estimators=n_estimators,
+        max_depth=max_depth,
         random_state=random_state,
-        n_jobs=-1,              # use all CPU cores
-        class_weight="balanced", # handle class imbalance
+        class_weight="balanced",  # Handle imbalanced classes
+        n_jobs=-1,
     )
-    model.fit(X_train, y_train)
-    print(f"[train] Random Forest trained with {n_estimators} estimators.")
+    print(f"[build] Random Forest: n_estimators={n_estimators}, max_depth={max_depth}")
     return model
 
 
 # ------------------------------------------------------------------ #
-#  Model evaluation (§9)                                              #
+#  Model training                                                     #
+# ------------------------------------------------------------------ #
+
+def train_model(
+    model: RandomForestClassifier,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+) -> RandomForestClassifier:
+    """Trains the Random Forest model."""
+    print("[train] Training Random Forest...")
+    model.fit(X_train, y_train)
+    print("[train] Training complete.")
+    return model
+
+
+# ------------------------------------------------------------------ #
+#  Model evaluation                                                   #
 # ------------------------------------------------------------------ #
 
 def evaluate_model(
     model: RandomForestClassifier,
-    X: pd.DataFrame,
-    y: pd.Series,
+    X: np.ndarray,
+    y: np.ndarray,
     split_name: str = "Test",
 ) -> dict:
-    """
-    Evaluates the model using the metrics specified in ML Document §9:
-      Accuracy, Precision, Recall, F1-Score, ROC-AUC.
-
-    Parameters
-    ----------
-    model : RandomForestClassifier
-        Trained model.
-    X : pd.DataFrame
-        Feature matrix.
-    y : pd.Series
-        True labels.
-    split_name : str
-        Label for print output (e.g., "Validation", "Test").
-
-    Returns
-    -------
-    dict
-        Dictionary of metric name → value.
-    """
+    """Evaluates the RF model with comprehensive classification metrics."""
     y_pred = model.predict(X)
     y_proba = model.predict_proba(X)[:, 1]
 
+    accuracy = accuracy_score(y, y_pred)
+    precision = precision_score(y, y_pred, zero_division=0)
+    recall = recall_score(y, y_pred, zero_division=0)
+    f1 = f1_score(y, y_pred, zero_division=0)
+    auc_roc = roc_auc_score(y, y_proba)
+
     metrics = {
-        "accuracy": accuracy_score(y, y_pred),
-        "precision": precision_score(y, y_pred, zero_division=0),
-        "recall": recall_score(y, y_pred, zero_division=0),
-        "f1_score": f1_score(y, y_pred, zero_division=0),
-        "roc_auc": roc_auc_score(y, y_proba),
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "auc_roc": auc_roc,
     }
 
-    print(f"\n{'=' * 50}")
-    print(f"  {split_name} Set Evaluation")
-    print(f"{'=' * 50}")
-    for name, value in metrics.items():
-        print(f"  {name:<12}: {value:.4f}")
-    print(f"\n  Classification Report:\n{classification_report(y, y_pred, target_names=['Normal', 'Faulty'])}")
-    print(f"  Confusion Matrix:\n{confusion_matrix(y, y_pred)}\n")
+    print(f"\n{'=' * 55}")
+    print(f"  {split_name} Set Evaluation (Random Forest Fault Detection)")
+    print(f"{'=' * 55}")
+    print(f"  Accuracy  : {accuracy * 100:.2f}%")
+    print(f"  Precision : {precision:.4f}")
+    print(f"  Recall    : {recall:.4f}")
+    print(f"  F1 Score  : {f1:.4f}")
+    print(f"  AUC-ROC   : {auc_roc:.4f}")
+    print(f"\n  Confusion Matrix:")
+    cm = confusion_matrix(y, y_pred)
+    print(f"    TN={cm[0][0]:5d}  FP={cm[0][1]:5d}")
+    print(f"    FN={cm[1][0]:5d}  TP={cm[1][1]:5d}")
+    print(f"{'=' * 55}\n")
 
     return metrics
 
 
 # ------------------------------------------------------------------ #
-#  Feature importance                                                 #
-# ------------------------------------------------------------------ #
-
-def print_feature_importance(
-    model: RandomForestClassifier,
-    feature_names: list,
-):
-    """
-    Prints the feature importance ranking from the trained Random Forest.
-    Useful for interpretability (ML Document §7.1 Rationale).
-    """
-    importances = model.feature_importances_
-    indices = np.argsort(importances)[::-1]
-
-    print(f"\n{'=' * 50}")
-    print("  Feature Importance Ranking")
-    print(f"{'=' * 50}")
-    for rank, idx in enumerate(indices, start=1):
-        print(f"  {rank}. {feature_names[idx]:<25} {importances[idx]:.4f}")
-    print()
-
-
-# ------------------------------------------------------------------ #
-#  Export model (§11)                                                 #
+#  Export model                                                       #
 # ------------------------------------------------------------------ #
 
 def save_model(
     model: RandomForestClassifier,
     model_filename: str = "random_forest_model.joblib",
 ) -> str:
-    """
-    Serializes the trained model to disk using joblib.
-
-    Returns
-    -------
-    str
-        Absolute path to the saved model file.
-    """
+    """Saves the trained Random Forest model to disk."""
     os.makedirs(MODELS_DIR, exist_ok=True)
     model_path = os.path.join(MODELS_DIR, model_filename)
     joblib.dump(model, model_path)
-    print(f"[export] Model saved to {model_path}")
+    print(f"[export] Random Forest model saved to {model_path}")
     return model_path

@@ -28,15 +28,16 @@ from lstm_train import (
 
 def main():
     print("=" * 60)
-    print("  Smart Streetlight — LSTM Degradation Forecasting Training")
+    print("  Smart Streetlight - LSTM Time-to-Failure Training")
     print("=" * 60)
 
     # ---------------------------------------------------------- #
     # Step 1: Generate synthetic sequential data                  #
     # ---------------------------------------------------------- #
     print("\n[Step 1] Generating synthetic sequential data...")
-    df = generate_sequential_dataset(n_nodes=50, n_timesteps=200)
-    print(f"  → Dataset shape: {df.shape}")
+    df = generate_sequential_dataset(n_nodes=200, n_timesteps=150)
+    print(f"  -> Dataset shape: {df.shape}")
+    print(f"  -> time_to_failure range: [{df['time_to_failure'].min()}, {df['time_to_failure'].max()}]")
 
     # ---------------------------------------------------------- #
     # Step 2: Preprocess (scale + create sequences)               #
@@ -84,8 +85,9 @@ def main():
     print("  LSTM Training Complete!")
     print("=" * 60)
     print(f"  Model file : {model_path}")
-    print(f"  Test MAE   : {test_metrics['mae']:.6f}")
-    print(f"  Test MSE   : {test_metrics['loss_mse']:.6f}")
+    print(f"  Test MAE   : {test_metrics['mae']:.4f} timesteps")
+    print(f"  Test MSE   : {test_metrics['mse']:.4f}")
+    print(f"  Test R2    : {test_metrics['r2']:.4f}")
     print("=" * 60)
 
     return test_metrics

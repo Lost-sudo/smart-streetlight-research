@@ -1,56 +1,56 @@
-"""Synthetic tabular streetlight sensor data for Random Forest training."""
+"""
+Tabular sensor data for Random Forest training, filtered from the unified dataset.
+
+The Random Forest is a fault DETECTOR -- it classifies whether a streetlight
+is currently in a "failed" state based on its current sensor snapshot.
+
+We filter the sequential dataset to keep only:
+  - Clean NORMAL readings (early timesteps, before degradation kicks in)
+  - Clear FAULT readings (timesteps where failure_status == 1)
+
+This eliminates the "gray area" degradation zone, giving the RF a clean
+binary classification problem.
+"""
 
 import numpy as np
 import pandas as pd
+from lstm_data import generate_sequential_dataset, RF_FEATURES, RF_TARGET
 
 
 def generate_synthetic_dataset(
-    n_samples: int = 2000,
-    faulty_ratio: float = 0.25,
+    n_nodes: int = 500,
     random_state: int = 42,
 ) -> pd.DataFrame:
-    rng = np.random.RandomState(random_state)
+    """Generate filtered normal-vs-fault dataset for Random Forest training."""
+    # 1. Generate the full lifecycle data
+    full_df = generate_sequential_dataset(
+        n_nodes=n_nodes, n_timesteps=150, random_state=random_state
+    )
 
-    n_faulty = int(n_samples * faulty_ratio)
-    n_normal = n_samples - n_faulty
+    # 2. Keep only clean "Normal" data (first 20% of each node's life)
+    #    and clear "Fault" data (failure_status == 1)
+    max_timestep = full_df.groupby("node_id")["timestep"].transform("max")
+    normal_cutoff = max_timestep * 0.20
 
-    normal_data = {
-        "voltage": rng.normal(loc=220.0, scale=5.0, size=n_normal),
-        "current": rng.normal(loc=0.45, scale=0.05, size=n_normal),
-        "power_consumption": rng.normal(loc=100.0, scale=10.0, size=n_normal),
-        "light_intensity": rng.normal(loc=350.0, scale=30.0, size=n_normal),
-        "operating_hours": rng.uniform(low=0, high=5000, size=n_normal),
-        "voltage_fluctuation": rng.normal(loc=0.02, scale=0.01, size=n_normal),
-        "current_deviation": rng.normal(loc=0.0, scale=0.02, size=n_normal),
-        "power_trend": rng.normal(loc=0.0, scale=0.5, size=n_normal),
-        "fault_frequency": rng.poisson(lam=0.3, size=n_normal),
-        "failure_status": np.zeros(n_normal, dtype=int),
-    }
+    normal_df = full_df[full_df["timestep"] <= normal_cutoff].copy()
+    normal_df["failure_status"] = 0  # Ensure label is clean
 
-    faulty_data = {
-        "voltage": rng.normal(loc=195.0, scale=15.0, size=n_faulty),
-        "current": rng.normal(loc=0.70, scale=0.15, size=n_faulty),
-        "power_consumption": rng.normal(loc=145.0, scale=25.0, size=n_faulty),
-        "light_intensity": rng.normal(loc=180.0, scale=60.0, size=n_faulty),
-        "operating_hours": rng.uniform(low=3000, high=10000, size=n_faulty),
-        "voltage_fluctuation": rng.normal(loc=0.12, scale=0.05, size=n_faulty),
-        "current_deviation": rng.normal(loc=0.25, scale=0.08, size=n_faulty),
-        "power_trend": rng.normal(loc=3.0, scale=1.5, size=n_faulty),
-        "fault_frequency": rng.poisson(lam=4.0, size=n_faulty),
-        "failure_status": np.ones(n_faulty, dtype=int),
-    }
+    faulty_df = full_df[full_df["failure_status"] == 1].copy()
 
-    df_normal = pd.DataFrame(normal_data)
-    df_faulty = pd.DataFrame(faulty_data)
-    df = pd.concat([df_normal, df_faulty], ignore_index=True)
+    # 3. Concatenate and shuffle
+    df = pd.concat([normal_df, faulty_df], ignore_index=True)
     df = df.sample(frac=1.0, random_state=random_state).reset_index(drop=True)
+
+    print(f"[rf_data] Normal samples: {len(normal_df)}, Fault samples: {len(faulty_df)}")
+    print(f"[rf_data] Total filtered dataset: {len(df)}")
 
     return df
 
 
 if __name__ == "__main__":
     df = generate_synthetic_dataset()
-    print(f"Dataset shape: {df.shape}")
+    print(f"\nFiltered Dataset shape: {df.shape}")
     print(f"\nClass distribution:\n{df['failure_status'].value_counts()}")
-    print(f"\nSample rows:\n{df.head(10).to_string()}")
-    print(f"\nDescriptive statistics:\n{df.describe().to_string()}")
+    print(f"\nFeatures used: {RF_FEATURES}")
+    print(f"\nSample rows:\n{df.head(10)[RF_FEATURES + [RF_TARGET]].to_string()}")
+    print(f"\nDescriptive statistics:\n{df[RF_FEATURES].describe().to_string()}")
