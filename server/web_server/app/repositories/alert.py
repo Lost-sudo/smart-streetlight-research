@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.models.streetlight import Alert
+from app.models.alert import Alert
 from app.schemas.streetlight import AlertCreate, AlertUpdate
 from typing import Optional, List
 

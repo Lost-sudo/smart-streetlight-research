@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.models.streetlight import MaintenanceLog
+from app.models.maintenance_log import MaintenanceLog
 from app.schemas.streetlight import MaintenanceLogCreate, MaintenanceLogUpdate
 from typing import Optional, List
 

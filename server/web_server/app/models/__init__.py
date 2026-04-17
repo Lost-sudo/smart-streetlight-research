@@ -4,3 +4,8 @@ from .streetlight import Streetlight, StreetlightLog, Alert, MaintenanceLog
 from .repair_task import RepairTask
 from .repair_log import RepairLog
 from .maintenance_task import MaintenanceTask
+from .streetlight_log import StreetlightLog
+from .alert import Alert
+from .maintenance_log import MaintenanceLog
+from .predictive_maintenance_log import PredictiveMaintenanceLog
+from .predictive_maintenance_alert import PredictiveMaintenanceAlert
