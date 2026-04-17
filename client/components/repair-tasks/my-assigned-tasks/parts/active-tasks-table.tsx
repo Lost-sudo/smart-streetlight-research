@@ -8,7 +8,7 @@ import { AlertTriangle, BrainCircuit, CheckCircle2, Clock } from "lucide-react";
 import { priorityColors, sourceTypeConfig, statusConfig } from "@/components/repair-tasks/my-assigned-tasks/utils";
 
 export type ActiveTaskRow = {
-  id: number;
+  id: string;
   priority: string;
   nodeName: string;
   alertType: string;
@@ -24,8 +24,8 @@ export function ActiveTasksTable({
 }: {
   tasks: ActiveTaskRow[];
   isUpdating: boolean;
-  onStartRepair: (taskId: number) => void;
-  onCompleteRepair: (taskId: number) => void;
+  onStartRepair: (taskId: string) => void;
+  onCompleteRepair: (taskId: string) => void;
 }) {
   return (
     <Table>

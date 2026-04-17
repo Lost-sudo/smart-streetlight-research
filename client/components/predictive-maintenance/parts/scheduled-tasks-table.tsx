@@ -8,9 +8,10 @@ import { RoleGate } from "@/components/auth/role-gate";
 import { AssignTechnicianDialog } from "@/components/predictive-maintenance/parts/assign-technician-dialog";
 import { priorityColors } from "@/components/predictive-maintenance/utils";
 
-import type { Technician, RepairTask } from "@/lib/redux/api/repairTaskApi";
+import type { Technician } from "@/lib/redux/api/repairTaskApi";
+import type { MaintenanceTask } from "@/lib/redux/api/maintenanceTaskApi";
 
-export type ScheduledTaskRow = RepairTask & { nodeName: string };
+export type ScheduledTaskRow = MaintenanceTask & { nodeName: string };
 
 export function ScheduledTasksTable({
   tasks,
@@ -70,7 +71,7 @@ export function ScheduledTasksTable({
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm">{task.scheduled_at ? new Date(task.scheduled_at).toLocaleDateString() : "Not set"}</span>
+                      <span className="text-sm">{task.scheduled_date ? new Date(task.scheduled_date).toLocaleDateString() : "Not set"}</span>
                     </TableCell>
                     <TableCell>
                       {task.technician_id ? (

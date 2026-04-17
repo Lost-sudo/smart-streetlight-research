@@ -80,6 +80,7 @@ class MaintenanceLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     streetlight_id = Column(Integer, ForeignKey("streetlights.id"))
     technician_id = Column(Integer, ForeignKey("users.id"))
+    maintenance_task_id = Column(Integer, ForeignKey("maintenance_tasks.id"), nullable=True, unique=True)
     description = Column(String)
     parts_replaced = Column(String)
     scheduled_date = Column(DateTime)
@@ -88,6 +89,8 @@ class MaintenanceLog(Base):
     
     streetlight = relationship("Streetlight", back_populates="maintenance_logs")
     technician = relationship("User", back_populates="maintenance_logs")
+    maintenance_task = relationship("MaintenanceTask", back_populates="maintenance_log")
+
 
 class PredictiveMaintenance(Base):
     __tablename__ = "predictive_maintenance"

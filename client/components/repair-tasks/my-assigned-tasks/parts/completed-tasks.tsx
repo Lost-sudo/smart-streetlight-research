@@ -7,7 +7,7 @@ import { CheckCircle2 } from "lucide-react";
 export function CompletedTasks({
   tasks,
 }: {
-  tasks: Array<{ id: number; nodeName: string; alertType: string }>;
+  tasks: Array<{ id: string; nodeName: string; alertType: string }>;
 }) {
   if (tasks.length === 0) return null;
 
