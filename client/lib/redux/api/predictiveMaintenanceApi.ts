@@ -19,7 +19,14 @@ export const predictiveMaintenanceApi = createApi({
       query: () => "/predictive-maintenance/",
       providesTags: ["PredictiveMaintenance"],
     }),
+    analyzeAllLogs: builder.mutation<{status: string, message: string}, void>({
+      query: () => ({
+        url: "/predictive-maintenance/analyze-all",
+        method: "POST",
+      }),
+      invalidatesTags: ["PredictiveMaintenance"],
+    }),
   }),
 });
 
-export const { useGetPredictiveMaintenanceLogsQuery } = predictiveMaintenanceApi;
+export const { useGetPredictiveMaintenanceLogsQuery, useAnalyzeAllLogsMutation } = predictiveMaintenanceApi;

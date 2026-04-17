@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 import { useGetStreetlightsQuery, type Streetlight } from "@/lib/redux/api/streetlightApi";
-import { useGetPredictiveMaintenanceLogsQuery, type PredictiveMaintenanceLog } from "@/lib/redux/api/predictiveMaintenanceApi";
+import { useGetPredictiveMaintenanceLogsQuery, useAnalyzeAllLogsMutation, type PredictiveMaintenanceLog } from "@/lib/redux/api/predictiveMaintenanceApi";
 import {
   useAssignTaskMutation,
   useGetAvailableTechniciansQuery,
@@ -18,16 +18,30 @@ import { PageHeader } from "@/components/predictive-maintenance/parts/page-heade
 import { SummaryCards } from "@/components/predictive-maintenance/parts/summary-cards";
 import { PredictionsTable, type PredictionRow } from "@/components/predictive-maintenance/parts/predictions-table";
 import { ScheduledTasksTable, type ScheduledTaskRow } from "@/components/predictive-maintenance/parts/scheduled-tasks-table";
+import { ActivePredictiveAlerts } from "@/components/predictive-maintenance/parts/active-predictive-alerts";
 import { indexStreetlightsById } from "@/components/predictive-maintenance/utils";
 
 export function PredictiveMaintenancePage() {
   const { data: streetlights = [], isLoading: slLoading } = useGetStreetlightsQuery(undefined, { pollingInterval: 15000 });
-  const { data: pmLogs = [], isLoading: pmLoading } = useGetPredictiveMaintenanceLogsQuery(undefined, { pollingInterval: 15000 });
+  const { data: pmLogs = [], isLoading: pmLoading } = useGetPredictiveMaintenanceLogsQuery(undefined, { pollingInterval: 1800000 });
   const { data: predictiveTasks = [] } = useGetTasksBySourceTypeQuery("PREDICTIVE", { pollingInterval: 15000 });
   const { data: availableTechnicians = [] } = useGetAvailableTechniciansQuery(undefined, { pollingInterval: 30000 });
 
   const [scheduleTask] = useScheduleTaskMutation();
   const [assignMutate] = useAssignTaskMutation();
+  const [analyzeAllLogs] = useAnalyzeAllLogsMutation();
+
+  useEffect(() => {
+    // Initially run predictive analysis
+    analyzeAllLogs().catch(console.error);
+
+    // Run every 30 minutes (30 * 60 * 1000 ms)
+    const interval = setInterval(() => {
+      analyzeAllLogs().catch(console.error);
+    }, 1800000);
+
+    return () => clearInterval(interval);
+  }, [analyzeAllLogs]);
 
   const [notification, setNotification] = useState<{ message: string; type: "success" | "info" } | null>(null);
   const showNotification = (message: string, type: "success" | "info" = "success") => {
@@ -118,9 +132,16 @@ export function PredictiveMaintenancePage() {
 
       <SummaryCards criticalCount={criticalCount} warningCount={warningCount} scheduledCount={scheduledCount} />
 
-      <PredictionsTable rows={mergedNodes} hasActiveTask={hasActiveTask} onScheduleMaintenance={handleScheduleMaintenance} />
-
-      <ScheduledTasksTable tasks={scheduledTaskRows} availableTechnicians={availableTechnicians} onAssign={handleAssign} />
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+        <div className="xl:col-span-7 sticky top-6">
+          <ActivePredictiveAlerts rows={mergedNodes} onScheduleMaintenance={handleScheduleMaintenance} hasActiveTask={hasActiveTask} />
+        </div>
+        
+        <div className="xl:col-span-5 space-y-8">
+          <PredictionsTable rows={mergedNodes.slice(0, 10)} />
+          <ScheduledTasksTable tasks={scheduledTaskRows} availableTechnicians={availableTechnicians} onAssign={handleAssign} />
+        </div>
+      </div>
     </div>
   );
 }

@@ -33,6 +33,7 @@ class RepairTask(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     alert_id = Column(Integer, ForeignKey("alerts.id"), nullable=True, unique=True)
+    predictive_alert_id = Column(Integer, ForeignKey("predictive_alerts.id"), nullable=True, unique=True)
     streetlight_id = Column(Integer, ForeignKey("streetlights.id"), nullable=False)
     technician_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     assigned_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -66,6 +67,7 @@ class RepairTask(Base):
 
     # Relationships
     alert = relationship("Alert", back_populates="repair_task")
+    predictive_alert = relationship("PredictiveAlert", back_populates="repair_task")
     streetlight = relationship("Streetlight", backref="repair_tasks")
     technician = relationship(
         "User",

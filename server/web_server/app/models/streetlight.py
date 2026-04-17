@@ -45,6 +45,7 @@ class Streetlight(Base):
     logs = relationship("StreetlightLog", back_populates="streetlight")
     maintenance_logs = relationship("MaintenanceLog", back_populates="streetlight")
     alerts = relationship("Alert", back_populates="streetlight")
+    predictive_alerts = relationship("PredictiveAlert", back_populates="streetlight")
     predictive_maintenance = relationship("PredictiveMaintenance", back_populates="streetlight", uselist=False)
 
 class StreetlightLog(Base):
@@ -98,3 +99,15 @@ class PredictiveMaintenance(Base):
     last_updated = Column(DateTime, default=datetime.utcnow)
     
     streetlight = relationship("Streetlight", back_populates="predictive_maintenance")
+
+class PredictiveAlert(Base):
+    __tablename__ = "predictive_alerts"
+    id = Column(Integer, primary_key=True, index=True)
+    streetlight_id = Column(Integer, ForeignKey("streetlights.id"))
+    urgency = Column(Enum(UrgencyLevel, name="urgency_level_enum"))
+    message = Column(String)
+    is_resolved = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    streetlight = relationship("Streetlight", back_populates="predictive_alerts")
+    repair_task = relationship("RepairTask", back_populates="predictive_alert", uselist=False)

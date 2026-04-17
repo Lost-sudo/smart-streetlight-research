@@ -43,16 +43,16 @@ const sidebarItems: SidebarItem[] = [
     allowedRoles: ["admin", "operator", "technician"],
   },
   {
-    title: "Predictive Analytics",
-    href: "/analytics",
-    icon: LineChart,
-    allowedRoles: ["admin", "operator"],
-  },
-  {
     title: "Fault Monitoring",
     href: "/immediate-repairs",
     icon: AlertTriangle,
     allowedRoles: ["admin", "operator", "technician"],
+  },
+  {
+    title: "Predictive Analytics",
+    href: "/analytics",
+    icon: LineChart,
+    allowedRoles: ["admin", "operator"],
   },
   {
     title: "Predictive Maintenance",

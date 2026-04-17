@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from sqlalchemy.orm import Session
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate
+from app.services.predictive_maintenance_log import PredictiveMaintenanceService
 from app.controllers.streetlight_log import StreetlightLogController
 from app.dependencies.rbac import require_roles
 from app.models.user import UserRole
@@ -15,9 +16,20 @@ router = APIRouter(
 def get_streetlight_log_controller(db: Session = Depends(get_db)):
     return StreetlightLogController(db)
 
+def run_predictive_analysis(streetlight_id: int):
+    """Background task to run decoupled predictive maintenance"""
+    db = SessionLocal()
+    try:
+        service = PredictiveMaintenanceService(db)
+        service.analyze_node(streetlight_id)
+    finally:
+        db.close()
+
 @router.post("/telemetry", response_model=StreetlightLogRead)
-def add_log_from_iot(iot_log: IoTNodeLogCreate, controller: StreetlightLogController = Depends(get_streetlight_log_controller)):
-    return controller.add_log_from_iot(iot_log=iot_log)
+def add_log_from_iot(iot_log: IoTNodeLogCreate, background_tasks: BackgroundTasks, controller: StreetlightLogController = Depends(get_streetlight_log_controller)):
+    created = controller.add_log_from_iot(iot_log=iot_log)
+    background_tasks.add_task(run_predictive_analysis, created.streetlight_id)
+    return created
 
 @router.get("/{streetlight_log_id}", dependencies=[Depends(require_roles([UserRole.admin, UserRole.operator, UserRole.technician]))], response_model=StreetlightLogRead)
 def get_streetlight_log_by_id(streetlight_log_id: int, controller: StreetlightLogController = Depends(get_streetlight_log_controller)):

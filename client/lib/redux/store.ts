@@ -6,6 +6,7 @@ import { streetlightApi } from "./api/streetlightApi";
 import { predictiveMaintenanceApi } from "./api/predictiveMaintenanceApi";
 import { repairTaskApi } from "./api/repairTaskApi";
 import { alertApi } from "./api/alertApi";
+import { predictiveAlertApi } from "./api/predictiveAlertApi";
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     [predictiveMaintenanceApi.reducerPath]: predictiveMaintenanceApi.reducer,
     [repairTaskApi.reducerPath]: repairTaskApi.reducer,
     [alertApi.reducerPath]: alertApi.reducer,
+    [predictiveAlertApi.reducerPath]: predictiveAlertApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -24,7 +26,8 @@ export const store = configureStore({
       streetlightApi.middleware,
       predictiveMaintenanceApi.middleware,
       repairTaskApi.middleware,
-      alertApi.middleware
+      alertApi.middleware,
+      predictiveAlertApi.middleware
     ),
 });
 

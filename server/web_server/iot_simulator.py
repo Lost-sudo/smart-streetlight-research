@@ -11,8 +11,8 @@ from app.schemas.streetlight import IoTNodeLogCreate
 
 API_URL = "http://localhost:8000"
 ENDPOINT = "/streetlight_log/telemetry"
-INTERVAL_SECONDS = 30
-DEVICE_IDS = ["NODE-001"]
+INTERVAL_SECONDS = 5
+DEVICE_IDS = ["SL-001"]
 TEST_MODE = False
 
 def generate_data(device_id: str, test_mode: bool = False) -> dict:
@@ -28,10 +28,21 @@ def generate_data(device_id: str, test_mode: bool = False) -> dict:
             "timestamp": current_time
         }
 
-    # 10% chance to generate an anomaly (to trigger Alerts via ML Pipeline)
-    is_anomaly = random.random() < 0.10
+    # 20% chance to generate a critical hardware fault (triggers immediate repairs map)
+    is_fault = random.random() < 0.20
+    # 30% chance to generate an anomaly (to trigger Predictive Alerts via ML Pipeline)
+    is_anomaly = random.random() < 0.30
 
-    if is_anomaly:
+    if is_fault:
+        return {
+            "device_id": device_id,
+            "voltage": 0.0,                               # Complete power failure
+            "current": 0.0,                               # No current
+            "power_consumption": 999.0,                   # Massive fault spike to guarantee > 0.8 confidence
+            "light_intensity": 0.0,                       # Darkness
+            "timestamp": current_time
+        }
+    elif is_anomaly:
         return {
             "device_id": device_id,
             "voltage": round(random.uniform(90.0, 140.0), 2),     # Dropped voltage

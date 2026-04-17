@@ -7,6 +7,9 @@ class PredictiveMaintenanceController:
     def __init__(self, db: Session):
         self.log_service = PredictiveMaintenanceService(db)
 
+    def analyze_all_nodes(self):
+        return self.log_service.analyze_all_nodes()
+
     def create_log(self, log: PredictiveMaintenanceCreate) -> PredictiveMaintenanceRead:
         """
         Create a new predictive maintenance log.

@@ -82,34 +82,6 @@ class StreetlightLogService:
         except Exception as e:
             logger.exception("Error during Fault Detection flow")
 
-        # 3. PREDICTIVE MAINTENANCE FORECASTING (LSTM)
-        try:
-            recent_logs = self.streetlight_log_repo.get_by_streetlight_id(streetlight.id, limit=10)
-            historical_logs = recent_logs[1:10]
-            historical_logs.reverse()
-            
-            prediction_result = self.ml_service.predict_failure(iot_log, historical_logs)
-            
-            # Upsert Predictive Maintenance Log
-            existing_pm = self.predictive_maintenance_repo.get_by_streetlight_id(streetlight.id)
-            if existing_pm:
-                pm_update = PredictiveMaintenanceUpdate(
-                    failure_probability=prediction_result["failure_probability"],
-                    predicted_failure_date=prediction_result["predicted_failure_date"],
-                    urgency_level=prediction_result["urgency_level"]
-                )
-                self.predictive_maintenance_repo.update(existing_pm.id, pm_update)
-            else:
-                pm_create = PredictiveMaintenanceCreate(
-                    streetlight_id=streetlight.id,
-                    failure_probability=prediction_result["failure_probability"],
-                    predicted_failure_date=prediction_result["predicted_failure_date"],
-                    urgency_level=prediction_result["urgency_level"]
-                )
-                self.predictive_maintenance_repo.create(pm_create)
-        except Exception as e:
-            logger.exception("Error during ML prediction flow")
-
         return created_log
 
 

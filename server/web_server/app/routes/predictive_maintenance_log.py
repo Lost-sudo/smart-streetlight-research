@@ -15,6 +15,10 @@ router = APIRouter(
 def get_predictive_maintenance_controller(db: Session = Depends(get_db)):
     return PredictiveMaintenanceController(db)
 
+@router.post("/analyze-all", dependencies=[Depends(require_roles([UserRole.admin, UserRole.operator, UserRole.technician]))])
+def analyze_all_nodes(controller: PredictiveMaintenanceController = Depends(get_predictive_maintenance_controller)):
+    return controller.analyze_all_nodes()
+
 @router.post("/", dependencies=[Depends(require_roles([UserRole.admin, UserRole.operator, UserRole.technician]))], response_model=PredictiveMaintenanceRead)
 def create_log(log: PredictiveMaintenanceCreate, controller: PredictiveMaintenanceController = Depends(get_predictive_maintenance_controller)):
     return controller.create_log(log)

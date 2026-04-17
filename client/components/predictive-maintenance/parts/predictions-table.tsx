@@ -3,11 +3,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BrainCircuit, CheckCircle2, Lightbulb } from "lucide-react";
+import { BrainCircuit, Lightbulb } from "lucide-react";
 
-import { RoleGate } from "@/components/auth/role-gate";
 import { urgencyConfig } from "@/components/predictive-maintenance/utils";
-import { ScheduleMaintenanceDialog } from "@/components/predictive-maintenance/parts/schedule-maintenance-dialog";
 
 export type PredictionRow = {
   id: number;
@@ -21,12 +19,8 @@ export type PredictionRow = {
 
 export function PredictionsTable({
   rows,
-  hasActiveTask,
-  onScheduleMaintenance,
 }: {
   rows: PredictionRow[];
-  hasActiveTask: (streetlightId: number) => boolean;
-  onScheduleMaintenance: (pm: PredictionRow, args: { scheduledAt?: string; description?: string }) => Promise<void>;
 }) {
   return (
     <div className="space-y-4">
@@ -47,7 +41,6 @@ export function PredictionsTable({
                 <TableHead className="font-bold">Failure Probability</TableHead>
                 <TableHead className="font-bold">Predicted Date</TableHead>
                 <TableHead className="font-bold">Urgency</TableHead>
-                <TableHead className="text-right font-bold w-[140px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -55,7 +48,6 @@ export function PredictionsTable({
                 rows.map((node) => {
                   const config = urgencyConfig[node.urgency_level] || urgencyConfig.low;
                   const failureProb = Math.round(node.failure_probability * 100);
-                  const alreadyScheduled = hasActiveTask(node.streetlight_id);
 
                   return (
                     <TableRow key={node.id} className="group transition-colors hover:bg-muted/30">
@@ -85,25 +77,6 @@ export function PredictionsTable({
                         <Badge variant="outline" className={`capitalize ${config.color} ${config.border} ${config.bg}`}>
                           {config.label}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {alreadyScheduled ? (
-                          <Badge variant="secondary" className="text-xs">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Scheduled
-                          </Badge>
-                        ) : (
-                          <RoleGate allowedRoles={["admin", "operator"]}>
-                            <ScheduleMaintenanceDialog
-                              nodeName={node.nodeName}
-                              predictedFailureDate={node.predicted_failure_date}
-                              failureProbability={node.failure_probability}
-                              urgencyColorClass={config.color}
-                              onSchedule={(args) => onScheduleMaintenance(node, args)}
-                              triggerClassName="opacity-0 group-hover:opacity-100 transition-opacity text-violet-600 hover:text-violet-700"
-                            />
-                          </RoleGate>
-                        )}
                       </TableCell>
                     </TableRow>
                   );
