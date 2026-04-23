@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   BrainCircuit,
   ClipboardList,
-  LucideIcon
+  LucideIcon,
+  MapPin
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { Role } from "@/types/auth";
@@ -41,6 +42,12 @@ const sidebarItems: SidebarItem[] = [
     href: "/monitoring",
     icon: Lightbulb,
     allowedRoles: ["admin", "operator", "technician"],
+  },
+  {
+    title: "Map View",
+    href: "/map",
+    icon: MapPin,
+    allowedRoles: ["admin", "operator", "technician", "viewer"],
   },
   {
     title: "Fault Monitoring",
@@ -97,7 +104,7 @@ export function Sidebar({ className }: React.HTMLAttributes<HTMLDivElement>) {
   const { user, logout } = useAuth();
 
   // Filter items based on user role
-  const filteredItems = sidebarItems.filter(item => 
+  const filteredItems = sidebarItems.filter(item =>
     !item.allowedRoles || (user && item.allowedRoles.includes(user.role))
   );
 
@@ -110,7 +117,7 @@ export function Sidebar({ className }: React.HTMLAttributes<HTMLDivElement>) {
               <Zap className="h-6 w-6 text-primary" />
               <h1 className="text-xl font-bold tracking-tight">SmartLight</h1>
             </div>
-            
+
             <div className="space-y-1">
               {filteredItems.map((item) => (
                 <Button
@@ -146,8 +153,8 @@ export function Sidebar({ className }: React.HTMLAttributes<HTMLDivElement>) {
             </p>
           </div>
         </div>
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
           onClick={logout}
         >

@@ -45,6 +45,7 @@ export const ROLE_PERMISSIONS = {
     "reports",
     "users",
     "settings",
+    "map",
   ],
   operator: [
     "dashboard",
@@ -56,6 +57,7 @@ export const ROLE_PERMISSIONS = {
     "my-assigned-tasks",
     "reports",
     "settings",
+    "map",
   ],
   technician: [
     "dashboard",
@@ -63,8 +65,9 @@ export const ROLE_PERMISSIONS = {
     "immediate-repairs",
     "repair-tasks",
     "my-assigned-tasks",
-    "settings"
+    "settings",
+    "map",
   ],
-  viewer: ["dashboard", "reports"],
+  viewer: ["dashboard", "reports", "map"],
 } as const;
 
