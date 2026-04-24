@@ -48,7 +48,7 @@ class IoTNodeLogCreate(BaseModel):
     power_consumption: float
     light_intensity: float
     timestamp: datetime
-    # Advanced features for Random Forest (optional)
+
     operating_hours: Optional[float] = None
     voltage_fluctuation: Optional[float] = None
     current_deviation: Optional[float] = None

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     COOKIE_SECURE: bool = True
     REFRESH_COOKIE_NAME: str = "refresh_token"
     REFRESH_COOKIE_SAMESITE: str = "strict"
+    ENABLE_ML: bool = True
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
