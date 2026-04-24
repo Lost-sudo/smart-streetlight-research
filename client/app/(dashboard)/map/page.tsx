@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
 
 // Dynamically import the Map component with no SSR
 const MapDashboard = dynamic(
@@ -9,20 +10,16 @@ const MapDashboard = dynamic(
   { 
     ssr: false,
     loading: () => (
-      <div className="flex flex-col gap-6 h-[calc(100vh-120px)]">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-64" />
-            <Skeleton className="h-4 w-96" />
-          </div>
+      <div className="relative h-full w-full overflow-hidden bg-slate-50 dark:bg-zinc-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-sm font-medium text-muted-foreground">Initializing Map View...</p>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
-          <Skeleton className="lg:col-span-3 h-full rounded-xl" />
-          <div className="flex flex-col gap-4">
-            <Skeleton className="h-64 w-full rounded-xl" />
-            <Skeleton className="h-32 w-full rounded-xl" />
-          </div>
-        </div>
+        
+        {/* Skeleton Overlays to match the new UI */}
+        <div className="absolute top-6 left-6 z-10 w-64 h-32 bg-card/50 backdrop-blur-sm rounded-xl animate-pulse" />
+        <div className="absolute bottom-10 left-10 z-10 w-[520px] h-20 bg-card/50 backdrop-blur-sm rounded-3xl animate-pulse" />
+        <div className="absolute top-6 right-6 bottom-6 z-10 w-80 bg-card/50 backdrop-blur-sm rounded-xl animate-pulse" />
       </div>
     )
   }

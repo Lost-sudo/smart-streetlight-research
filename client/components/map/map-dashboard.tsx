@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -72,7 +72,15 @@ const statusColors: Record<string, { bg: string; text: string; badge: "default" 
 
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
   const map = useMap();
-  map.setView(center, zoom);
+  const [hasInitialSet, setHasInitialSet] = useState(false);
+
+  useEffect(() => {
+    if (!hasInitialSet && center[0] !== 0) {
+      map.setView(center, zoom);
+      setHasInitialSet(true);
+    }
+  }, [center, zoom, map, hasInitialSet]);
+
   return null;
 }
 
@@ -93,14 +101,17 @@ export default function MapDashboard() {
   }, []);
 
   // Center the map on the first streetlight or Cantilan center
-  const center: [number, number] = streetlights.length > 0 
-    ? [streetlights[0].latitude, streetlights[0].longitude] 
-    : [9.335583, 125.976972];
+  const center = useMemo<[number, number]>(() => {
+    return streetlights.length > 0 
+      ? [streetlights[0].latitude, streetlights[0].longitude] 
+      : [9.335583, 125.976972];
+  }, [streetlights.length === 0]); // Only re-calculate when transitioning from empty to loaded
+
   const zoom = 15;
 
   if (isLoadingStreetlights) {
     return (
-      <div className="flex h-full w-full items-center justify-center">
+      <div className="flex h-full w-full items-center justify-center p-8 pt-6">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <span className="ml-2 text-muted-foreground">Loading map data...</span>
       </div>
@@ -109,7 +120,7 @@ export default function MapDashboard() {
 
   if (isErrorStreetlights) {
     return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-4">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-8 pt-6">
         <AlertTriangle className="h-12 w-12 text-destructive" />
         <div className="text-center">
           <h3 className="text-lg font-bold">Failed to load streetlights</h3>
@@ -120,7 +131,7 @@ export default function MapDashboard() {
   }
 
   return (
-    <div className="flex flex-col gap-6 h-[calc(100vh-120px)]">
+    <div className="relative h-full w-full overflow-hidden">
       <style jsx global>{`
         @keyframes ping-rapid {
           0% { transform: scale(1); opacity: 0.8; }
@@ -150,179 +161,201 @@ export default function MapDashboard() {
           background: #09090b !important;
         }
       `}</style>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Interactive Map</h1>
-          <p className="text-muted-foreground">Real-time geographical visualization of streetlight nodes.</p>
-        </div>
-        <div className="flex gap-2">
-          {Object.entries(statusColors).map(([status, colors]) => (
-            <div key={status} className="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-card text-xs">
-              <div className={cn("h-2 w-2 rounded-full", status === "active" ? "bg-emerald-500" : status === "faulty" ? "bg-red-500" : status === "maintenance" ? "bg-amber-500" : "bg-zinc-500")} />
-              <span className="capitalize">{status}</span>
+      {/* Floating Header */}
+      <div className="absolute top-6 left-6 z-[1000] pointer-events-none max-w-sm">
+        <Card className="p-5 bg-card/80 backdrop-blur-md border-none shadow-2xl pointer-events-auto">
+          <h1 className="text-2xl font-bold tracking-tight">Interactive Map</h1>
+          <p className="text-xs text-muted-foreground mt-1">Real-time geographical visualization of streetlight nodes.</p>
+          
+          <div className="mt-4 flex flex-wrap gap-2">
+            {Object.entries(statusColors).map(([status, colors]) => (
+              <div key={status} className="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-background/50 text-[10px]">
+                <div className={cn("h-1.5 w-1.5 rounded-full", status === "active" ? "bg-emerald-500" : status === "faulty" ? "bg-red-500" : status === "maintenance" ? "bg-amber-500" : "bg-zinc-500")} />
+                <span className="capitalize">{status}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* Summary Stats Overlay */}
+      <div className="absolute bottom-10 left-10 z-[1000] pointer-events-none">
+        <div className="px-6 py-4 bg-card/90 backdrop-blur-xl border border-white/10 shadow-2xl pointer-events-auto flex flex-row items-center gap-8 rounded-3xl w-fit">
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Total Nodes</span>
+            <span className="text-2xl font-black leading-none mt-1">{streetlights.length}</span>
+          </div>
+          
+          <div className="h-10 w-px bg-border/60" />
+          
+          <div className="flex flex-row items-center gap-8">
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-emerald-500 uppercase font-black tracking-widest">Active</span>
+              <span className="text-2xl font-black text-emerald-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'active').length}</span>
             </div>
-          ))}
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Inactive</span>
+              <span className="text-2xl font-black text-zinc-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'inactive').length}</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-red-500 uppercase font-black tracking-widest">Faulty</span>
+              <span className="text-2xl font-black text-red-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'faulty').length}</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-amber-500 uppercase font-black tracking-widest">Maint.</span>
+              <span className="text-2xl font-black text-amber-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'maintenance').length}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
-        <Card className="lg:col-span-3 overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur-sm relative">
-          <MapContainer
-            center={center}
-            zoom={zoom}
-            style={{ height: "100%", width: "100%", borderRadius: "12px" }}
-            zoomControl={false}
+      <MapContainer
+        center={center}
+        zoom={zoom}
+        style={{ height: "100%", width: "100%" }}
+        zoomControl={false}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {streetlights.map((node) => (
+          <Marker
+            key={node.id}
+            position={[node.latitude, node.longitude]}
+            icon={createStatusIcon(node.status)}
+            eventHandlers={{
+              click: () => setSelectedNode(node),
+            }}
           >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            {streetlights.map((node) => (
-              <Marker
-                key={node.id}
-                position={[node.latitude, node.longitude]}
-                icon={createStatusIcon(node.status)}
-                eventHandlers={{
-                  click: () => setSelectedNode(node),
-                }}
-              >
-                <Popup className="custom-popup">
-                  <div className="p-1">
-                    <h3 className="font-bold text-sm">{node.name}</h3>
-                    <p className="text-[10px] text-muted-foreground mb-2">{node.device_id || 'No ID'}</p>
-                    <Badge variant={statusColors[node.status]?.badge || "default"} className="text-[10px] h-4">
-                      {node.status}
+            <Popup className="custom-popup">
+              <div className="p-1">
+                <h3 className="font-bold text-sm">{node.name}</h3>
+                <p className="text-[10px] text-muted-foreground mb-2">{node.device_id || 'No ID'}</p>
+                <Badge variant={statusColors[node.status]?.badge || "default"} className="text-[10px] h-4">
+                  {node.status}
+                </Badge>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+        <ChangeView center={center} zoom={zoom} />
+      </MapContainer>
+
+      {/* Floating Detail Panel */}
+      <div className="absolute top-6 right-6 bottom-6 z-[1000] pointer-events-none w-80">
+        <Card className="h-full border-none shadow-2xl bg-card/80 backdrop-blur-md pointer-events-auto flex flex-col overflow-hidden">
+          <CardHeader className="pb-3 border-b bg-muted/30">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Node Details
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {selectedNode ? "Detailed information for the selected node" : "Select a node on the map to view details"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-y-auto p-4">
+            {selectedNode ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                  <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", statusColors[selectedNode.status].bg)}>
+                    <Lightbulb className={cn("h-5 w-5", statusColors[selectedNode.status].text)} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate">{selectedNode.name}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono truncate">{selectedNode.device_id}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 rounded-md border bg-background/50">
+                    <p className="text-[9px] text-muted-foreground flex items-center gap-1 mb-1 uppercase font-bold">
+                      <Zap className="h-3 w-3" /> Status
+                    </p>
+                    <Badge variant={statusColors[selectedNode.status].badge} className="text-[9px] capitalize py-0 h-4">
+                      {selectedNode.status}
                     </Badge>
                   </div>
-                </Popup>
-              </Marker>
-            ))}
-            <ChangeView center={center} zoom={zoom} />
-          </MapContainer>
+                  <div className="p-2 rounded-md border bg-background/50">
+                    <p className="text-[9px] text-muted-foreground flex items-center gap-1 mb-1 uppercase font-bold">
+                      <Settings className="h-3 w-3" /> Model
+                    </p>
+                    <p className="text-[10px] font-semibold truncate">{selectedNode.model_info}</p>
+                  </div>
+                  <div className="p-2 rounded-md border bg-background/50">
+                    <p className="text-[9px] text-muted-foreground flex items-center gap-1 mb-1 uppercase font-bold">
+                      <MapPin className="h-3 w-3" /> Coordinates
+                    </p>
+                    <p className="text-[9px] font-mono leading-tight">
+                      {selectedNode.latitude.toFixed(4)}, {selectedNode.longitude.toFixed(4)}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-md border bg-background/50">
+                    <p className="text-[9px] text-muted-foreground flex items-center gap-1 mb-1 uppercase font-bold">
+                      <Sun className="h-3 w-3" /> LDR Light
+                    </p>
+                    <p className="text-[10px] font-semibold">
+                      {isLoadingLogs ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : latestLog ? (
+                        `${latestLog.light_intensity} lx`
+                      ) : (
+                        '—'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <div className="flex items-center justify-between text-[10px] mb-2 uppercase font-bold text-muted-foreground">
+                    <span>Power Consumption</span>
+                    <span className="text-foreground">{isLoadingLogs ? '...' : latestLog ? `${latestLog.power_consumption.toFixed(1)} W` : '0.0 W'}</span>
+                  </div>
+                  <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-primary h-full transition-all duration-500"
+                      style={{ 
+                        width: latestLog 
+                          ? `${Math.min((latestLog.power_consumption / 150) * 100, 100)}%` 
+                          : '0%' 
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h4 className="text-[10px] uppercase font-bold text-muted-foreground mb-3">Recent Activity</h4>
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 mt-1" />
+                        <div className="flex-1">
+                          <p className="text-[10px] font-medium leading-tight text-foreground">Status check: {selectedNode.status}</p>
+                          <p className="text-[9px] text-muted-foreground">{new Date().toLocaleTimeString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <MapPin className="h-8 w-8" />
+                </div>
+                <p className="text-sm font-medium">No node selected</p>
+                <p className="text-xs text-muted-foreground max-w-[160px] mt-1">Select a streetlight marker on the map to see its real-time telemetry.</p>
+              </div>
+            )}
+          </CardContent>
+          {selectedNode && (
+            <div className="p-4 border-t bg-muted/20">
+              <button className="w-full py-2 bg-primary text-primary-foreground rounded-md text-xs font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors">
+                View Detailed Logs
+              </button>
+            </div>
+          )}
         </Card>
-
-        <div className="flex flex-col gap-4 overflow-y-auto pr-2">
-          <Card className="border shadow-md bg-card/50 backdrop-blur-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Node Details
-              </CardTitle>
-              <CardDescription>
-                {selectedNode ? "Detailed information for the selected node" : "Select a node on the map to view details"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {selectedNode ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
-                    <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", statusColors[selectedNode.status].bg)}>
-                      <Lightbulb className={cn("h-5 w-5", statusColors[selectedNode.status].text)} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm">{selectedNode.name}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{selectedNode.device_id}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-md border bg-card/30">
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 mb-1">
-                        <Zap className="h-3 w-3" /> Status
-                      </p>
-                      <Badge variant={statusColors[selectedNode.status].badge} className="text-[10px] capitalize">
-                        {selectedNode.status}
-                      </Badge>
-                    </div>
-                    <div className="p-3 rounded-md border bg-card/30">
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 mb-1">
-                        <Settings className="h-3 w-3" /> Model
-                      </p>
-                      <p className="text-xs font-semibold">{selectedNode.model_info}</p>
-                    </div>
-                    <div className="p-3 rounded-md border bg-card/30">
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 mb-1">
-                        <MapPin className="h-3 w-3" /> Coordinates
-                      </p>
-                      <p className="text-[10px] font-mono leading-tight">
-                        {selectedNode.latitude.toFixed(4)}<br />
-                        {selectedNode.longitude.toFixed(4)}
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-md border bg-card/30">
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 mb-1">
-                        <Sun className="h-3 w-3" /> LDR Light
-                      </p>
-                      <p className="text-xs font-semibold">
-                        {isLoadingLogs ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : latestLog ? (
-                          `${latestLog.light_intensity} lx`
-                        ) : (
-                          '—'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between text-xs mb-2">
-                      <span className="text-muted-foreground">Power Consumption</span>
-                      <span className="font-semibold">
-                        {isLoadingLogs ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : latestLog ? (
-                          `${latestLog.power_consumption.toFixed(1)} W`
-                        ) : (
-                          '0.0 W'
-                        )}
-                      </span>
-                    </div>
-                    <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-primary h-full transition-all duration-500"
-                        style={{ 
-                          width: latestLog 
-                            ? `${Math.min((latestLog.power_consumption / 150) * 100, 100)}%` 
-                            : '0%' 
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-8 flex flex-col items-center justify-center text-center opacity-40">
-                  <MapPin className="h-12 w-12 mb-2" />
-                  <p className="text-sm">No node selected</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border shadow-md bg-card/50 backdrop-blur-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Total Nodes</span>
-                <span className="font-bold">{streetlights.length}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-emerald-500">Active</span>
-                <span className="font-bold">{streetlights.filter(n => n.status === 'active').length}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-red-500">Faulty</span>
-                <span className="font-bold">{streetlights.filter(n => n.status === 'faulty').length}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-amber-500">Maintenance</span>
-                <span className="font-bold">{streetlights.filter(n => n.status === 'maintenance').length}</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );
