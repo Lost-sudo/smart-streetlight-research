@@ -48,6 +48,12 @@ class IoTNodeLogCreate(BaseModel):
     power_consumption: float
     light_intensity: float
     timestamp: datetime
+    # Advanced features for Random Forest (optional)
+    operating_hours: Optional[float] = None
+    voltage_fluctuation: Optional[float] = None
+    current_deviation: Optional[float] = None
+    power_trend: Optional[float] = None
+    fault_frequency: Optional[int] = None
 
 class StreetlightLogRead(BaseModel):
     id: int
@@ -57,6 +63,12 @@ class StreetlightLogRead(BaseModel):
     power_consumption: float
     light_intensity: float
     timestamp: datetime
+    # Advanced features
+    operating_hours: Optional[float] = None
+    voltage_fluctuation: Optional[float] = None
+    current_deviation: Optional[float] = None
+    power_trend: Optional[float] = None
+    fault_frequency: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

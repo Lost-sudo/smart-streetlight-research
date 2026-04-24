@@ -100,16 +100,52 @@ class MLPredictionService:
         except Exception as e:
             logger.exception("Error loading ML artifacts; using mock predictions.")
 
-    def detect_fault(self, iot_log: IoTNodeLogCreate):
+    def detect_fault(self, iot_log: IoTNodeLogCreate, historical_logs: list = None, streetlight_info: Any = None):
         """Use Random Forest to detect if the streetlight is currently in a fault state."""
         if not self.rf_model or not self.rf_scaler:
             return self._mock_detect_fault(iot_log)
 
-        operating_hours = 1000.0
-        voltage_fluctuation = 0.0
-        current_deviation = 0.0
-        power_trend = 0.0
-        fault_frequency = 0.0
+        # --- AUTOMATIC FEATURE EXTRACTION ---
+        
+        # 1. Operating Hours: Use IoT value, or calculate from installation date
+        if iot_log.operating_hours is not None:
+            operating_hours = iot_log.operating_hours
+        elif streetlight_info and streetlight_info.installation_date:
+            delta = datetime.utcnow() - streetlight_info.installation_date
+            operating_hours = max(delta.total_seconds() / 3600.0, 0.0)
+        else:
+            operating_hours = 1000.0 # Fallback
+
+        # 2. Voltage Fluctuation: Use IoT value, or calculate StdDev from history
+        if iot_log.voltage_fluctuation is not None:
+            voltage_fluctuation = iot_log.voltage_fluctuation
+        elif historical_logs and len(historical_logs) > 1:
+            voltages = [float(getattr(l, "voltage", 220.0)) for l in historical_logs] + [iot_log.voltage]
+            voltage_fluctuation = float(pd.Series(voltages).std())
+        else:
+            voltage_fluctuation = 0.0
+
+        # 3. Current Deviation: Use IoT value, or calculate deviation from mean
+        if iot_log.current_deviation is not None:
+            current_deviation = iot_log.current_deviation
+        elif historical_logs and len(historical_logs) > 3:
+            avg_current = sum(float(getattr(l, "current", 0.45)) for l in historical_logs) / len(historical_logs)
+            current_deviation = iot_log.current - avg_current
+        else:
+            current_deviation = 0.0
+
+        # 4. Power Trend: Use IoT value, or calculate slope/delta from history
+        if iot_log.power_trend is not None:
+            power_trend = iot_log.power_trend
+        elif historical_logs and len(historical_logs) > 1:
+            # Simple delta from previous reading
+            prev_power = float(getattr(historical_logs[0], "power_consumption", 100.0))
+            power_trend = iot_log.power_consumption - prev_power
+        else:
+            power_trend = 0.0
+
+        # 5. Fault Frequency
+        fault_frequency = float(iot_log.fault_frequency) if iot_log.fault_frequency is not None else 0.0
 
         df = pd.DataFrame(
             [

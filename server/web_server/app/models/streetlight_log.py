@@ -14,4 +14,11 @@ class StreetlightLog(Base):
     is_on = Column(Boolean, default=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     
+    # Advanced features for ML
+    operating_hours = Column(Float, nullable=True)
+    voltage_fluctuation = Column(Float, nullable=True)
+    current_deviation = Column(Float, nullable=True)
+    power_trend = Column(Float, nullable=True)
+    fault_frequency = Column(Integer, nullable=True)
+
     streetlight = relationship("Streetlight", back_populates="logs")

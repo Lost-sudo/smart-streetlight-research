@@ -48,7 +48,10 @@ class StreetlightLogService:
 
         # 2. FAULT DETECTION (Random Forest)
         try:
-            fault_result = self.ml_service.detect_fault(iot_log)
+            # Fetch history for feature engineering (operating_hours, trends, etc.)
+            historical_logs = self.streetlight_log_repo.get_by_streetlight_id(streetlight.id, limit=20)
+            
+            fault_result = self.ml_service.detect_fault(iot_log, historical_logs, streetlight)
             if fault_result.get("is_faulty", False):
                 if streetlight.status != "maintenance":
                     self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))

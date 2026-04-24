@@ -25,9 +25,9 @@ The primary objectives of the ML component are:
 
 ### 3.2 Target Variables
 
-- Failure Status (Normal / Faulty)
-- Failure Probability Score
-- Maintenance Urgency Level (Low, Medium, High)
+- **Failure Status** (Normal / Faulty): Used by Random Forest.
+- **Time to Failure** (RUL - Remaining Useful Life): Used by LSTM.
+- **Maintenance Urgency Level** (Low, Medium, High): Derived from model outputs.
 
 ## 4. Data Sources and Data Collection
 
@@ -51,51 +51,43 @@ Data is collected from IoT-enabled streetlight nodes, including:
 
 ### 5.1 Raw Features
 
-- Voltage (V)
-- Current (A)
-- Power (W)
-- Light intensity (Lux)
-- Operating hours
+- **Voltage (V)**
+- **Current (A)**
+- **Power (W)**
+- **Light intensity (Lux)**
+- **Timestep** (Sequential index for LSTM)
 
-### 5.2 Engineered Features
+### 5.2 Engineered Features (Used by Random Forest)
 
-- Power consumption trends
-- Voltage fluctuation rate
-- Current deviation from baseline
-- Operating time since last maintenance
-- Frequency of minor faults
+- **Operating Hours:** Total accumulated time the lamp has been active.
+- **Voltage Fluctuation:** Short-term variance or standard deviation in voltage readings.
+- **Current Deviation:** Difference between measured current and expected nominal current.
+- **Power Trend:** Rate of change in power consumption over recent cycles.
+- **Fault Frequency:** Count of minor glitches or transient errors detected by the MCU.
 
 ## 6. Data Preprocessing
 
 - Handling missing values (interpolation / mean substitution)
 - Noise filtering and smoothing
-- Normalization and scaling
+- Normalization and scaling (StandardScaler)
 - Label encoding for categorical variables
 - Time-window aggregation for time-series analysis
 
 ## 7. Model Selection and Design
 
-### 7.1 Failure Prediction Model
+### 7.1 Fault Detection Model (Random Forest)
 
 - **Model Type:** Random Forest Classifier
-- **Rationale:**
-  - Handles non-linear relationships
-  - Robust to noise
-  - Interpretable feature importance
+- **Input:** Snapshot of current sensor readings + Engineered features.
+- **Output:** Binary classification (0: Normal, 1: Faulty).
+- **Rationale:** Robust to noise and provides feature importance.
 
-### 7.2 Anomaly Detection Model
-
-- **Model Type:** Support Vector Machine (One-Class SVM)
-- **Rationale:**
-  - Effective for detecting deviations from normal behavior
-  - Suitable when labeled fault data is limited
-
-### 7.3 Time-Series Prediction Model (Optional)
+### 7.2 Predictive Maintenance Model (LSTM)
 
 - **Model Type:** Long Short-Term Memory (LSTM)
-- **Rationale:**
-  - Captures temporal dependencies
-  - Effective for degradation trend forecasting
+- **Input:** Sequence of historical sensor readings (voltage, current, power, light).
+- **Output:** Regression value (Time to Failure).
+- **Rationale:** Captures temporal dependencies in degradation patterns.
 
 ## 8. Model Training Strategy
 
@@ -117,12 +109,9 @@ Data is collected from IoT-enabled streetlight nodes, including:
 
 ## 9. Model Evaluation Metrics
 
-- Accuracy
-- Precision
-- Recall
-- F1-Score
+- Accuracy, Precision, Recall, F1-Score (RF)
+- Mean Absolute Error (LSTM)
 - ROC-AUC (for failure prediction)
-- Mean Absolute Error (for time-series models)
 
 ## 10. Maintenance Urgency Classification Logic
 
@@ -135,8 +124,8 @@ Maintenance urgency is derived using:
 **Urgency Levels:**
 
 - **Low:** Normal operation
-- **Medium:** Potential degradation detected
-- **High:** High probability of failure
+- **Medium:** Potential degradation detected (RUL < Threshold)
+- **High:** High probability of failure or immediate fault detected
 
 ## 11. Model Deployment and Integration
 
@@ -177,6 +166,51 @@ Maintenance urgency is derived using:
 - Online learning models
 - Integration of weather and traffic data
 
-## 16. Conclusion
+## 16. IoT Data Requirements (Field Specification)
+
+To ensure the ML models function correctly, the IoT devices should send the following data fields in their telemetry payload.
+
+### 16.1 Required Raw Sensors
+
+These fields are **mandatory** for every transmission:
+
+| Field Name | Data Type | Unit | Description |
+| :--- | :--- | :--- | :--- |
+| `device_id` | String | - | Unique identifier for the streetlight node. |
+| `voltage` | Float | Volts (V) | RMS voltage measurement. |
+| `current` | Float | Amperes (A) | RMS current measurement. |
+| `power_consumption` | Float | Watts (W) | Active power consumption. |
+| `light_intensity` | Float | Lux | Ambient light level from LDR sensor. |
+| `timestamp` | ISO8601 | - | Date and time of the reading. |
+
+### 16.2 Advanced Features (Hybrid Support)
+
+The system now supports **Automatic Feature Extraction**. You can choose to calculate these on the IoT device or let the backend handle them.
+
+| Field Name | IoT Requirement | Backend Fallback |
+| :--- | :--- | :--- |
+| `voltage_fluctuation`| **Highly Recommended** | Calculated as StdDev of recent logs. |
+| `operating_hours` | Optional | Calculated from `installation_date`. |
+| `current_deviation` | Optional | Calculated from historical mean current. |
+| `power_trend` | Optional | Calculated from the delta of previous logs. |
+| `fault_frequency` | Optional | Defaults to 0 if not provided. |
+
+> [!TIP]
+> For the best accuracy, the IoT device should still send **`voltage_fluctuation`** if possible, as it can sample voltage faster than the network can transmit.
+
+### 16.3 Sample JSON Payload (Minimal)
+
+```json
+{
+  "device_id": "SL-001",
+  "voltage": 218.5,
+  "current": 0.46,
+  "power_consumption": 102.3,
+  "light_intensity": 345.0,
+  "timestamp": "2024-04-24T17:30:00Z"
+}
+```
+
+## 17. Conclusion
 
 The machine learning design outlined in this document enables intelligent, data-driven predictive maintenance for streetlight infrastructure. By integrating ML models directly within the FastAPI backend, the system achieves efficient inference, scalability, and maintainability, supporting the overall objectives of smart city automation.
