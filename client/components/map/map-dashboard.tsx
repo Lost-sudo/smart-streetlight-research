@@ -8,7 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Lightbulb, MapPin, AlertTriangle, Settings, Activity, Zap, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Streetlight } from "@/lib/redux/api/streetlightApi";
+import { 
+  useGetStreetlightsQuery, 
+  useGetStreetlightLogsQuery,
+  type Streetlight 
+} from "@/lib/redux/api/streetlightApi";
+import { Loader2 } from "lucide-react";
 
 // Fix for default marker icons in Leaflet with Next.js
 const fixLeafletIcons = () => {
@@ -56,73 +61,7 @@ const createStatusIcon = (status: string) => {
   });
 };
 
-const hardcodedNodes: Streetlight[] = [
-  {
-    id: 1,
-    name: "Cantilan Town Plaza",
-    device_id: "SN-CAN-001",
-    latitude: 9.3356,
-    longitude: 125.9770,
-    model_info: "SmartPole v2",
-    installation_date: "2024-01-15",
-    status: "active",
-    is_on: true,
-    created_at: "2024-01-15T10:00:00Z",
-    has_telemetry: true,
-  },
-  {
-    id: 2,
-    name: "Cantilan Public Market",
-    device_id: "SN-CAN-002",
-    latitude: 9.3365,
-    longitude: 125.9780,
-    model_info: "SmartPole v2",
-    installation_date: "2024-01-20",
-    status: "faulty",
-    is_on: false,
-    created_at: "2024-01-20T11:00:00Z",
-    has_telemetry: true,
-  },
-  {
-    id: 3,
-    name: "Cantilan Municipal Hall",
-    device_id: "SN-CAN-003",
-    latitude: 9.3345,
-    longitude: 125.9760,
-    model_info: "SmartPole v1",
-    installation_date: "2023-11-05",
-    status: "maintenance",
-    is_on: true,
-    created_at: "2023-11-05T09:00:00Z",
-    has_telemetry: true,
-  },
-  {
-    id: 4,
-    name: "San Pedro Street",
-    device_id: "SN-CAN-004",
-    latitude: 9.3370,
-    longitude: 125.9750,
-    model_info: "SmartPole v2",
-    installation_date: "2024-02-10",
-    status: "inactive",
-    is_on: false,
-    created_at: "2024-02-10T14:00:00Z",
-    has_telemetry: false,
-  },
-  {
-    id: 5,
-    name: "Cantilan Bayfront",
-    device_id: "SN-CAN-005",
-    latitude: 9.3330,
-    longitude: 125.9790,
-    model_info: "SmartPole v2",
-    installation_date: "2024-03-01",
-    status: "active",
-    is_on: true,
-    created_at: "2024-03-01T08:30:00Z",
-    has_telemetry: true,
-  }
-];
+// Real data will be fetched from the API
 
 const statusColors: Record<string, { bg: string; text: string; badge: "default" | "destructive" | "secondary" | "outline" }> = {
   active: { bg: "bg-emerald-100 dark:bg-emerald-900/40", text: "text-emerald-600 dark:text-emerald-400", badge: "default" },
@@ -140,12 +79,45 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
 export default function MapDashboard() {
   const [selectedNode, setSelectedNode] = useState<Streetlight | null>(null);
 
+  const { data: streetlights = [], isLoading: isLoadingStreetlights, isError: isErrorStreetlights } = useGetStreetlightsQuery();
+  
+  const { data: logs, isLoading: isLoadingLogs } = useGetStreetlightLogsQuery(
+    { id: selectedNode?.id as number, limit: 1 },
+    { skip: !selectedNode }
+  );
+
+  const latestLog = logs && logs.length > 0 ? logs[0] : null;
+
   useEffect(() => {
     fixLeafletIcons();
   }, []);
 
-  const center: [number, number] = [9.335583, 125.976972];
+  // Center the map on the first streetlight or Cantilan center
+  const center: [number, number] = streetlights.length > 0 
+    ? [streetlights[0].latitude, streetlights[0].longitude] 
+    : [9.335583, 125.976972];
   const zoom = 15;
+
+  if (isLoadingStreetlights) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Loading map data...</span>
+      </div>
+    );
+  }
+
+  if (isErrorStreetlights) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-4">
+        <AlertTriangle className="h-12 w-12 text-destructive" />
+        <div className="text-center">
+          <h3 className="text-lg font-bold">Failed to load streetlights</h3>
+          <p className="text-muted-foreground">Please check your connection or try again later.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 h-[calc(100vh-120px)]">
@@ -205,7 +177,7 @@ export default function MapDashboard() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {hardcodedNodes.map((node) => (
+            {streetlights.map((node) => (
               <Marker
                 key={node.id}
                 position={[node.latitude, node.longitude]}
@@ -217,8 +189,8 @@ export default function MapDashboard() {
                 <Popup className="custom-popup">
                   <div className="p-1">
                     <h3 className="font-bold text-sm">{node.name}</h3>
-                    <p className="text-[10px] text-muted-foreground mb-2">{node.device_id}</p>
-                    <Badge variant={statusColors[node.status].badge} className="text-[10px] h-4">
+                    <p className="text-[10px] text-muted-foreground mb-2">{node.device_id || 'No ID'}</p>
+                    <Badge variant={statusColors[node.status]?.badge || "default"} className="text-[10px] h-4">
                       {node.status}
                     </Badge>
                   </div>
@@ -281,19 +253,39 @@ export default function MapDashboard() {
                       <p className="text-[10px] text-muted-foreground flex items-center gap-1 mb-1">
                         <Sun className="h-3 w-3" /> LDR Light
                       </p>
-                      <p className="text-xs font-semibold">{selectedNode.status === 'active' ? '450 lx' : '—'}</p>
+                      <p className="text-xs font-semibold">
+                        {isLoadingLogs ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : latestLog ? (
+                          `${latestLog.light_intensity} lx`
+                        ) : (
+                          '—'
+                        )}
+                      </p>
                     </div>
                   </div>
 
                   <div className="pt-2">
                     <div className="flex items-center justify-between text-xs mb-2">
                       <span className="text-muted-foreground">Power Consumption</span>
-                      <span className="font-semibold">{selectedNode.is_on ? '34.5 W' : '0.0 W'}</span>
+                      <span className="font-semibold">
+                        {isLoadingLogs ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : latestLog ? (
+                          `${latestLog.power_consumption.toFixed(1)} W`
+                        ) : (
+                          '0.0 W'
+                        )}
+                      </span>
                     </div>
                     <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
                       <div
                         className="bg-primary h-full transition-all duration-500"
-                        style={{ width: selectedNode.is_on ? '70%' : '0%' }}
+                        style={{ 
+                          width: latestLog 
+                            ? `${Math.min((latestLog.power_consumption / 150) * 100, 100)}%` 
+                            : '0%' 
+                        }}
                       />
                     </div>
                   </div>
@@ -314,19 +306,19 @@ export default function MapDashboard() {
             <CardContent className="space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Total Nodes</span>
-                <span className="font-bold">{hardcodedNodes.length}</span>
+                <span className="font-bold">{streetlights.length}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-emerald-500">Active</span>
-                <span className="font-bold">{hardcodedNodes.filter(n => n.status === 'active').length}</span>
+                <span className="font-bold">{streetlights.filter(n => n.status === 'active').length}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-red-500">Faulty</span>
-                <span className="font-bold">{hardcodedNodes.filter(n => n.status === 'faulty').length}</span>
+                <span className="font-bold">{streetlights.filter(n => n.status === 'faulty').length}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-amber-500">Maintenance</span>
-                <span className="font-bold">{hardcodedNodes.filter(n => n.status === 'maintenance').length}</span>
+                <span className="font-bold">{streetlights.filter(n => n.status === 'maintenance').length}</span>
               </div>
             </CardContent>
           </Card>
