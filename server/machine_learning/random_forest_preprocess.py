@@ -4,67 +4,90 @@ random_forest_preprocess.py
 Preprocessing pipeline for the Random Forest Fault Detection model.
 
 Handles:
-  - StandardScaler normalization
-  - Feature extraction
-  - Scaler persistence for inference-time reuse
+  - Temporal feature engineering (diffs, rolling statistics)
+  - Feature extraction (no scaling — RF is scale-invariant)
 """
 
-import os
-import joblib
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
 
 from lstm_data import RF_FEATURES, RF_TARGET
 
-MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
+
+def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add temporal (delta + rolling) features to the DataFrame.
+
+    These features allow the Random Forest to detect:
+      - Voltage/current/power fluctuation over time
+      - Degradation trends
+      - Instability patterns
+
+    The data MUST be sorted by time before calling this function.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame sorted by timestamp, containing voltage, current, power.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with added temporal features.
+    """
+    # --- Delta features: change from previous reading ---
+    df["d_voltage"] = df["voltage"].diff().fillna(0)
+    df["d_current"] = df["current"].diff().fillna(0)
+    df["d_power"] = df["power"].diff().fillna(0)
+
+    # --- Rolling statistics: variability over last 5 readings ---
+    df["std_current_5"] = df["current"].rolling(5).std().fillna(0)
+    df["std_voltage_5"] = df["voltage"].rolling(5).std().fillna(0)
+
+    print(f"[rf_preprocess] Added temporal features: d_voltage, d_current, d_power, std_current_5, std_voltage_5")
+    return df
 
 
 def preprocess_pipeline(
     df: pd.DataFrame,
     fit: bool = True,
-    scaler_filename: str = "random_forest_scaler.joblib",
 ) -> tuple:
     """
     Preprocesses data for Random Forest training/inference.
 
+    Steps:
+      1. Sort by timestamp (ensures temporal features are meaningful)
+      2. Add temporal features (diffs, rolling stds)
+      3. Extract feature matrix X and target vector y
+
+    No StandardScaler is used — Random Forest is scale-invariant.
+
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame containing RF features and target.
+        DataFrame containing raw sensor columns + failure_status target.
     fit : bool
-        If True, fits a new scaler and saves it.
-        If False, loads an existing scaler (for inference).
-    scaler_filename : str
-        Filename for the scaler artifact.
+        If True, training mode. If False, inference mode.
+        (Both use the same logic since there's no scaler to fit/load.)
 
     Returns
     -------
-    tuple of (X, y, scaler)
-        X: np.ndarray of shape (n_samples, n_features) -- scaled features
-        y: np.ndarray of shape (n_samples,) -- target labels
-        scaler: the fitted StandardScaler instance
+    tuple of (X, y, feature_names)
+        X: np.ndarray of shape (n_samples, n_features) — raw features
+        y: np.ndarray of shape (n_samples,) — target labels
+        feature_names: list of feature column names
     """
-    scaler_path = os.path.join(MODELS_DIR, scaler_filename)
+    # 1. Sort by timestamp to ensure temporal features are correct
+    df = df.sort_values("timestamp").reset_index(drop=True)
 
+    # 2. Add temporal features
+    df = add_temporal_features(df)
+
+    # 3. Extract features and target
     X = df[RF_FEATURES].values
     y = df[RF_TARGET].values
 
-    if fit:
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        os.makedirs(MODELS_DIR, exist_ok=True)
-        joblib.dump(scaler, scaler_path)
-        print(f"[rf_preprocess] StandardScaler fitted and saved to {scaler_path}")
-    else:
-        if not os.path.exists(scaler_path):
-            raise FileNotFoundError(
-                f"Scaler not found at {scaler_path}. Train the Random Forest first."
-            )
-        scaler = joblib.load(scaler_path)
-        X_scaled = scaler.transform(X)
-        print(f"[rf_preprocess] StandardScaler loaded from {scaler_path}")
-
-    print(f"[rf_preprocess] X shape: {X_scaled.shape}, y shape: {y.shape}")
+    print(f"[rf_preprocess] X shape: {X.shape}, y shape: {y.shape}")
     print(f"[rf_preprocess] Class balance: 0={int((y==0).sum())}, 1={int((y==1).sum())}")
-    return X_scaled, y, scaler
+    print(f"[rf_preprocess] Features: {RF_FEATURES}")
+
+    return X, y, df

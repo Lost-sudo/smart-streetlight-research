@@ -18,11 +18,11 @@ import pandas as pd
 LSTM_FEATURES = ["timestep", "voltage", "current", "power_consumption", "light_intensity"]
 LSTM_TARGET = "time_to_failure"
 
-# Features the Random Forest will use (snapshot-based, no temporal info)
+# Features the Random Forest will use (real IoT sensor data + temporal features)
 RF_FEATURES = [
-    "voltage", "current", "power_consumption", "light_intensity",
-    "operating_hours", "voltage_fluctuation", "current_deviation",
-    "power_trend", "fault_frequency",
+    "voltage", "current", "power", "ldr", "mode_encoded",
+    "d_voltage", "d_current", "d_power",
+    "std_current_5", "std_voltage_5",
 ]
 RF_TARGET = "failure_status"
 

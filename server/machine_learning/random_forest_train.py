@@ -7,12 +7,18 @@ Problem Type : Binary Classification (is this streetlight currently faulty?)
 Algorithm    : Random Forest Classifier via scikit-learn
 Target       : failure_status (0 = normal, 1 = fault)
 
+Key improvements:
+  - Stratified train/val/test split (both classes in all sets)
+  - Classification report with per-class metrics
+  - Test predictions saved to CSV for debugging
+
 Evaluation Metrics: Accuracy, Precision, Recall, F1-Score, AUC-ROC
 """
 
 import os
 import joblib
 import numpy as np
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
@@ -25,11 +31,14 @@ from sklearn.metrics import (
     confusion_matrix,
 )
 
+from lstm_data import RF_FEATURES
+
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
+DATASETS_DIR = os.path.join(os.path.dirname(__file__), "datasets")
 
 
 # ------------------------------------------------------------------ #
-#  Data splitting                                                     #
+#  Data splitting (stratified — both classes in all sets)              #
 # ------------------------------------------------------------------ #
 
 def split_data(
@@ -40,19 +49,31 @@ def split_data(
     test_ratio: float = 0.15,
     random_state: int = 42,
 ) -> tuple:
-    """Splits data into Train (70%), Validation (15%), Test (15%) sets."""
+    """Splits data into Train (70%), Validation (15%), Test (15%) with stratification.
+
+    Uses stratified shuffle split to ensure both Normal and Faulty classes
+    appear in all sets. This is appropriate for single-device IoT data
+    where there is no node-level leakage concern.
+    """
     assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6
 
+    # First split: separate test set
     X_temp, X_test, y_temp, y_test = train_test_split(
         X, y, test_size=test_ratio, random_state=random_state, stratify=y
     )
 
+    # Second split: separate validation from training
     relative_val = val_ratio / (train_ratio + val_ratio)
     X_train, X_val, y_train, y_val = train_test_split(
         X_temp, y_temp, test_size=relative_val, random_state=random_state, stratify=y_temp
     )
 
+    print(f"[split] Stratified split (both classes in all sets):")
     print(f"[split] Train: {len(X_train)}  |  Val: {len(X_val)}  |  Test: {len(X_test)}")
+    print(f"[split] Train class balance: 0={int((y_train==0).sum())}, 1={int((y_train==1).sum())}")
+    print(f"[split] Val   class balance: 0={int((y_val==0).sum())}, 1={int((y_val==1).sum())}")
+    print(f"[split] Test  class balance: 0={int((y_test==0).sum())}, 1={int((y_test==1).sum())}")
+
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
@@ -133,9 +154,36 @@ def evaluate_model(
     cm = confusion_matrix(y, y_pred)
     print(f"    TN={cm[0][0]:5d}  FP={cm[0][1]:5d}")
     print(f"    FN={cm[1][0]:5d}  TP={cm[1][1]:5d}")
+
+    # --- Classification Report (per-class performance) ---
+    print(f"\n  Classification Report:")
+    print(classification_report(y, y_pred, target_names=["Normal", "Faulty"]))
     print(f"{'=' * 55}\n")
 
     return metrics
+
+
+# ------------------------------------------------------------------ #
+#  Save test predictions for analysis                                 #
+# ------------------------------------------------------------------ #
+
+def save_predictions(
+    model: RandomForestClassifier,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    filename: str = "rf_test_predictions.csv",
+) -> str:
+    """Save test set predictions to CSV for debugging misclassifications."""
+    df_test = pd.DataFrame(X_test, columns=RF_FEATURES)
+    df_test["y_true"] = y_test
+    df_test["y_pred"] = model.predict(X_test)
+    df_test["y_proba"] = model.predict_proba(X_test)[:, 1]
+
+    os.makedirs(DATASETS_DIR, exist_ok=True)
+    filepath = os.path.join(DATASETS_DIR, filename)
+    df_test.to_csv(filepath, index=False)
+    print(f"[predictions] Test predictions saved to {filepath}")
+    return filepath
 
 
 # ------------------------------------------------------------------ #

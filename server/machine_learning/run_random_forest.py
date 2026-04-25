@@ -3,19 +3,20 @@ run_random_forest.py
 ====================
 Standalone entry point that orchestrates the full Random Forest training pipeline:
 
-  1. Generate filtered normal-vs-fault data from the unified dataset
-  2. Preprocess: StandardScaler normalization
-  3. Split into Train (70%) / Validation (15%) / Test (15%)
+  1. Load real IoT sensor data from datasets/dataset.csv
+  2. Preprocess: temporal feature engineering (no scaling — RF is scale-invariant)
+  3. Chronological split into Train (70%) / Validation (15%) / Test (15%)
   4. Build and train a Random Forest classifier
-  5. Evaluate on Validation and Test sets
-  6. Export the trained model to models/random_forest_model.joblib
+  5. Evaluate on Validation and Test sets (with classification report)
+  6. Save test predictions to CSV for debugging
+  7. Export the trained model to models/random_forest_model.joblib
 
 Usage:
     cd server/machine_learning
     python run_random_forest.py
 """
 
-from random_forest_data import generate_synthetic_dataset
+from random_forest_data import load_real_dataset
 from random_forest_preprocess import preprocess_pipeline
 from random_forest_train import (
     split_data,
@@ -23,6 +24,7 @@ from random_forest_train import (
     train_model,
     evaluate_model,
     save_model,
+    save_predictions,
 )
 from lstm_data import RF_FEATURES
 
@@ -30,25 +32,26 @@ from lstm_data import RF_FEATURES
 def main():
     print("=" * 60)
     print("  Smart Streetlight - Random Forest Fault Detection Training")
+    print("  (Trained on Real IoT Data)")
     print("=" * 60)
 
     # ---------------------------------------------------------- #
-    # Step 1: Generate filtered fault detection data              #
+    # Step 1: Load real IoT sensor data                           #
     # ---------------------------------------------------------- #
-    print("\n[Step 1] Generating filtered dataset...")
-    df = generate_synthetic_dataset(n_nodes=500)
+    print("\n[Step 1] Loading real IoT dataset...")
+    df = load_real_dataset()
     print(f"  -> Dataset shape: {df.shape}")
 
     # ---------------------------------------------------------- #
-    # Step 2: Preprocess (scale features)                         #
+    # Step 2: Preprocess (temporal features, no scaling)          #
     # ---------------------------------------------------------- #
     print(f"\n[Step 2] Preprocessing ({len(RF_FEATURES)} features)...")
-    X, y, scaler = preprocess_pipeline(df, fit=True)
+    X, y, df_processed = preprocess_pipeline(df, fit=True)
 
     # ---------------------------------------------------------- #
-    # Step 3: Split dataset (70 / 15 / 15)                        #
+    # Step 3: Stratified split (70 / 15 / 15)                     #
     # ---------------------------------------------------------- #
-    print("\n[Step 3] Splitting dataset...")
+    print("\n[Step 3] Stratified split (both classes in all sets)...")
     X_train, X_val, X_test, y_train, y_val, y_test = split_data(X, y)
 
     # ---------------------------------------------------------- #
@@ -68,15 +71,21 @@ def main():
     test_metrics = evaluate_model(model, X_test, y_test, split_name="Test")
 
     # ---------------------------------------------------------- #
-    # Step 6: Export model                                        #
+    # Step 6: Save test predictions for analysis                  #
     # ---------------------------------------------------------- #
-    print("[Step 6] Exporting model...")
+    print("[Step 6] Saving test predictions...")
+    pred_path = save_predictions(model, X_test, y_test)
+
+    # ---------------------------------------------------------- #
+    # Step 7: Export model                                        #
+    # ---------------------------------------------------------- #
+    print("[Step 7] Exporting model...")
     model_path = save_model(model)
 
     # ---------------------------------------------------------- #
-    # Step 7: Feature Importance                                  #
+    # Step 8: Feature Importance                                  #
     # ---------------------------------------------------------- #
-    print("\n[Step 7] Feature Importance:")
+    print("\n[Step 8] Feature Importance:")
     importances = model.feature_importances_
     for fname, imp in sorted(zip(RF_FEATURES, importances), key=lambda x: -x[1]):
         bar = "#" * int(imp * 50)
@@ -88,10 +97,11 @@ def main():
     print("\n" + "=" * 60)
     print("  Random Forest Training Complete!")
     print("=" * 60)
-    print(f"  Model file   : {model_path}")
-    print(f"  Test Accuracy : {test_metrics['accuracy'] * 100:.2f}%")
-    print(f"  Test F1 Score : {test_metrics['f1']:.4f}")
-    print(f"  Test AUC-ROC  : {test_metrics['auc_roc']:.4f}")
+    print(f"  Model file        : {model_path}")
+    print(f"  Predictions file  : {pred_path}")
+    print(f"  Test Accuracy     : {test_metrics['accuracy'] * 100:.2f}%")
+    print(f"  Test F1 Score     : {test_metrics['f1']:.4f}")
+    print(f"  Test AUC-ROC      : {test_metrics['auc_roc']:.4f}")
     print("=" * 60)
 
     return test_metrics

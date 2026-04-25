@@ -15,15 +15,9 @@ from app.schemas.streetlight import IoTNodeLogCreate
 logger = logging.getLogger(__name__)
 
 RF_FEATURES = [
-    "voltage",
-    "current",
-    "power_consumption",
-    "light_intensity",
-    "operating_hours",
-    "voltage_fluctuation",
-    "current_deviation",
-    "power_trend",
-    "fault_frequency",
+    "voltage", "current", "power", "ldr", "mode_encoded",
+    "d_voltage", "d_current", "d_power",
+    "std_current_5", "std_voltage_5",
 ]
 
 # LSTM features now include timestep for temporal awareness
@@ -33,7 +27,6 @@ LSTM_FEATURES = ["timestep", "voltage", "current", "power_consumption", "light_i
 SERVER_DIR = Path(__file__).resolve().parents[3]
 MODELS_DIR = SERVER_DIR / "machine_learning" / "models"
 RF_MODEL_PATH = MODELS_DIR / "random_forest_model.joblib"
-RF_SCALER_PATH = MODELS_DIR / "random_forest_scaler.joblib"
 LSTM_MODEL_PATH = MODELS_DIR / "lstm_model.pt"
 LSTM_SCALER_PATH = MODELS_DIR / "lstm_scaler.joblib"
 
@@ -75,19 +68,17 @@ class MLPredictionService:
     def __init__(self, use_lstm: bool = True):
         self.use_lstm = use_lstm
         self.rf_model = None
-        self.rf_scaler = None
         self.lstm_model = None
         self.lstm_scaler = None
         self._load_artifacts()
 
     def _load_artifacts(self):
         try:
-            if RF_MODEL_PATH.exists() and RF_SCALER_PATH.exists():
+            if RF_MODEL_PATH.exists():
                 self.rf_model = joblib.load(RF_MODEL_PATH)
-                self.rf_scaler = joblib.load(RF_SCALER_PATH)
-                logger.info("Loaded Random Forest model artifacts.")
+                logger.info("Loaded Random Forest model artifact (no scaler needed).")
             else:
-                logger.warning("Random Forest model/scaler not found; using mock fault detection.")
+                logger.warning("Random Forest model not found; using mock fault detection.")
                 
             if LSTM_MODEL_PATH.exists() and LSTM_SCALER_PATH.exists():
                 self.lstm_model = LSTMModel(input_size=len(LSTM_FEATURES))
@@ -101,73 +92,68 @@ class MLPredictionService:
             logger.exception("Error loading ML artifacts; using mock predictions.")
 
     def detect_fault(self, iot_log: IoTNodeLogCreate, historical_logs: list = None, streetlight_info: Any = None):
-        """Use Random Forest to detect if the streetlight is currently in a fault state."""
-        if not self.rf_model or not self.rf_scaler:
+        """Use Random Forest to detect if the streetlight is currently in a fault state.
+
+        The model was trained on real IoT data with these features:
+          - Raw sensors: voltage, current, power, ldr, pwm, mode_encoded
+          - Temporal: d_voltage, d_current, d_power (diffs from previous)
+          - Rolling: std_current_5, std_voltage_5 (variability over 5 readings)
+
+        No scaler is used — Random Forest is scale-invariant.
+        """
+        if not self.rf_model:
             return self._mock_detect_fault(iot_log)
 
-        # --- AUTOMATIC FEATURE EXTRACTION ---
-        
-        # 1. Operating Hours: Use IoT value, or calculate from installation date
-        if iot_log.operating_hours is not None:
-            operating_hours = iot_log.operating_hours
-        elif streetlight_info and streetlight_info.installation_date:
-            delta = datetime.utcnow() - streetlight_info.installation_date
-            operating_hours = max(delta.total_seconds() / 3600.0, 0.0)
-        else:
-            operating_hours = 1000.0 # Fallback
+        # --- RAW SENSOR FEATURES ---
+        voltage = iot_log.voltage
+        current = iot_log.current
+        power = abs(iot_log.power_consumption)  # Ensure positive
+        ldr = iot_log.light_intensity           # Map light_intensity -> ldr
+        pwm = 255.0                             # Default full brightness
+        mode_encoded = 1                        # Default NIGHT mode
 
-        # 2. Voltage Fluctuation: Use IoT value, or calculate StdDev from history
-        if iot_log.voltage_fluctuation is not None:
-            voltage_fluctuation = iot_log.voltage_fluctuation
-        elif historical_logs and len(historical_logs) > 1:
-            voltages = [float(getattr(l, "voltage", 220.0)) for l in historical_logs] + [iot_log.voltage]
-            voltage_fluctuation = float(pd.Series(voltages).std())
-        else:
-            voltage_fluctuation = 0.0
+        # --- TEMPORAL FEATURES (computed from historical logs) ---
+        d_voltage = 0.0
+        d_current = 0.0
+        d_power = 0.0
+        std_voltage_5 = 0.0
+        std_current_5 = 0.0
 
-        # 3. Current Deviation: Use IoT value, or calculate deviation from mean
-        if iot_log.current_deviation is not None:
-            current_deviation = iot_log.current_deviation
-        elif historical_logs and len(historical_logs) > 3:
-            avg_current = sum(float(getattr(l, "current", 0.45)) for l in historical_logs) / len(historical_logs)
-            current_deviation = iot_log.current - avg_current
-        else:
-            current_deviation = 0.0
+        if historical_logs and len(historical_logs) > 0:
+            # Delta features: difference from most recent historical reading
+            prev = historical_logs[0]  # Most recent previous log
+            d_voltage = voltage - float(getattr(prev, "voltage", voltage))
+            d_current = current - float(getattr(prev, "current", current))
+            prev_power = abs(float(getattr(prev, "power_consumption", power)))
+            d_power = power - prev_power
 
-        # 4. Power Trend: Use IoT value, or calculate slope/delta from history
-        if iot_log.power_trend is not None:
-            power_trend = iot_log.power_trend
-        elif historical_logs and len(historical_logs) > 1:
-            # Simple delta from previous reading
-            prev_power = float(getattr(historical_logs[0], "power_consumption", 100.0))
-            power_trend = iot_log.power_consumption - prev_power
-        else:
-            power_trend = 0.0
-
-        # 5. Fault Frequency
-        fault_frequency = float(iot_log.fault_frequency) if iot_log.fault_frequency is not None else 0.0
+        if historical_logs and len(historical_logs) >= 4:
+            # Rolling std over last 5 readings (4 historical + current)
+            recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:4]] + [voltage]
+            recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:4]] + [current]
+            std_voltage_5 = float(pd.Series(recent_voltages).std())
+            std_current_5 = float(pd.Series(recent_currents).std())
 
         df = pd.DataFrame(
             [
                 {
-                    "voltage": iot_log.voltage,
-                    "current": iot_log.current,
-                    "power_consumption": iot_log.power_consumption,
-                    "light_intensity": iot_log.light_intensity,
-                    "operating_hours": operating_hours,
-                    "voltage_fluctuation": voltage_fluctuation,
-                    "current_deviation": current_deviation,
-                    "power_trend": power_trend,
-                    "fault_frequency": fault_frequency,
+                    "voltage": voltage,
+                    "current": current,
+                    "power": power,
+                    "ldr": ldr,
+                    "mode_encoded": mode_encoded,
+                    "d_voltage": d_voltage,
+                    "d_current": d_current,
+                    "d_power": d_power,
+                    "std_current_5": std_current_5,
+                    "std_voltage_5": std_voltage_5,
                 }
             ]
         )
 
-        df[RF_FEATURES] = self.rf_scaler.transform(df[RF_FEATURES])
-
         try:
-            probas = self.rf_model.predict_proba(df)
-            failure_prob = float(probas[0][1]) if probas.shape[1] > 1 else float(self.rf_model.predict(df)[0])
+            probas = self.rf_model.predict_proba(df[RF_FEATURES])
+            failure_prob = float(probas[0][1]) if probas.shape[1] > 1 else float(self.rf_model.predict(df[RF_FEATURES])[0])
         except Exception as e:
             logger.exception("Random Forest prediction error; using mock fault detection.")
             return self._mock_detect_fault(iot_log)
