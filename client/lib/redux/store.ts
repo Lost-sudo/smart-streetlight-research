@@ -10,6 +10,8 @@ import { predictiveAlertApi } from "./api/predictiveAlertApi";
 import { repairLogApi } from "./api/repairLogApi";
 import { maintenanceTaskApi } from "./api/maintenanceTaskApi";
 import { maintenanceLogApi } from "./api/maintenanceLogApi";
+import { reportApi } from "./api/reportApi";
+
 
 
 export const store = configureStore({
@@ -25,6 +27,8 @@ export const store = configureStore({
     [repairLogApi.reducerPath]: repairLogApi.reducer,
     [maintenanceTaskApi.reducerPath]: maintenanceTaskApi.reducer,
     [maintenanceLogApi.reducerPath]: maintenanceLogApi.reducer,
+    [reportApi.reducerPath]: reportApi.reducer,
+
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -37,7 +41,9 @@ export const store = configureStore({
       predictiveAlertApi.middleware,
       repairLogApi.middleware,
       maintenanceTaskApi.middleware,
-      maintenanceLogApi.middleware
+      maintenanceLogApi.middleware,
+      reportApi.middleware
+
     ),
 });
 

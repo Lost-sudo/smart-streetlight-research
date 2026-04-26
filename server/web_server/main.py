@@ -11,6 +11,8 @@ from app.routes.predictive_maintenance_log import router as predictive_maintenan
 from app.routes.predictive_alert import router as predictive_alert_router
 from app.routes.repair_log import router as repair_log_router
 from app.routes.maintenance_task import router as maintenance_task_router
+from app.routes.report import router as report_router
+
 from app.core.config import settings
 import uvicorn
 
@@ -44,6 +46,8 @@ app.include_router(predictive_maintenance_router)
 app.include_router(predictive_alert_router)
 app.include_router(repair_log_router)
 app.include_router(maintenance_task_router)
+app.include_router(report_router)
+
 
 @app.get("/")
 def root():

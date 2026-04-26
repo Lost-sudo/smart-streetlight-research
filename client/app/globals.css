@@ -152,3 +152,41 @@
 .animate-blob {
   animation: blob 7s infinite;
 }
+
+@media print {
+  /* Hide sidebar and other non-report UI elements */
+  nav, aside, header, .no-print, button {
+    display: none !important;
+  }
+
+  /* Reset layout for print */
+  main, .flex-1 {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Ensure cards look good on paper */
+  .card, .shadow-md, .shadow-lg {
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
+.report-capture-area {
+  --background: #f9fafb;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --primary: #0f172a;
+  --primary-foreground: #f8fafc;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --ring: #94a3b8;
+  background-color: #f9fafb !important;
+}
