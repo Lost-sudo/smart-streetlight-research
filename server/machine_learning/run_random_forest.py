@@ -26,7 +26,7 @@ from random_forest_train import (
     save_model,
     save_predictions,
 )
-from lstm_data import RF_FEATURES
+from random_forest_data import RF_FEATURES
 
 
 def main():
@@ -46,7 +46,7 @@ def main():
     # Step 2: Preprocess (temporal features, no scaling)          #
     # ---------------------------------------------------------- #
     print(f"\n[Step 2] Preprocessing ({len(RF_FEATURES)} features)...")
-    X, y, df_processed = preprocess_pipeline(df, fit=True)
+    X, y, df_processed = preprocess_pipeline(df)
 
     # ---------------------------------------------------------- #
     # Step 3: Stratified split (70 / 15 / 15)                     #

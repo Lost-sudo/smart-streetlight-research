@@ -11,7 +11,7 @@ Handles:
 import numpy as np
 import pandas as pd
 
-from lstm_data import RF_FEATURES, RF_TARGET
+from random_forest_data import RF_FEATURES, RF_TARGET
 
 
 def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -27,7 +27,7 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame sorted by timestamp, containing voltage, current, power.
+        DataFrame sorted by timestep, containing voltage, current, power.
 
     Returns
     -------
@@ -47,15 +47,12 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def preprocess_pipeline(
-    df: pd.DataFrame,
-    fit: bool = True,
-) -> tuple:
+def preprocess_pipeline(df: pd.DataFrame) -> tuple:
     """
     Preprocesses data for Random Forest training/inference.
 
     Steps:
-      1. Sort by timestamp (ensures temporal features are meaningful)
+      1. Sort by timestep (ensures temporal features are meaningful)
       2. Add temporal features (diffs, rolling stds)
       3. Extract feature matrix X and target vector y
 
@@ -65,19 +62,16 @@ def preprocess_pipeline(
     ----------
     df : pd.DataFrame
         DataFrame containing raw sensor columns + failure_status target.
-    fit : bool
-        If True, training mode. If False, inference mode.
-        (Both use the same logic since there's no scaler to fit/load.)
 
     Returns
     -------
-    tuple of (X, y, feature_names)
+    tuple of (X, y, df)
         X: np.ndarray of shape (n_samples, n_features) — raw features
         y: np.ndarray of shape (n_samples,) — target labels
-        feature_names: list of feature column names
+        df: pd.DataFrame with added temporal features
     """
-    # 1. Sort by timestamp to ensure temporal features are correct
-    df = df.sort_values("timestamp").reset_index(drop=True)
+    # 1. Sort by timestep to ensure temporal features are correct
+    df = df.sort_values("timestep").reset_index(drop=True)
 
     # 2. Add temporal features
     df = add_temporal_features(df)

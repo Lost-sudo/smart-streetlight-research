@@ -1,126 +1,146 @@
 """
-Unified synthetic streetlight sensor data for both LSTM and Random Forest training.
+Unified data module for both LSTM and Random Forest training.
 
-Each node simulates a streetlight going through:
-  Normal operation -> Gradual degradation -> Catastrophic failure
+Loads real IoT sensor data from datasets/streetlight_dataset.csv.
 
-The dataset includes:
-  - `time_to_failure`: countdown (in timesteps) until the node fails (LSTM regression target)
-  - `failure_status`:  binary flag, 1 = the node is currently in a failed state (RF target)
-  - `timestep`:        the current timestep of the node (included as an LSTM feature)
+Dataset columns:
+  device_id, timestep, ldr, light_intensity, voltage, current, power,
+  mode (fault code: 0=normal, 1-6=fault types), fault_name, pwm
+
+The module provides:
+  - Feature/target definitions for both models
+  - Real dataset loader with time_to_failure computation for the LSTM
+  - Real dataset loader for Random Forest fault detection
 """
 
+import os
 import numpy as np
 import pandas as pd
 
 
-# Features the LSTM will use (includes timestep for temporal awareness)
-LSTM_FEATURES = ["timestep", "voltage", "current", "power_consumption", "light_intensity"]
+# ------------------------------------------------------------------ #
+#  Feature / target definitions                                       #
+# ------------------------------------------------------------------ #
+
+# Features the LSTM will use (real IoT sensor data)
+# No 'timestep' — it's a monotonically increasing counter that leaks position,
+# not sensor degradation patterns. The model must generalize across devices.
+LSTM_FEATURES = ["voltage", "current", "power", "ldr"]
 LSTM_TARGET = "time_to_failure"
 
-# Features the Random Forest will use (real IoT sensor data + temporal features)
-RF_FEATURES = [
-    "voltage", "current", "power", "ldr", "mode_encoded",
-    "d_voltage", "d_current", "d_power",
-    "std_current_5", "std_voltage_5",
-]
-RF_TARGET = "failure_status"
+
+# ------------------------------------------------------------------ #
+#  Dataset path                                                       #
+# ------------------------------------------------------------------ #
+
+DATASET_PATH = os.path.join(
+    os.path.dirname(__file__), "datasets", "streetlight_dataset.csv"
+)
 
 
-def _generate_single_node_series(
-    node_id: int,
-    n_timesteps: int,
-    rng: np.random.RandomState,
-) -> pd.DataFrame:
-    """Generate a single streetlight's lifecycle: normal -> degradation -> failure."""
-    t = np.arange(n_timesteps)
+# ------------------------------------------------------------------ #
+#  LSTM dataset loader                                                #
+# ------------------------------------------------------------------ #
 
-    # Point of failure (last 5% of timesteps)
-    failure_idx = int(n_timesteps * 0.95)
+def load_lstm_dataset(csv_path: str = DATASET_PATH) -> pd.DataFrame:
+    """Load the real IoT dataset and compute time_to_failure for LSTM training.
 
-    # --- Degradation factor: starts at 1.0, ramps up to ~1.35 at failure point ---
-    degradation_factor = 1.0 + (t / failure_idx).clip(max=1.0) * 0.35
+    Steps:
+      1. Load CSV
+      2. Ensure power is always positive
+      3. Create binary failure_status from mode (mode > 0 → faulty)
+      4. Compute time_to_failure per device:
+         - For each row, count how many timesteps remain until the device
+           transitions from NORMAL to a fault state (mode > 0).
+         - Once in a fault state, time_to_failure = 0.
+      5. Add node_id column for grouping during sequence creation.
 
-    # --- Core sensor readings degrade over time ---
-    voltage = 220.0 - (t / failure_idx).clip(max=1.0) * 20.0 + rng.normal(0, 2.0, n_timesteps)
-    current = 0.45 * degradation_factor + rng.normal(0, 0.03, n_timesteps)
-    power_consumption = 100.0 * degradation_factor + rng.normal(0, 5.0, n_timesteps)
-    light_intensity = 350.0 - (t / failure_idx).clip(max=1.0) * 150.0 + rng.normal(0, 15.0, n_timesteps)
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with LSTM features, time_to_failure target, and node_id.
+    """
+    df = pd.read_csv(csv_path)
 
-    # --- Extra engineered features for Random Forest ---
-    operating_hours = np.linspace(rng.uniform(500, 2000), rng.uniform(4000, 8000), num=n_timesteps)
-    voltage_fluctuation = 0.02 * degradation_factor + rng.normal(0, 0.01, n_timesteps)
-    current_deviation = 0.01 * degradation_factor + rng.normal(0, 0.02, n_timesteps)
-    power_trend = (t / n_timesteps) * 2.0 + rng.normal(0, 0.1, n_timesteps)
-    lam = 0.3 + (t / n_timesteps) * 3.0
-    fault_frequency = rng.poisson(lam=lam, size=n_timesteps)
+    # --- Ensure power is always positive ---
+    df["power"] = df["power"].abs()
 
-    # --- Failure status: binary label ---
-    failure_status = np.zeros(n_timesteps, dtype=int)
-    failure_status[failure_idx:] = 1
+    # --- Binary target: 0 = Normal, 1 = Faulty (any fault type) ---
+    df["failure_status"] = (df["mode"] > 0).astype(int)
 
-    # --- Time to failure: countdown in timesteps ---
-    # Before failure point: counts down from failure_idx to 0
-    # At and after failure point: 0 (already failed)
-    time_to_failure = np.maximum(failure_idx - t, 0).astype(float)
+    # --- Sort by device and timestep ---
+    df = df.sort_values(["device_id", "timestep"]).reset_index(drop=True)
 
-    # --- When the node has actually failed, readings go catastrophic ---
-    n_failed = n_timesteps - failure_idx
-    voltage[failure_idx:] = rng.normal(80.0, 10.0, n_failed)
-    current[failure_idx:] = rng.normal(2.5, 0.5, n_failed)
-    power_consumption[failure_idx:] = rng.normal(500.0, 50.0, n_failed)
-    light_intensity[failure_idx:] = rng.normal(10.0, 5.0, n_failed)
-    voltage_fluctuation[failure_idx:] = rng.normal(0.15, 0.05, n_failed)
-    current_deviation[failure_idx:] = rng.normal(0.30, 0.08, n_failed)
-    fault_frequency[failure_idx:] = rng.poisson(lam=6.0, size=n_failed)
+    # --- Compute time_to_failure ---
+    # For each device, we compute the reverse countdown to the next fault.
+    # Walking backwards: if current row is faulty, ttf=0.
+    # If current row is normal, ttf = distance (in rows) to the next faulty row.
+    ttf_values = np.zeros(len(df), dtype=float)
 
-    df = pd.DataFrame({
-        "node_id": node_id,
-        "timestep": t,
-        "voltage": voltage,
-        "current": current,
-        "power_consumption": power_consumption,
-        "light_intensity": light_intensity,
-        "operating_hours": operating_hours,
-        "voltage_fluctuation": voltage_fluctuation,
-        "current_deviation": current_deviation,
-        "power_trend": power_trend,
-        "fault_frequency": fault_frequency,
-        "failure_status": failure_status,
-        "time_to_failure": time_to_failure,
-    })
+    for device_id, group in df.groupby("device_id"):
+        idx = group.index.values
+        fault_flags = group["failure_status"].values
+        n = len(fault_flags)
+        ttf = np.zeros(n, dtype=float)
+
+        # Walk backwards to compute time_to_failure
+        countdown = 0.0
+        for i in range(n - 1, -1, -1):
+            if fault_flags[i] == 1:
+                countdown = 0.0
+            else:
+                countdown += 1.0
+            ttf[i] = countdown
+
+        ttf_values[idx] = ttf
+
+    df["time_to_failure"] = ttf_values
+
+    # --- Assign node_id (needed for LSTM sequence grouping) ---
+    # Use the device_id directly, but map to integer for compatibility
+    device_ids = df["device_id"].unique()
+    device_map = {did: i for i, did in enumerate(device_ids)}
+    df["node_id"] = df["device_id"].map(device_map)
+
+    normal_count = (df["failure_status"] == 0).sum()
+    faulty_count = (df["failure_status"] == 1).sum()
+
+    print(f"[lstm_data] Loaded real IoT dataset: {csv_path}")
+    print(f"[lstm_data] Total samples: {len(df)}")
+    print(f"[lstm_data] Normal: {normal_count}, Faulty: {faulty_count}")
+    print(f"[lstm_data] time_to_failure range: [{df['time_to_failure'].min():.0f}, {df['time_to_failure'].max():.0f}]")
+    print(f"[lstm_data] Devices: {list(device_ids)}")
+    print(f"[lstm_data] Fault type breakdown:")
+    for _, row in df.groupby(["mode", "fault_name"]).size().reset_index(name="count").iterrows():
+        print(f"          mode={int(row['mode'])} ({row['fault_name']}): {row['count']}")
 
     return df
 
+
+# ------------------------------------------------------------------ #
+#  Legacy compatibility: generate_sequential_dataset wraps the loader #
+# ------------------------------------------------------------------ #
 
 def generate_sequential_dataset(
     n_nodes: int = 200,
     n_timesteps: int = 150,
     random_state: int = 42,
 ) -> pd.DataFrame:
-    """Generate the full dataset across multiple streetlight nodes."""
-    rng = np.random.RandomState(random_state)
-    node_dfs = []
+    """Load the real dataset (legacy interface for run_lstm.py compatibility).
 
-    for node_id in range(n_nodes):
-        node_df = _generate_single_node_series(node_id, n_timesteps, rng)
-        node_dfs.append(node_df)
-
-    return pd.concat(node_dfs, ignore_index=True)
+    The n_nodes, n_timesteps, and random_state parameters are ignored —
+    the real dataset is always used.
+    """
+    return load_lstm_dataset()
 
 
 # --------------------------------------------------------------------- #
 #  CLI entry point                                                       #
 # --------------------------------------------------------------------- #
 if __name__ == "__main__":
-    df = generate_sequential_dataset()
+    df = load_lstm_dataset()
     print(f"\nDataset shape: {df.shape}")
-    print(f"\nSample rows (node 0, first 5 timesteps):")
-    print(df[df["node_id"] == 0].head(5).to_string())
-    print("\n... (middle of lifecycle) ...")
-    mid = df[(df["node_id"] == 0) & (df["timestep"].between(70, 74))]
-    print(mid.to_string())
-    print("\n... (failure zone) ...")
-    print(df[df["node_id"] == 0].tail(5).to_string())
+    print(f"\nSample rows (first 10):")
+    print(df.head(10).to_string())
     print(f"\ntime_to_failure stats:\n{df['time_to_failure'].describe()}")
     print(f"\nfailure_status distribution:\n{df['failure_status'].value_counts()}")
