@@ -6,7 +6,7 @@ from datetime import datetime
 class StreetlightLog(Base):
     __tablename__ = "streetlight_logs"
     id = Column(Integer, primary_key=True, index=True)
-    streetlight_id = Column(Integer, ForeignKey("streetlights.id"))
+    streetlight_id = Column(Integer, ForeignKey("streetlights.id"), index=True)
     voltage = Column(Float)
     current = Column(Float)
     power_consumption = Column(Float)

@@ -28,7 +28,14 @@ def run_predictive_analysis(streetlight_id: int):
 @router.post("/telemetry", response_model=StreetlightLogRead)
 def add_log_from_iot(iot_log: IoTNodeLogCreate, background_tasks: BackgroundTasks, controller: StreetlightLogController = Depends(get_streetlight_log_controller)):
     created = controller.add_log_from_iot(iot_log=iot_log)
-    background_tasks.add_task(run_predictive_analysis, created.streetlight_id)
+    
+    # --- INTERVAL-BASED AI TRIGGER ---
+    # Predictive maintenance (LSTM) is resource-intensive. 
+    # We trigger it every 50 logs (or on the very first log).
+    log_count = controller.get_log_count(created.streetlight_id)
+    if log_count == 1 or log_count % 50 == 0:
+        background_tasks.add_task(run_predictive_analysis, created.streetlight_id)
+        
     return created
 
 @router.get("/{streetlight_log_id}", dependencies=[Depends(require_roles([UserRole.admin, UserRole.operator, UserRole.technician]))], response_model=StreetlightLogRead)

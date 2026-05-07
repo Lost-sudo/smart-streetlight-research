@@ -56,3 +56,9 @@ class StreetlightLogController:
         """
         logs = self.service.get_streetlight_logs_by_streetlight_id(streetlight_id, limit=limit)
         return [StreetlightLogRead.model_validate(l, from_attributes=True) for l in logs]
+
+    def get_log_count(self, streetlight_id: int) -> int:
+        """
+        Get the total number of telemetry logs for a specific streetlight.
+        """
+        return self.service.get_log_count(streetlight_id)

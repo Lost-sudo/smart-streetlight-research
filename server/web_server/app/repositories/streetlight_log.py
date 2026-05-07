@@ -61,3 +61,12 @@ class StreetlightLogRepository:
         return self.db.query(StreetlightLog).filter(
             StreetlightLog.streetlight_id == streetlight_id
         ).order_by(StreetlightLog.timestamp.desc()).limit(limit).all()
+
+    def count_by_streetlight_id(self, streetlight_id: int) -> int:
+        """
+        Get the total count of logs for a specific streetlight.
+        Used to determine if predictive maintenance analysis should be triggered.
+        """
+        return self.db.query(StreetlightLog).filter(
+            StreetlightLog.streetlight_id == streetlight_id
+        ).count()
