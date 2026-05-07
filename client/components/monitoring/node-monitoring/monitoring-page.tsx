@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { RoleGate } from "@/components/auth/role-gate";
 import { cn } from "@/lib/utils";
-import { useGetStreetlightsQuery, useDeleteStreetlightMutation, type Streetlight } from "@/lib/redux/api/streetlightApi";
+import { useGetStreetlightsQuery, useUpdateStreetlightMutation, useDeleteStreetlightMutation, type Streetlight } from "@/lib/redux/api/streetlightApi";
 import { useGetPredictiveMaintenanceLogsQuery, type PredictiveMaintenanceLog } from "@/lib/redux/api/predictiveMaintenanceApi";
 
 import { CreateNodeDialog } from "../CreateNodeDialog";
@@ -43,6 +43,7 @@ export function NodeMonitoringPage() {
   });
   const { data: pmLogs = [] } = useGetPredictiveMaintenanceLogsQuery(undefined, { pollingInterval: 15000 });
   const [deleteStreetlight, { isLoading: isDeleting }] = useDeleteStreetlightMutation();
+  const [updateStreetlight] = useUpdateStreetlightMutation();
 
   const [selectedNode, setSelectedNode] = useState<Streetlight | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -66,6 +67,28 @@ export function NodeMonitoringPage() {
     }
     return m;
   }, [pmLogs]);
+
+  // Automatic offline detection and status update
+  useEffect(() => {
+    // Only process if we have both data sources
+    if (streetlights.length === 0 || pmByStreetlightId.size === 0) return;
+
+    streetlights.forEach((node) => {
+      // Only update if it's currently active in the UI/Store
+      if (node.status === "active") {
+        const pm = pmByStreetlightId.get(node.id);
+        const isOnline = isOnlineFromLastUpdated(pm?.last_updated, nowTick);
+
+        if (!isOnline) {
+          console.log(`Node ${node.name} (${node.id}) detected offline. Updating status to inactive.`);
+          updateStreetlight({
+            id: node.id,
+            data: { status: "inactive" },
+          });
+        }
+      }
+    });
+  }, [streetlights, pmByStreetlightId, nowTick, updateStreetlight]);
 
   // Sort nodes by priority: faulty → maintenance → active → inactive
   const sortedNodes = useMemo(() => {
