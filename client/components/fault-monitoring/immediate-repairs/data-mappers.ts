@@ -23,7 +23,7 @@ export function mapRepairTaskToMaintenanceTask({
   alertById: Map<number, Alert>;
   streetlightById: Map<number, Streetlight>;
 }): MaintenanceTask {
-  const alert = alertById.get(task.alert_id);
+  const alert = task.alert_id ? alertById.get(task.alert_id) : undefined;
   const sl = alert?.streetlight_id ? streetlightById.get(alert.streetlight_id) : undefined;
 
   const priorityStr = alert?.severity === "critical" ? "High" : alert?.severity === "high" ? "Medium" : "Low";

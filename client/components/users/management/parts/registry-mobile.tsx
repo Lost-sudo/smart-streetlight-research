@@ -6,12 +6,13 @@ import { Loader2 } from "lucide-react";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
 import { roleColors, roleIcons } from "@/components/users/management/utils";
+import type { User, Role } from "@/types/auth";
 
 export function RegistryMobile({
   users,
   isFetching,
 }: {
-  users: any[];
+  users: User[];
   isFetching: boolean;
 }) {
   return (
@@ -23,7 +24,7 @@ export function RegistryMobile({
         </div>
       ) : users.length > 0 ? (
         users.map((user) => {
-          const RoleIcon = roleIcons[user.role];
+          const RoleIcon = roleIcons[user.role as Role];
           return (
             <div key={user.id} className="bg-card/50 border border-border/50 rounded-xl p-4 space-y-4 shadow-sm">
               <div className="flex items-center justify-between">
@@ -41,7 +42,7 @@ export function RegistryMobile({
                   <p className="text-muted-foreground font-semibold mb-1">Role</p>
                   <Badge
                     variant="outline"
-                    className={`flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full font-semibold capitalize ${roleColors[user.role]}`}
+                    className={`flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full font-semibold capitalize ${roleColors[user.role as Role]}`}
                   >
                     <RoleIcon className="h-3 w-3" />
                     {user.role}
