@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -15,13 +16,13 @@ from app.schemas.streetlight import IoTNodeLogCreate
 logger = logging.getLogger(__name__)
 
 RF_FEATURES = [
-    "voltage", "current", "power", "ldr", "mode_encoded",
+    "voltage", "current", "power", "ldr",
     "d_voltage", "d_current", "d_power",
     "std_current_5", "std_voltage_5",
 ]
 
-# LSTM features now include timestep for temporal awareness
-LSTM_FEATURES = ["timestep", "voltage", "current", "power_consumption", "light_intensity"]
+# LSTM features — no 'timestep' (it leaks position, not sensor patterns)
+LSTM_FEATURES = ["voltage", "current", "power", "ldr"]
 
 # server/web_server/app/services -> server
 SERVER_DIR = Path(__file__).resolve().parents[3]
@@ -29,10 +30,10 @@ MODELS_DIR = SERVER_DIR / "machine_learning" / "models"
 RF_MODEL_PATH = MODELS_DIR / "random_forest_model.joblib"
 LSTM_MODEL_PATH = MODELS_DIR / "lstm_model.pt"
 LSTM_SCALER_PATH = MODELS_DIR / "lstm_scaler.joblib"
+LSTM_TARGET_SCALER_PATH = MODELS_DIR / "lstm_target_scaler.joblib"
 
-# Maximum time-to-failure from training (n_timesteps * 0.95)
-# This is used to normalize the LSTM output into a probability
-MAX_TTF = 142.0  # 150 * 0.95 = 142 max timesteps to failure in training data
+# Maximum time-to-failure from training data (used as fallback normalization).
+MAX_TTF = 1732.0  # Max time_to_failure from real streetlight_dataset.csv
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size: int, hidden_size: int = 64, dropout: float = 0.2):
@@ -65,11 +66,13 @@ def _torch_load_state_dict(path: Path) -> dict[str, Any]:
 
 
 class MLPredictionService:
-    def __init__(self, use_lstm: bool = True):
+    def __init__(self, use_lstm: bool = True, rf_threshold: float = 0.35):
         self.use_lstm = use_lstm
+        self.rf_threshold = rf_threshold
         self.rf_model = None
         self.lstm_model = None
         self.lstm_scaler = None
+        self.lstm_target_scaler = None
         self._load_artifacts()
 
     def _load_artifacts(self):
@@ -85,7 +88,13 @@ class MLPredictionService:
                 self.lstm_model.load_state_dict(_torch_load_state_dict(LSTM_MODEL_PATH))
                 self.lstm_model.eval()
                 self.lstm_scaler = joblib.load(LSTM_SCALER_PATH)
-                logger.info("Loaded LSTM model artifacts.")
+                logger.info("Loaded LSTM model and feature scaler.")
+
+                if LSTM_TARGET_SCALER_PATH.exists():
+                    self.lstm_target_scaler = joblib.load(LSTM_TARGET_SCALER_PATH)
+                    logger.info("Loaded LSTM target scaler for inverse-transform.")
+                else:
+                    logger.warning("LSTM target scaler not found; using raw TTF output.")
             else:
                 logger.warning("LSTM model/scaler not found; using mock predictive maintenance.")
         except Exception as e:
@@ -95,7 +104,7 @@ class MLPredictionService:
         """Use Random Forest to detect if the streetlight is currently in a fault state.
 
         The model was trained on real IoT data with these features:
-          - Raw sensors: voltage, current, power, ldr, pwm, mode_encoded
+          - Raw sensors: voltage, current, power, ldr, pwm
           - Temporal: d_voltage, d_current, d_power (diffs from previous)
           - Rolling: std_current_5, std_voltage_5 (variability over 5 readings)
 
@@ -110,29 +119,32 @@ class MLPredictionService:
         power = abs(iot_log.power_consumption)  # Ensure positive
         ldr = iot_log.light_intensity           # Map light_intensity -> ldr
         pwm = 255.0                             # Default full brightness
-        mode_encoded = 1                        # Default NIGHT mode
 
-        # --- TEMPORAL FEATURES (computed from historical logs) ---
-        d_voltage = 0.0
-        d_current = 0.0
-        d_power = 0.0
-        std_voltage_5 = 0.0
-        std_current_5 = 0.0
+        # --- TEMPORAL FEATURES ---
+        # Prioritize pre-calculated features from the service layer
+        d_voltage = getattr(iot_log, "d_voltage", None)
+        d_current = getattr(iot_log, "d_current", None)
+        d_power = getattr(iot_log, "d_power", None)
+        std_voltage_5 = getattr(iot_log, "std_voltage_5", None)
+        std_current_5 = getattr(iot_log, "std_current_5", None)
 
-        if historical_logs and len(historical_logs) > 0:
-            # Delta features: difference from most recent historical reading
-            prev = historical_logs[0]  # Most recent previous log
-            d_voltage = voltage - float(getattr(prev, "voltage", voltage))
-            d_current = current - float(getattr(prev, "current", current))
-            prev_power = abs(float(getattr(prev, "power_consumption", power)))
-            d_power = power - prev_power
+        # Fallback if features are not pre-calculated (e.g., from old database records or direct API calls)
+        if any(v is None for v in [d_voltage, d_current, d_power, std_voltage_5, std_current_5]):
+            d_voltage, d_current, d_power = 0.0, 0.0, 0.0
+            std_voltage_5, std_current_5 = 0.0, 0.0
 
-        if historical_logs and len(historical_logs) >= 4:
-            # Rolling std over last 5 readings (4 historical + current)
-            recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:4]] + [voltage]
-            recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:4]] + [current]
-            std_voltage_5 = float(pd.Series(recent_voltages).std())
-            std_current_5 = float(pd.Series(recent_currents).std())
+            if historical_logs and len(historical_logs) > 0:
+                prev = historical_logs[0]
+                d_voltage = voltage - float(getattr(prev, "voltage", voltage))
+                d_current = current - float(getattr(prev, "current", current))
+                prev_power = abs(float(getattr(prev, "power_consumption", power)))
+                d_power = power - prev_power
+
+            if historical_logs and len(historical_logs) >= 4:
+                recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:4]] + [voltage]
+                recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:4]] + [current]
+                std_voltage_5 = float(pd.Series(recent_voltages).std())
+                std_current_5 = float(pd.Series(recent_currents).std())
 
         df = pd.DataFrame(
             [
@@ -141,7 +153,7 @@ class MLPredictionService:
                     "current": current,
                     "power": power,
                     "ldr": ldr,
-                    "mode_encoded": mode_encoded,
+                    "pwm": pwm,
                     "d_voltage": d_voltage,
                     "d_current": d_current,
                     "d_power": d_power,
@@ -158,7 +170,7 @@ class MLPredictionService:
             logger.exception("Random Forest prediction error; using mock fault detection.")
             return self._mock_detect_fault(iot_log)
 
-        is_faulty = failure_prob > 0.5
+        is_faulty = failure_prob >= self.rf_threshold
         return {
             "is_faulty": is_faulty,
             "confidence": round(failure_prob, 4),
@@ -169,8 +181,8 @@ class MLPredictionService:
         """
         Use LSTM to predict time-to-failure.
         
-        The LSTM outputs a raw time_to_failure value (in timesteps).
-        We convert this to:
+        The LSTM outputs a normalized [0, 1] time_to_failure value.
+        We inverse-transform it to real timestep counts, then convert to:
           - failure_probability: higher when time_to_failure is low
           - predicted_failure_date: estimated date based on time_to_failure
           - urgency_level: low/medium/high based on probability
@@ -183,22 +195,21 @@ class MLPredictionService:
             
         latest_history = historical_logs[-9:]
         
-        # Build the sequence with timestep included as a feature
+        # Build the sequence with features matching training:
+        # [voltage, current, power, ldr] — no timestep
         sequence_data = []
-        for i, log in enumerate(latest_history):
+        for log in latest_history:
             sequence_data.append([
-                float(i),  # timestep (relative position in sequence)
-                getattr(log, "voltage", 220.0),
-                getattr(log, "current", 0.45),
-                getattr(log, "power_consumption", 100.0),
-                getattr(log, "light_intensity", 350.0)
+                getattr(log, "voltage", 11.0),
+                getattr(log, "current", 0.6),
+                abs(getattr(log, "power_consumption", 7.0)),  # Ensure positive
+                getattr(log, "light_intensity", 200.0)
             ])
             
         sequence_data.append([
-            float(len(latest_history)),  # current timestep
             iot_log.voltage,
             iot_log.current,
-            iot_log.power_consumption,
+            abs(iot_log.power_consumption),  # Ensure positive
             iot_log.light_intensity
         ])
         
@@ -207,21 +218,30 @@ class MLPredictionService:
         input_tensor = torch.FloatTensor(scaled_data).unsqueeze(0)
         
         with torch.no_grad():
-            predicted_ttf = self.lstm_model(input_tensor).item()
+            raw_output = self.lstm_model(input_tensor).item()
         
+        # Inverse-transform the normalized output back to real timestep count
+        if self.lstm_target_scaler:
+            predicted_ttf = float(
+                self.lstm_target_scaler.inverse_transform(
+                    np.array([[raw_output]])
+                )[0, 0]
+            )
+        else:
+            # Fallback: assume output is already in real units
+            predicted_ttf = raw_output
+
         # Clamp to valid range
         predicted_ttf = max(predicted_ttf, 0.0)
         
         # Convert time-to-failure to failure probability
         # Lower TTF = higher probability of failure
-        # TTF of 0 = 100% failure, TTF of MAX_TTF+ = low probability
         failure_prob = 1.0 - min(predicted_ttf / MAX_TTF, 1.0)
         failure_prob = min(max(failure_prob, 0.0), 1.0)
         
         urgency_level = self._map_urgency(failure_prob)
         
         # Each timestep approximates ~6 hours in a real deployment
-        # So predicted_ttf * 6 hours = predicted time until failure
         hours_to_failure = predicted_ttf * 6.0
         predicted_failure_date = datetime.utcnow() + timedelta(hours=hours_to_failure)
 

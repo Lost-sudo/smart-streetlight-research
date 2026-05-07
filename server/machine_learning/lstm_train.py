@@ -16,6 +16,7 @@ Note: TensorFlow is not available for Python 3.14, so PyTorch is used instead.
       The model is exported as a .pt file.
 """
 
+import copy
 import os
 import numpy as np
 import torch
@@ -174,7 +175,7 @@ def train_model(
         # --- Early stopping check ---
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            best_model_state = model.state_dict().copy()
+            best_model_state = copy.deepcopy(model.state_dict())
             epochs_without_improvement = 0
         else:
             epochs_without_improvement += 1

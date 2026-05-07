@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 import logging
+import numpy as np
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -57,30 +58,39 @@ class StreetlightLogService:
             else:
                 iot_log.operating_hours = 1000.0
 
-        # 2. Voltage Fluctuation
-        if iot_log.voltage_fluctuation is None:
-            if historical_logs and len(historical_logs) > 1:
-                voltages = [float(l.voltage) for l in historical_logs] + [iot_log.voltage]
-                # Using simple list variance for speed
-                mean = sum(voltages) / len(voltages)
-                iot_log.voltage_fluctuation = (sum((x - mean) ** 2 for x in voltages) / len(voltages)) ** 0.5
-            else:
-                iot_log.voltage_fluctuation = 0.0
+        # 2. ML FEATURE EXTRACTION (Aligned with model training)
+        # historical_logs[0] is the most recent previous log
+        if historical_logs and len(historical_logs) > 0:
+            prev = historical_logs[0]
+            iot_log.d_voltage = iot_log.voltage - float(prev.voltage)
+            iot_log.d_current = iot_log.current - float(prev.current)
+            iot_log.d_power = iot_log.power_consumption - float(prev.power_consumption)
+        else:
+            iot_log.d_voltage = 0.0
+            iot_log.d_current = 0.0
+            iot_log.d_power = 0.0
 
-        # 3. Current Deviation
+        if historical_logs and len(historical_logs) >= 4:
+            recent_voltages = [float(l.voltage) for l in historical_logs[:4]] + [iot_log.voltage]
+            recent_currents = [float(l.current) for l in historical_logs[:4]] + [iot_log.current]
+            
+            # Using ddof=1 for sample standard deviation (matches Pandas training default)
+            iot_log.std_voltage_5 = float(np.std(recent_voltages, ddof=1))
+            iot_log.std_current_5 = float(np.std(recent_currents, ddof=1))
+        else:
+            iot_log.std_voltage_5 = 0.0
+            iot_log.std_current_5 = 0.0
+
+        # Map to legacy fields for backward compatibility/UI
+        iot_log.power_trend = iot_log.d_power
+        iot_log.voltage_fluctuation = iot_log.std_voltage_5
+        
         if iot_log.current_deviation is None:
-            if historical_logs and len(historical_logs) > 3:
+            if historical_logs:
                 avg_current = sum(float(l.current) for l in historical_logs) / len(historical_logs)
                 iot_log.current_deviation = iot_log.current - avg_current
             else:
                 iot_log.current_deviation = 0.0
-
-        # 4. Power Trend
-        if iot_log.power_trend is None:
-            if historical_logs and len(historical_logs) > 0:
-                iot_log.power_trend = iot_log.power_consumption - float(historical_logs[0].power_consumption)
-            else:
-                iot_log.power_trend = 0.0
 
         if iot_log.fault_frequency is None:
             iot_log.fault_frequency = 0

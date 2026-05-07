@@ -31,7 +31,7 @@ from sklearn.metrics import (
     confusion_matrix,
 )
 
-from lstm_data import RF_FEATURES
+from random_forest_data import RF_FEATURES
 
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 DATASETS_DIR = os.path.join(os.path.dirname(__file__), "datasets")
@@ -123,10 +123,15 @@ def evaluate_model(
     X: np.ndarray,
     y: np.ndarray,
     split_name: str = "Test",
+    threshold: float = 0.35,
 ) -> dict:
-    """Evaluates the RF model with comprehensive classification metrics."""
-    y_pred = model.predict(X)
+    """Evaluates the RF model with comprehensive classification metrics.
+    
+    The 'threshold' parameter allows for tuning the decision boundary.
+    Lowering it increases Recall (catches more faults).
+    """
     y_proba = model.predict_proba(X)[:, 1]
+    y_pred = (y_proba >= threshold).astype(int)
 
     accuracy = accuracy_score(y, y_pred)
     precision = precision_score(y, y_pred, zero_division=0)

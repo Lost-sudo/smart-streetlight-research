@@ -20,5 +20,12 @@ class StreetlightLog(Base):
     current_deviation = Column(Float, nullable=True)
     power_trend = Column(Float, nullable=True)
     fault_frequency = Column(Integer, nullable=True)
+    
+    # ML model features (aligned with training)
+    d_voltage = Column(Float, nullable=True)
+    d_current = Column(Float, nullable=True)
+    d_power = Column(Float, nullable=True)
+    std_voltage_5 = Column(Float, nullable=True)
+    std_current_5 = Column(Float, nullable=True)
 
     streetlight = relationship("Streetlight", back_populates="logs")

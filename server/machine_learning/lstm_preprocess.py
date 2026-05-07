@@ -4,7 +4,8 @@ lstm_preprocess.py
 Preprocessing pipeline for the LSTM Time-to-Failure Prediction model.
 
 Handles:
-  - MinMaxScaler normalization (standard for neural networks)
+  - MinMaxScaler normalization for features (standard for neural networks)
+  - MinMaxScaler normalization for target (prevents loss-scale mismatch)
   - Sliding-window sequence creation for LSTM input
   - Scaler persistence for inference-time reuse
 
@@ -72,6 +73,55 @@ def scale_features(
     return scaled, scaler
 
 
+def scale_target(
+    y: np.ndarray,
+    fit: bool = True,
+    scaler_filename: str = "lstm_target_scaler.joblib",
+) -> tuple:
+    """
+    Applies MinMaxScaler to the time_to_failure target.
+
+    Normalizing the target to [0, 1] prevents loss-scale mismatch:
+    raw counts (0–1732) against MinMax-scaled [0,1] features would cause
+    the MSE loss to be dominated by the large target range, destabilizing
+    gradient updates.
+
+    Parameters
+    ----------
+    y : np.ndarray
+        1D array of raw time_to_failure values.
+    fit : bool
+        If True, fits a new scaler and saves it. If False, loads existing.
+    scaler_filename : str
+        Filename for the target scaler artifact.
+
+    Returns
+    -------
+    tuple of (scaled_y, scaler)
+        - scaled_y: np.ndarray of shape (n_samples,) in [0, 1]
+        - scaler: the fitted MinMaxScaler instance
+    """
+    scaler_path = os.path.join(MODELS_DIR, scaler_filename)
+
+    if fit:
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        scaled = scaler.fit_transform(y.reshape(-1, 1)).ravel()
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        joblib.dump(scaler, scaler_path)
+        print(f"[lstm_preprocess] Target scaler fitted and saved to {scaler_path}")
+        print(f"[lstm_preprocess] Target range mapped: [{y.min():.1f}, {y.max():.1f}] -> [0.0, 1.0]")
+    else:
+        if not os.path.exists(scaler_path):
+            raise FileNotFoundError(
+                f"Target scaler not found at {scaler_path}. Train the LSTM first."
+            )
+        scaler = joblib.load(scaler_path)
+        scaled = scaler.transform(y.reshape(-1, 1)).ravel()
+        print(f"[lstm_preprocess] Target scaler loaded from {scaler_path}")
+
+    return scaled, scaler
+
+
 # ------------------------------------------------------------------ #
 #  Sliding window sequence creation                                   #
 # ------------------------------------------------------------------ #
@@ -124,8 +174,9 @@ def preprocess_pipeline(
     """
     Runs the full LSTM preprocessing pipeline:
       1. Scale features with MinMaxScaler
-      2. Group by node and create sliding-window sequences
-      3. Concatenate all node sequences
+      2. Scale target (time_to_failure) to [0, 1]
+      3. Group by node and create sliding-window sequences
+      4. Concatenate all node sequences
 
     Parameters
     ----------
@@ -134,21 +185,25 @@ def preprocess_pipeline(
     lookback : int
         Number of past time steps per input sequence (default: 10).
     fit : bool
-        True for training (fits scaler), False for inference (loads scaler).
+        True for training (fits scalers), False for inference (loads scalers).
 
     Returns
     -------
     tuple of (X, y)
         X: np.ndarray of shape (total_samples, lookback, n_features)
-        y: np.ndarray of shape (total_samples,)
+        y: np.ndarray of shape (total_samples,) — normalized to [0, 1]
     """
     # Scale features
-    scaled_data, scaler = scale_features(df, fit=fit)
+    scaled_data, feature_scaler = scale_features(df, fit=fit)
+
+    # Scale the target (time_to_failure) to [0, 1]
+    raw_target = df[LSTM_TARGET].values
+    scaled_target, target_scaler = scale_target(raw_target, fit=fit)
 
     # Build a temporary DataFrame with node_id for grouping
     df_scaled = pd.DataFrame(scaled_data, columns=LSTM_FEATURES)
     df_scaled["node_id"] = df["node_id"].values
-    df_scaled[LSTM_TARGET] = df[LSTM_TARGET].values
+    df_scaled[LSTM_TARGET] = scaled_target
 
     # Create sequences per node (to avoid cross-node contamination)
     all_X, all_y = [], []
@@ -165,5 +220,5 @@ def preprocess_pipeline(
     y = np.concatenate(all_y, axis=0)
 
     print(f"[lstm_preprocess] Sequences created: X={X.shape}, y={y.shape}")
-    print(f"[lstm_preprocess] Target (time_to_failure) range: [{y.min():.1f}, {y.max():.1f}]")
+    print(f"[lstm_preprocess] Target (normalized) range: [{y.min():.4f}, {y.max():.4f}]")
     return X, y

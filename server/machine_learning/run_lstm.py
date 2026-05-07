@@ -3,7 +3,7 @@ run_lstm.py
 ===========
 Standalone entry point that orchestrates the full LSTM training pipeline:
 
-  1. Generate synthetic sequential streetlight sensor data
+  1. Load real IoT sequential streetlight sensor data
   2. Preprocess: MinMaxScaler + sliding-window sequences
   3. Split into Train (70%) / Validation (15%) / Test (15%)
   4. Build and train an LSTM model
@@ -15,7 +15,7 @@ Usage:
     python run_lstm.py
 """
 
-from lstm_data import generate_sequential_dataset
+from lstm_data import load_lstm_dataset
 from lstm_preprocess import preprocess_pipeline
 from lstm_train import (
     split_sequences,
@@ -29,13 +29,14 @@ from lstm_train import (
 def main():
     print("=" * 60)
     print("  Smart Streetlight - LSTM Time-to-Failure Training")
+    print("  (Trained on Real IoT Data)")
     print("=" * 60)
 
     # ---------------------------------------------------------- #
-    # Step 1: Generate synthetic sequential data                  #
+    # Step 1: Load real IoT sequential data                      #
     # ---------------------------------------------------------- #
-    print("\n[Step 1] Generating synthetic sequential data...")
-    df = generate_sequential_dataset(n_nodes=200, n_timesteps=150)
+    print("\n[Step 1] Loading real IoT sequential data...")
+    df = load_lstm_dataset()
     print(f"  -> Dataset shape: {df.shape}")
     print(f"  -> time_to_failure range: [{df['time_to_failure'].min()}, {df['time_to_failure'].max()}]")
 
