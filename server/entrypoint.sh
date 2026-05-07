@@ -5,8 +5,10 @@
 set -e
 
 echo "Running database migrations..."
-# Run migrations from the root /app directory where alembic.ini is
 alembic upgrade head
+
+echo "Seeding initial admin..."
+python seed_admin.py
 
 echo "Starting server..."
 # Set working directory to web_server for uvicorn
