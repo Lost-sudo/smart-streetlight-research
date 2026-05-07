@@ -120,27 +120,31 @@ class MLPredictionService:
         ldr = iot_log.light_intensity           # Map light_intensity -> ldr
         pwm = 255.0                             # Default full brightness
 
-        # --- TEMPORAL FEATURES (computed from historical logs) ---
-        d_voltage = 0.0
-        d_current = 0.0
-        d_power = 0.0
-        std_voltage_5 = 0.0
-        std_current_5 = 0.0
+        # --- TEMPORAL FEATURES ---
+        # Prioritize pre-calculated features from the service layer
+        d_voltage = getattr(iot_log, "d_voltage", None)
+        d_current = getattr(iot_log, "d_current", None)
+        d_power = getattr(iot_log, "d_power", None)
+        std_voltage_5 = getattr(iot_log, "std_voltage_5", None)
+        std_current_5 = getattr(iot_log, "std_current_5", None)
 
-        if historical_logs and len(historical_logs) > 0:
-            # Delta features: difference from most recent historical reading
-            prev = historical_logs[0]  # Most recent previous log
-            d_voltage = voltage - float(getattr(prev, "voltage", voltage))
-            d_current = current - float(getattr(prev, "current", current))
-            prev_power = abs(float(getattr(prev, "power_consumption", power)))
-            d_power = power - prev_power
+        # Fallback if features are not pre-calculated (e.g., from old database records or direct API calls)
+        if any(v is None for v in [d_voltage, d_current, d_power, std_voltage_5, std_current_5]):
+            d_voltage, d_current, d_power = 0.0, 0.0, 0.0
+            std_voltage_5, std_current_5 = 0.0, 0.0
 
-        if historical_logs and len(historical_logs) >= 4:
-            # Rolling std over last 5 readings (4 historical + current)
-            recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:4]] + [voltage]
-            recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:4]] + [current]
-            std_voltage_5 = float(pd.Series(recent_voltages).std())
-            std_current_5 = float(pd.Series(recent_currents).std())
+            if historical_logs and len(historical_logs) > 0:
+                prev = historical_logs[0]
+                d_voltage = voltage - float(getattr(prev, "voltage", voltage))
+                d_current = current - float(getattr(prev, "current", current))
+                prev_power = abs(float(getattr(prev, "power_consumption", power)))
+                d_power = power - prev_power
+
+            if historical_logs and len(historical_logs) >= 4:
+                recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:4]] + [voltage]
+                recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:4]] + [current]
+                std_voltage_5 = float(pd.Series(recent_voltages).std())
+                std_current_5 = float(pd.Series(recent_currents).std())
 
         df = pd.DataFrame(
             [

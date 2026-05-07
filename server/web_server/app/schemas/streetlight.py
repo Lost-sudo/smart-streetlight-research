@@ -54,6 +54,13 @@ class IoTNodeLogCreate(BaseModel):
     current_deviation: Optional[float] = None
     power_trend: Optional[float] = None
     fault_frequency: Optional[int] = None
+    
+    # ML model features
+    d_voltage: Optional[float] = None
+    d_current: Optional[float] = None
+    d_power: Optional[float] = None
+    std_voltage_5: Optional[float] = None
+    std_current_5: Optional[float] = None
 
 class StreetlightLogRead(BaseModel):
     id: int
@@ -69,6 +76,13 @@ class StreetlightLogRead(BaseModel):
     current_deviation: Optional[float] = None
     power_trend: Optional[float] = None
     fault_frequency: Optional[int] = None
+
+    # ML model features
+    d_voltage: Optional[float] = None
+    d_current: Optional[float] = None
+    d_power: Optional[float] = None
+    std_voltage_5: Optional[float] = None
+    std_current_5: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
 
