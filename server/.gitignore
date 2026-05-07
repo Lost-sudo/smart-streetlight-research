@@ -2,6 +2,7 @@
 __pycache__
 ./.env
 
+# Keep Alembic files (required for deployment)
 alembic.ini
 alembic/
 alembic/versions
