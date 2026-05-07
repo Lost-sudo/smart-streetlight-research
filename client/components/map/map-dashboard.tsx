@@ -6,7 +6,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, MapPin, AlertTriangle, Settings, Activity, Zap, Sun } from "lucide-react";
+import { Lightbulb, MapPin, AlertTriangle, Settings, Activity, Zap, Sun, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
   useGetStreetlightsQuery, 
@@ -162,14 +162,14 @@ export default function MapDashboard() {
         }
       `}</style>
       {/* Floating Header */}
-      <div className="absolute top-6 left-6 z-[1000] pointer-events-none max-w-sm">
-        <Card className="p-5 bg-card/80 backdrop-blur-md border-none shadow-2xl pointer-events-auto">
-          <h1 className="text-2xl font-bold tracking-tight">Interactive Map</h1>
-          <p className="text-xs text-muted-foreground mt-1">Real-time geographical visualization of streetlight nodes.</p>
+      <div className="absolute top-4 left-4 right-4 md:top-6 md:left-6 md:right-auto z-[1000] pointer-events-none md:max-w-sm">
+        <Card className="p-4 md:p-5 bg-card/80 backdrop-blur-md border-none shadow-2xl pointer-events-auto">
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight">Interactive Map</h1>
+          <p className="text-[10px] md:text-xs text-muted-foreground mt-1">Real-time geographical visualization of streetlight nodes.</p>
           
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-1.5 md:gap-2">
             {Object.entries(statusColors).map(([status, colors]) => (
-              <div key={status} className="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-background/50 text-[10px]">
+              <div key={status} className="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-background/50 text-[9px] md:text-[10px]">
                 <div className={cn("h-1.5 w-1.5 rounded-full", status === "active" ? "bg-emerald-500" : status === "faulty" ? "bg-red-500" : status === "maintenance" ? "bg-amber-500" : "bg-zinc-500")} />
                 <span className="capitalize">{status}</span>
               </div>
@@ -179,31 +179,34 @@ export default function MapDashboard() {
       </div>
 
       {/* Summary Stats Overlay */}
-      <div className="absolute bottom-10 left-10 z-[1000] pointer-events-none">
-        <div className="px-6 py-4 bg-card/90 backdrop-blur-xl border border-white/10 shadow-2xl pointer-events-auto flex flex-row items-center gap-8 rounded-3xl w-fit">
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Total Nodes</span>
-            <span className="text-2xl font-black leading-none mt-1">{streetlights.length}</span>
+      <div className={cn(
+        "absolute bottom-4 left-4 right-4 md:bottom-10 md:left-10 md:right-auto z-[1000] pointer-events-none transition-all duration-300",
+        selectedNode && "bottom-[280px] md:bottom-10" // Move up on mobile when node is selected
+      )}>
+        <div className="px-4 py-3 md:px-6 md:py-4 bg-card/90 backdrop-blur-xl border border-white/10 shadow-2xl pointer-events-auto flex flex-row items-center gap-4 md:gap-8 rounded-2xl md:rounded-3xl w-full md:w-fit overflow-x-auto no-scrollbar">
+          <div className="flex flex-col items-center min-w-[60px]">
+            <span className="text-[8px] md:text-[10px] text-muted-foreground uppercase font-black tracking-widest">Total</span>
+            <span className="text-lg md:text-2xl font-black leading-none mt-1">{streetlights.length}</span>
           </div>
           
-          <div className="h-10 w-px bg-border/60" />
+          <div className="h-8 md:h-10 w-px bg-border/60 shrink-0" />
           
-          <div className="flex flex-row items-center gap-8">
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] text-emerald-500 uppercase font-black tracking-widest">Active</span>
-              <span className="text-2xl font-black text-emerald-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'active').length}</span>
+          <div className="flex flex-row items-center gap-4 md:gap-8">
+            <div className="flex flex-col items-center min-w-[40px]">
+              <span className="text-[8px] md:text-[10px] text-emerald-500 uppercase font-black tracking-widest">Active</span>
+              <span className="text-lg md:text-2xl font-black text-emerald-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'active').length}</span>
             </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Inactive</span>
-              <span className="text-2xl font-black text-zinc-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'inactive').length}</span>
+            <div className="flex flex-col items-center min-w-[40px]">
+              <span className="text-[8px] md:text-[10px] text-zinc-500 uppercase font-black tracking-widest">Inact.</span>
+              <span className="text-lg md:text-2xl font-black text-zinc-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'inactive').length}</span>
             </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] text-red-500 uppercase font-black tracking-widest">Faulty</span>
-              <span className="text-2xl font-black text-red-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'faulty').length}</span>
+            <div className="flex flex-col items-center min-w-[40px]">
+              <span className="text-[8px] md:text-[10px] text-red-500 uppercase font-black tracking-widest">Faulty</span>
+              <span className="text-lg md:text-2xl font-black text-red-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'faulty').length}</span>
             </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] text-amber-500 uppercase font-black tracking-widest">Maint.</span>
-              <span className="text-2xl font-black text-amber-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'maintenance').length}</span>
+            <div className="flex flex-col items-center min-w-[40px]">
+              <span className="text-[8px] md:text-[10px] text-amber-500 uppercase font-black tracking-widest">Maint.</span>
+              <span className="text-lg md:text-2xl font-black text-amber-500/90 leading-none mt-1">{streetlights.filter(n => n.status === 'maintenance').length}</span>
             </div>
           </div>
         </div>
@@ -243,9 +246,15 @@ export default function MapDashboard() {
       </MapContainer>
 
       {/* Floating Detail Panel */}
-      <div className="absolute top-6 right-6 bottom-6 z-[1000] pointer-events-none w-80">
-        <Card className="h-full border-none shadow-2xl bg-card/80 backdrop-blur-md pointer-events-auto flex flex-col overflow-hidden">
-          <CardHeader className="pb-3 border-b bg-muted/30">
+      <div className={cn(
+        "absolute z-[1001] pointer-events-none transition-all duration-500 ease-in-out",
+        "bottom-0 left-0 right-0 md:top-6 md:right-6 md:bottom-6 md:left-auto md:w-80",
+        selectedNode 
+          ? "translate-y-0 opacity-100" 
+          : "translate-y-full opacity-0 md:translate-y-0 md:opacity-0 md:pointer-events-none"
+      )}>
+        <Card className="h-[320px] md:h-full border-none shadow-2xl bg-card/80 backdrop-blur-md pointer-events-auto flex flex-col overflow-hidden rounded-t-3xl md:rounded-xl">
+          <CardHeader className="pb-3 border-b bg-muted/30 relative">
             <CardTitle className="text-lg flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />
               Node Details
@@ -253,6 +262,13 @@ export default function MapDashboard() {
             <CardDescription className="text-xs">
               {selectedNode ? "Detailed information for the selected node" : "Select a node on the map to view details"}
             </CardDescription>
+            {/* Close button for mobile */}
+            <button 
+              onClick={() => setSelectedNode(null)}
+              className="absolute top-4 right-4 p-1 rounded-full hover:bg-muted md:hidden"
+            >
+              <X className="h-5 w-5 text-muted-foreground" />
+            </button>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto p-4">
             {selectedNode ? (
