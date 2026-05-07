@@ -189,3 +189,9 @@ class StreetlightLogService:
             A list of streetlight logs for the given streetlight ID
         """
         return self.streetlight_log_repo.get_by_streetlight_id(streetlight_id, limit=limit)
+
+    def get_log_count(self, streetlight_id: int) -> int:
+        """
+        Get the total number of telemetry logs for a specific streetlight.
+        """
+        return self.streetlight_log_repo.count_by_streetlight_id(streetlight_id)
