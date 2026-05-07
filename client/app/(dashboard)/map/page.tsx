@@ -16,10 +16,10 @@ const MapDashboard = dynamic(
           <p className="text-sm font-medium text-muted-foreground">Initializing Map View...</p>
         </div>
         
-        {/* Skeleton Overlays to match the new UI */}
-        <div className="absolute top-6 left-6 z-10 w-64 h-32 bg-card/50 backdrop-blur-sm rounded-xl animate-pulse" />
-        <div className="absolute bottom-10 left-10 z-10 w-[520px] h-20 bg-card/50 backdrop-blur-sm rounded-3xl animate-pulse" />
-        <div className="absolute top-6 right-6 bottom-6 z-10 w-80 bg-card/50 backdrop-blur-sm rounded-xl animate-pulse" />
+        {/* Skeleton Overlays to match the new responsive UI */}
+        <div className="absolute top-4 left-4 right-4 md:top-6 md:left-6 md:right-auto z-10 md:w-64 h-32 bg-card/50 backdrop-blur-sm rounded-xl animate-pulse" />
+        <div className="absolute bottom-4 left-4 right-4 md:bottom-10 md:left-10 md:right-auto z-10 h-20 md:w-[520px] bg-card/50 backdrop-blur-sm rounded-2xl md:rounded-3xl animate-pulse" />
+        <div className="hidden md:block absolute top-6 right-6 bottom-6 z-10 w-80 bg-card/50 backdrop-blur-sm rounded-xl animate-pulse" />
       </div>
     )
   }
