@@ -5,3 +5,6 @@ __pycache__
 alembic.ini
 alembic/
 alembic/versions
+
+.env
+.env.*
