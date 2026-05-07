@@ -31,16 +31,12 @@ COPY . .
 # This ensures that web_server can import from machine_learning correctly
 ENV PYTHONPATH=/app
 
-# Default port (can be overridden by cloud platforms like Render)
-ENV PORT=8000
+# Set the working directory to /app
+WORKDIR /app
 
-# Set the working directory to web_server where main.py resides
-WORKDIR /app/web_server
+# Copy the entrypoint script and give it permissions
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
-# Expose the API port (documentation only)
-EXPOSE 8000
-
-# Start the uvicorn server
-# We use 'python -m uvicorn' to ensure the binary is found in the Python path
-# and shell execution mode ($PORT) to allow environment variable expansion
-CMD python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+# Use the entrypoint script to start the container
+ENTRYPOINT ["./entrypoint.sh"]
