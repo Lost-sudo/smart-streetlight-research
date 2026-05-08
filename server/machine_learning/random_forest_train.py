@@ -68,11 +68,8 @@ def split_data(
         X_temp, y_temp, test_size=relative_val, random_state=random_state, stratify=y_temp
     )
 
-    print(f"[split] Stratified split (both classes in all sets):")
+    print(f"[split] Stratified split ({len(np.unique(y))} classes in all sets):")
     print(f"[split] Train: {len(X_train)}  |  Val: {len(X_val)}  |  Test: {len(X_test)}")
-    print(f"[split] Train class balance: 0={int((y_train==0).sum())}, 1={int((y_train==1).sum())}")
-    print(f"[split] Val   class balance: 0={int((y_val==0).sum())}, 1={int((y_val==1).sum())}")
-    print(f"[split] Test  class balance: 0={int((y_test==0).sum())}, 1={int((y_test==1).sum())}")
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 
@@ -123,46 +120,41 @@ def evaluate_model(
     X: np.ndarray,
     y: np.ndarray,
     split_name: str = "Test",
-    threshold: float = 0.35,
 ) -> dict:
-    """Evaluates the RF model with comprehensive classification metrics.
+    """Evaluates the multi-class RF model."""
+    y_pred = model.predict(X)
     
-    The 'threshold' parameter allows for tuning the decision boundary.
-    Lowering it increases Recall (catches more faults).
-    """
-    y_proba = model.predict_proba(X)[:, 1]
-    y_pred = (y_proba >= threshold).astype(int)
-
     accuracy = accuracy_score(y, y_pred)
-    precision = precision_score(y, y_pred, zero_division=0)
-    recall = recall_score(y, y_pred, zero_division=0)
-    f1 = f1_score(y, y_pred, zero_division=0)
-    auc_roc = roc_auc_score(y, y_proba)
+    # Using weighted average for multi-class precision/recall/f1
+    precision = precision_score(y, y_pred, average='weighted', zero_division=0)
+    recall = recall_score(y, y_pred, average='weighted', zero_division=0)
+    f1 = f1_score(y, y_pred, average='weighted', zero_division=0)
 
     metrics = {
         "accuracy": accuracy,
         "precision": precision,
         "recall": recall,
         "f1": f1,
-        "auc_roc": auc_roc,
     }
 
     print(f"\n{'=' * 55}")
-    print(f"  {split_name} Set Evaluation (Random Forest Fault Detection)")
+    print(f"  {split_name} Set Evaluation (Multi-Class Fault Detection)")
     print(f"{'=' * 55}")
     print(f"  Accuracy  : {accuracy * 100:.2f}%")
-    print(f"  Precision : {precision:.4f}")
-    print(f"  Recall    : {recall:.4f}")
-    print(f"  F1 Score  : {f1:.4f}")
-    print(f"  AUC-ROC   : {auc_roc:.4f}")
-    print(f"\n  Confusion Matrix:")
-    cm = confusion_matrix(y, y_pred)
-    print(f"    TN={cm[0][0]:5d}  FP={cm[0][1]:5d}")
-    print(f"    FN={cm[1][0]:5d}  TP={cm[1][1]:5d}")
-
-    # --- Classification Report (per-class performance) ---
+    print(f"  Weighted F1: {f1:.4f}")
+    
+    # --- Classification Report ---
+    target_names = [
+        "NORMAL", 
+        "VOLTAGE_FLUCTUATION", 
+        "OVERCURRENT", 
+        "SENSOR_DEGRADATION", 
+        "LAMP_DEGRADATION", 
+        "SYSTEM_FAILURE", 
+        "INTERMITTENT_FAULT"
+    ]
     print(f"\n  Classification Report:")
-    print(classification_report(y, y_pred, target_names=["Normal", "Faulty"]))
+    print(classification_report(y, y_pred, target_names=target_names))
     print(f"{'=' * 55}\n")
 
     return metrics
@@ -182,7 +174,6 @@ def save_predictions(
     df_test = pd.DataFrame(X_test, columns=RF_FEATURES)
     df_test["y_true"] = y_test
     df_test["y_pred"] = model.predict(X_test)
-    df_test["y_proba"] = model.predict_proba(X_test)[:, 1]
 
     os.makedirs(DATASETS_DIR, exist_ok=True)
     filepath = os.path.join(DATASETS_DIR, filename)

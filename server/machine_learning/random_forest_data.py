@@ -25,7 +25,7 @@ RF_FEATURES = [
     "d_voltage", "d_current", "d_power",
     "std_current_5", "std_voltage_5",
 ]
-RF_TARGET = "failure_status"
+RF_TARGET = "fault_type"
 
 
 def load_real_dataset(csv_path: str = DATASET_PATH) -> pd.DataFrame:
@@ -47,16 +47,17 @@ def load_real_dataset(csv_path: str = DATASET_PATH) -> pd.DataFrame:
     # --- Ensure power is always positive ---
     df["power"] = df["power"].abs()
 
-    # --- Binary target: 0 = Normal, 1 = Faulty (any fault type) ---
-    df["failure_status"] = (df["mode"] > 0).astype(int)
+    # --- Multi-class target: 0-6 modes ---
+    df["fault_type"] = df["mode"].astype(int)
 
-    normal_count = (df["failure_status"] == 0).sum()
-    faulty_count = (df["failure_status"] == 1).sum()
+    # For backward compatibility or binary needs, we can still see normal vs faulty
+    normal_count = (df["fault_type"] == 0).sum()
+    faulty_count = (df["fault_type"] > 0).sum()
 
-    print(f"[rf_data] Loaded real IoT dataset: {csv_path}")
+    print(f"[rf_data] Loaded multi-class dataset: {csv_path}")
     print(f"[rf_data] Total samples: {len(df)}")
     print(f"[rf_data] Normal: {normal_count}, Faulty: {faulty_count}")
-    print(f"[rf_data] Fault type breakdown:")
+    print(f"[rf_data] Multi-class distribution:")
     for _, row in df.groupby(["mode", "fault_name"]).size().reset_index(name="count").iterrows():
         print(f"          mode={int(row['mode'])} ({row['fault_name']}): {row['count']}")
 

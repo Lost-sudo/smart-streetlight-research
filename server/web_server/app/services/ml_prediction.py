@@ -25,6 +25,16 @@ RF_FEATURES = [
 # LSTM features — including 'elapsed_time' derived from timesteps
 LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time"]
 
+FAULT_TYPE_MAP = {
+    0: "NORMAL",
+    1: "VOLTAGE_FLUCTUATION",
+    2: "OVERCURRENT",
+    3: "SENSOR_DEGRADATION",
+    4: "LAMP_DEGRADATION",
+    5: "SYSTEM_FAILURE",
+    6: "INTERMITTENT_FAULT"
+}
+
 # server/web_server/app/services -> server
 SERVER_DIR = Path(__file__).resolve().parents[3]
 MODELS_DIR = SERVER_DIR / "machine_learning" / "models"
@@ -77,13 +87,14 @@ class MLPredictionService:
         self.lstm_model = None
         self.lstm_scaler = None
         self.lstm_target_scaler = None
+        self.decay_scale = DEFAULT_DECAY_SCALE
         self._load_artifacts()
 
     def _load_artifacts(self):
         try:
             if RF_MODEL_PATH.exists():
                 self.rf_model = joblib.load(RF_MODEL_PATH)
-                logger.info("Loaded Random Forest model artifact.")
+                logger.info("Loaded Random Forest multi-class model.")
             else:
                 logger.warning("Random Forest model not found.")
                 
@@ -171,24 +182,24 @@ class MLPredictionService:
         }])
 
         try:
-            probas = self.rf_model.predict_proba(df[RF_FEATURES])
-            failure_prob = float(probas[0][1]) if probas.shape[1] > 1 else float(self.rf_model.predict(df[RF_FEATURES])[0])
+            # Predict specific mode (0-6)
+            pred_mode = int(self.rf_model.predict(df[RF_FEATURES])[0])
+            
+            # Get confidence (probability of the predicted class)
+            probas = self.rf_model.predict_proba(df[RF_FEATURES])[0]
+            confidence = float(probas[pred_mode])
         except Exception as e:
-            logger.exception("Random Forest prediction error.")
+            logger.exception("Random Forest multi-class prediction error.")
             return None
 
-        is_faulty = failure_prob >= self.rf_threshold
-        
-        # Identify "SYSTEM_FAILURE" (total power loss)
-        fault_type = "HARDWARE_FAULT"
-        if is_faulty and voltage == 0 and current == 0:
-            fault_type = "SYSTEM_FAILURE"
+        is_faulty = pred_mode > 0
+        fault_name = FAULT_TYPE_MAP.get(pred_mode, "UNKNOWN_FAULT")
 
         return {
             "is_faulty": is_faulty,
-            "confidence": round(failure_prob, 4),
-            "urgency_level": self._map_urgency(failure_prob),
-            "fault_type": fault_type
+            "confidence": round(confidence, 4),
+            "urgency_level": self._map_urgency(1.0 - probas[0]), # Probability of ANY fault
+            "fault_type": fault_name
         }
 
     def predict_failure(self, iot_log: IoTNodeLogCreate, historical_logs=None):

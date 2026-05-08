@@ -15,9 +15,14 @@ class ReportService:
         mttr_hours = self.report_repo.get_mttr_data(month, year)
         maint_stats = self.report_repo.get_maintenance_stats(month, year)
         total_energy_month = self.report_repo.get_total_energy_for_month(month, year)
+        uptime_pct = self.report_repo.get_uptime_percentage(month, year)
+        energy_savings = self.report_repo.get_energy_savings_data(month, year)
 
         # Target month name
-        target_month_name = datetime(year, month, 1).strftime('%B %Y')
+        try:
+            target_month_name = datetime(year, month, 1).strftime('%B %Y')
+        except ValueError:
+            target_month_name = f"{month}/{year}"
 
         # Handle empty energy data
         if not energy_data_raw:
@@ -42,10 +47,10 @@ class ReportService:
         # Format metrics
         metrics = SystemMetrics(
             energy_consumption=f"{total_energy_month:,.0f} kWh",
-            energy_savings="Calculated vs Target",
-            uptime_percentage="99.9%", # Still placeholder for now
-            uptime_status="Availability for Period",
-            mttr=f"{mttr_hours:.1f} Hours",
+            energy_savings=energy_savings,
+            uptime_percentage=f"{uptime_pct:.1f}%" if uptime_pct > 0 else "N/A",
+            uptime_status="System Availability" if uptime_pct > 0 else "No logs available",
+            mttr=f"{mttr_hours:.1f} Hours" if mttr_hours > 0 else "N/A",
             mttr_target="Target: < 6 Hours",
             reporting_period=target_month_name,
             reporting_filter="Monthly Breakdown"

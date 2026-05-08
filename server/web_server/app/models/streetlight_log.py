@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, Float, Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
@@ -28,5 +28,6 @@ class StreetlightLog(Base):
     d_power = Column(Float, nullable=True)
     std_voltage_5 = Column(Float, nullable=True)
     std_current_5 = Column(Float, nullable=True)
+    fault_type = Column(String, nullable=True)
 
     streetlight = relationship("Streetlight", back_populates="logs")
