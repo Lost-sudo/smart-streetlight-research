@@ -8,10 +8,15 @@ Handles:
   - Feature extraction (no scaling — RF is scale-invariant)
 """
 
+import os
 import numpy as np
 import pandas as pd
 
 from random_forest_data import RF_FEATURES, RF_TARGET
+
+
+DATASETS_DIR = os.path.join(os.path.dirname(__file__), "datasets")
+DATASET_CSV = os.path.join(DATASETS_DIR, "streetlight_dataset.csv")
 
 
 def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -85,3 +90,12 @@ def preprocess_pipeline(df: pd.DataFrame) -> tuple:
     print(f"[rf_preprocess] Features: {RF_FEATURES}")
 
     return X, y, df
+
+
+# ------------------------------------------------------------------ #
+#  CLI: Run standalone to remove synthetic data                       #
+# ------------------------------------------------------------------ #
+
+if __name__ == "__main__":
+    removed = remove_synthetic_from_csv()
+    print(f"Done. Removed {removed} synthetic rows.")

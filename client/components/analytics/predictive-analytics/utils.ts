@@ -1,4 +1,4 @@
-export const ONLINE_WINDOW_MS = 120_000;
+export const ONLINE_WINDOW_MS = 300_000; // 5 minutes window
 
 export function parsePossiblyNaiveUtc(lastUpdated: unknown) {
   if (typeof lastUpdated !== "string" || lastUpdated.length === 0) return null;

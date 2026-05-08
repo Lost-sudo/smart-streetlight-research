@@ -9,7 +9,7 @@ import { DashboardHeader } from "@/components/dashboard/overview/parts/dashboard
 import { SummaryCards } from "@/components/dashboard/overview/parts/summary-cards";
 import { NodeStatusGrid } from "@/components/dashboard/overview/parts/node-status-grid";
 
-const ONLINE_WINDOW_MS = 120_000;
+const ONLINE_WINDOW_MS = 300_000; // 5 minutes window
 
 function getOnlineStatus(lastUpdated: unknown, nowMs: number) {
   if (typeof lastUpdated !== "string" || lastUpdated.length === 0) return false;

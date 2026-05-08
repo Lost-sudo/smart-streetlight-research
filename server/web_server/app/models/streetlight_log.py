@@ -11,6 +11,7 @@ class StreetlightLog(Base):
     current = Column(Float)
     power_consumption = Column(Float)
     light_intensity = Column(Float)
+    pwm = Column(Float, nullable=True)
     is_on = Column(Boolean, default=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     

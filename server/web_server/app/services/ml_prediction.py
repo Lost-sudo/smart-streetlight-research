@@ -66,7 +66,7 @@ def _torch_load_state_dict(path: Path) -> dict[str, Any]:
 
 
 class MLPredictionService:
-    def __init__(self, use_lstm: bool = True, rf_threshold: float = 0.35):
+    def __init__(self, use_lstm: bool = True, rf_threshold: float = 0.5):
         self.use_lstm = use_lstm
         self.rf_threshold = rf_threshold
         self.rf_model = None
@@ -118,7 +118,9 @@ class MLPredictionService:
         current = iot_log.current
         power = abs(iot_log.power_consumption)  # Ensure positive
         ldr = iot_log.light_intensity           # Map light_intensity -> ldr
-        pwm = 255.0                             # Default full brightness
+        pwm = getattr(iot_log, "pwm", 255.0)
+        if pwm is None:
+            pwm = 255.0  # Default full brightness if missing
 
         # --- TEMPORAL FEATURES ---
         # Prioritize pre-calculated features from the service layer
@@ -171,6 +173,14 @@ class MLPredictionService:
             return self._mock_detect_fault(iot_log)
 
         is_faulty = failure_prob >= self.rf_threshold
+        
+        logger.info(
+            f"Fault Detection [Node: {getattr(streetlight_info, 'name', 'unknown')}]: "
+            f"Prob={failure_prob:.4f}, Threshold={self.rf_threshold}, Result={'FAULTY' if is_faulty else 'NORMAL'}"
+        )
+        if is_faulty:
+            logger.warning(f"Fault details: V={voltage}, C={current}, P={power}, L={ldr}, PWM={pwm}")
+
         return {
             "is_faulty": is_faulty,
             "confidence": round(failure_prob, 4),
