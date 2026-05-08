@@ -165,6 +165,36 @@ export function NodeDetailsDialog({ node, open, onOpenChange }: NodeDetailsDialo
             </Card>
           </div>
 
+          {/* Analysis Summary */}
+          {latest && (
+            <div className={cn(
+              "p-4 rounded-xl border flex items-center justify-between",
+              latest.fault_type === "NORMAL" || !latest.fault_type ? "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/20" : "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20"
+            )}>
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "h-10 w-10 rounded-full flex items-center justify-center",
+                  latest.fault_type === "NORMAL" || !latest.fault_type ? "bg-emerald-100 dark:bg-emerald-800/20 text-emerald-600" : "bg-red-100 dark:bg-red-800/20 text-red-600"
+                )}>
+                  <Cpu className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold">Live System Analysis</h4>
+                  <p className="text-xs text-muted-foreground">Real-time fault classification from AI models</p>
+                </div>
+              </div>
+              <Badge 
+                variant={latest.fault_type === "NORMAL" || !latest.fault_type ? "secondary" : "destructive"}
+                className={cn(
+                  "px-3 py-1 text-xs font-bold uppercase tracking-wider shadow-sm",
+                  latest.fault_type === "NORMAL" || !latest.fault_type ? "bg-emerald-500 text-white border-none" : ""
+                )}
+              >
+                {latest.fault_type || "NORMAL"}
+              </Badge>
+            </div>
+          )}
+
           {/* Node Info Bar */}
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground px-1">
             <span className="flex items-center gap-1.5">
@@ -208,6 +238,7 @@ export function NodeDetailsDialog({ node, open, onOpenChange }: NodeDetailsDialo
                             <TableHead className="text-right">Current (A)</TableHead>
                             <TableHead className="text-right">Power (W)</TableHead>
                             <TableHead className="text-right">Light (lux)</TableHead>
+                            <TableHead className="text-right">Fault State</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -220,6 +251,25 @@ export function NodeDetailsDialog({ node, open, onOpenChange }: NodeDetailsDialo
                               <TableCell className="text-right font-mono">{log.current.toFixed(2)}</TableCell>
                               <TableCell className="text-right font-mono">{log.power_consumption.toFixed(2)}</TableCell>
                               <TableCell className="text-right font-mono">{log.light_intensity.toFixed(2)}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge 
+                                  variant={
+                                    log.fault_type === "NORMAL" ? "secondary" : 
+                                    log.fault_type === "SYSTEM_FAILURE" ? "destructive" : "outline"
+                                  }
+                                  className={cn(
+                                    "text-[10px] px-1.5 py-0 uppercase font-bold",
+                                    log.fault_type === "NORMAL" && "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+                                    log.fault_type === "VOLTAGE_FLUCTUATION" && "bg-amber-500/10 text-amber-600 border-amber-500/20",
+                                    log.fault_type === "OVERCURRENT" && "bg-orange-500/10 text-orange-600 border-orange-500/20",
+                                    log.fault_type === "SENSOR_DEGRADATION" && "bg-blue-500/10 text-blue-600 border-blue-500/20",
+                                    log.fault_type === "LAMP_DEGRADATION" && "bg-purple-500/10 text-purple-600 border-purple-500/20",
+                                    log.fault_type === "INTERMITTENT_FAULT" && "bg-zinc-500/10 text-zinc-600 border-zinc-500/20"
+                                  )}
+                                >
+                                  {log.fault_type || "NORMAL"}
+                                </Badge>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

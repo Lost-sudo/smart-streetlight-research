@@ -101,7 +101,6 @@ def main():
     print(f"  Predictions file  : {pred_path}")
     print(f"  Test Accuracy     : {test_metrics['accuracy'] * 100:.2f}%")
     print(f"  Test F1 Score     : {test_metrics['f1']:.4f}")
-    print(f"  Test AUC-ROC      : {test_metrics['auc_roc']:.4f}")
     print("=" * 60)
 
     return test_metrics

@@ -14,6 +14,7 @@ import {
   type Streetlight 
 } from "@/lib/redux/api/streetlightApi";
 import { Loader2 } from "lucide-react";
+import { NodeDetailsDialog } from "../monitoring/NodeDetailsDialog";
 
 // Fix for default marker icons in Leaflet with Next.js
 const fixLeafletIcons = () => {
@@ -86,6 +87,7 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
 
 export default function MapDashboard() {
   const [selectedNode, setSelectedNode] = useState<Streetlight | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   const { data: streetlights = [], isLoading: isLoadingStreetlights, isError: isErrorStreetlights } = useGetStreetlightsQuery();
   
@@ -366,13 +368,22 @@ export default function MapDashboard() {
           </CardContent>
           {selectedNode && (
             <div className="p-4 border-t bg-muted/20">
-              <button className="w-full py-2 bg-primary text-primary-foreground rounded-md text-xs font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors">
+              <button 
+                onClick={() => setDetailDialogOpen(true)}
+                className="w-full py-2 bg-primary text-primary-foreground rounded-md text-xs font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors"
+              >
                 View Detailed Logs
               </button>
             </div>
           )}
         </Card>
       </div>
+
+      <NodeDetailsDialog 
+        node={selectedNode} 
+        open={detailDialogOpen} 
+        onOpenChange={setDetailDialogOpen} 
+      />
     </div>
   );
 }
