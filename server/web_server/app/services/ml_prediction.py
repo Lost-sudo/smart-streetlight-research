@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -32,8 +33,11 @@ LSTM_MODEL_PATH = MODELS_DIR / "lstm_model.pt"
 LSTM_SCALER_PATH = MODELS_DIR / "lstm_scaler.joblib"
 LSTM_TARGET_SCALER_PATH = MODELS_DIR / "lstm_target_scaler.joblib"
 
-# Maximum time-to-failure from training data (used as fallback normalization).
-MAX_TTF = 1732.0  # Max time_to_failure from real streetlight_dataset.csv
+# Exponential decay scale for TTF → failure-probability conversion.
+# Calibrated to the model's observed output range (normal ≈ 200-270 TTF,
+# degrading ≈ 40-100 TTF, faulty ≈ 0 TTF).  A larger value makes the
+# curve decay more slowly (lower probabilities for healthy readings).
+DECAY_SCALE = 150.0
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size: int, hidden_size: int = 64, dropout: float = 0.2):
@@ -79,9 +83,9 @@ class MLPredictionService:
         try:
             if RF_MODEL_PATH.exists():
                 self.rf_model = joblib.load(RF_MODEL_PATH)
-                logger.info("Loaded Random Forest model artifact (no scaler needed).")
+                logger.info("Loaded Random Forest model artifact.")
             else:
-                logger.warning("Random Forest model not found; using mock fault detection.")
+                logger.warning("Random Forest model not found.")
                 
             if LSTM_MODEL_PATH.exists() and LSTM_SCALER_PATH.exists():
                 self.lstm_model = LSTMModel(input_size=len(LSTM_FEATURES))
@@ -94,43 +98,36 @@ class MLPredictionService:
                     self.lstm_target_scaler = joblib.load(LSTM_TARGET_SCALER_PATH)
                     logger.info("Loaded LSTM target scaler for inverse-transform.")
                 else:
-                    logger.warning("LSTM target scaler not found; using raw TTF output.")
+                    logger.warning("LSTM target scaler not found.")
             else:
-                logger.warning("LSTM model/scaler not found; using mock predictive maintenance.")
+                logger.warning("LSTM model/scaler not found.")
         except Exception as e:
-            logger.exception("Error loading ML artifacts; using mock predictions.")
+            logger.exception("Error loading ML artifacts.")
 
     def detect_fault(self, iot_log: IoTNodeLogCreate, historical_logs: list = None, streetlight_info: Any = None):
-        """Use Random Forest to detect if the streetlight is currently in a fault state.
-
-        The model was trained on real IoT data with these features:
-          - Raw sensors: voltage, current, power, ldr, pwm
-          - Temporal: d_voltage, d_current, d_power (diffs from previous)
-          - Rolling: std_current_5, std_voltage_5 (variability over 5 readings)
-
-        No scaler is used — Random Forest is scale-invariant.
+        """
+        Detect if the streetlight is currently faulty using Random Forest.
+        Returns None if model is missing.
         """
         if not self.rf_model:
-            return self._mock_detect_fault(iot_log)
+            return None
 
         # --- RAW SENSOR FEATURES ---
         voltage = iot_log.voltage
         current = iot_log.current
-        power = abs(iot_log.power_consumption)  # Ensure positive
-        ldr = iot_log.light_intensity           # Map light_intensity -> ldr
+        power = abs(iot_log.power_consumption)
+        ldr = iot_log.light_intensity
         pwm = getattr(iot_log, "pwm", 255.0)
         if pwm is None:
-            pwm = 255.0  # Default full brightness if missing
+            pwm = 255.0
 
         # --- TEMPORAL FEATURES ---
-        # Prioritize pre-calculated features from the service layer
         d_voltage = getattr(iot_log, "d_voltage", None)
         d_current = getattr(iot_log, "d_current", None)
         d_power = getattr(iot_log, "d_power", None)
         std_voltage_5 = getattr(iot_log, "std_voltage_5", None)
         std_current_5 = getattr(iot_log, "std_current_5", None)
 
-        # Fallback if features are not pre-calculated (e.g., from old database records or direct API calls)
         if any(v is None for v in [d_voltage, d_current, d_power, std_voltage_5, std_current_5]):
             d_voltage, d_current, d_power = 0.0, 0.0, 0.0
             std_voltage_5, std_current_5 = 0.0, 0.0
@@ -148,40 +145,29 @@ class MLPredictionService:
                 std_voltage_5 = float(pd.Series(recent_voltages).std())
                 std_current_5 = float(pd.Series(recent_currents).std())
 
-        df = pd.DataFrame(
-            [
-                {
-                    "voltage": voltage,
-                    "current": current,
-                    "power": power,
-                    "ldr": ldr,
-                    "pwm": pwm,
-                    "d_voltage": d_voltage,
-                    "d_current": d_current,
-                    "d_power": d_power,
-                    "std_current_5": std_current_5,
-                    "std_voltage_5": std_voltage_5,
-                }
-            ]
-        )
+        df = pd.DataFrame([{
+            "voltage": voltage,
+            "current": current,
+            "power": power,
+            "ldr": ldr,
+            "pwm": pwm,
+            "d_voltage": d_voltage,
+            "d_current": d_current,
+            "d_power": d_power,
+            "std_current_5": std_current_5,
+            "std_voltage_5": std_voltage_5,
+        }])
 
         try:
             probas = self.rf_model.predict_proba(df[RF_FEATURES])
             failure_prob = float(probas[0][1]) if probas.shape[1] > 1 else float(self.rf_model.predict(df[RF_FEATURES])[0])
         except Exception as e:
-            logger.exception("Random Forest prediction error; using mock fault detection.")
-            return self._mock_detect_fault(iot_log)
+            logger.exception("Random Forest prediction error.")
+            return None
 
         is_faulty = failure_prob >= self.rf_threshold
         
-        logger.info(
-            f"Fault Detection [Node: {getattr(streetlight_info, 'name', 'unknown')}]: "
-            f"Prob={failure_prob:.4f}, Threshold={self.rf_threshold}, Result={'FAULTY' if is_faulty else 'NORMAL'}"
-        )
-        if is_faulty:
-            logger.warning(f"Fault details: V={voltage}, C={current}, P={power}, L={ldr}, PWM={pwm}")
-
-        # Identify "SYSTEM_FAILURE" (total power loss) for higher severity alerts
+        # Identify "SYSTEM_FAILURE" (total power loss)
         fault_type = "HARDWARE_FAULT"
         if is_faulty and voltage == 0 and current == 0:
             fault_type = "SYSTEM_FAILURE"
@@ -196,36 +182,29 @@ class MLPredictionService:
     def predict_failure(self, iot_log: IoTNodeLogCreate, historical_logs=None):
         """
         Use LSTM to predict time-to-failure.
-        
-        The LSTM outputs a normalized [0, 1] time_to_failure value.
-        We inverse-transform it to real timestep counts, then convert to:
-          - failure_probability: higher when time_to_failure is low
-          - predicted_failure_date: estimated date based on time_to_failure
-          - urgency_level: low/medium/high based on probability
+        Returns None if models missing or historical data < 9 logs.
         """
         if not self.use_lstm or not self.lstm_model or not self.lstm_scaler:
-            return self._mock_prediction(iot_log)
+            return None
 
         if not historical_logs or len(historical_logs) < 9:
-            return self._mock_prediction(iot_log)
+            return None
             
         latest_history = historical_logs[-9:]
         
-        # Build the sequence with features matching training:
-        # [voltage, current, power, ldr] — no timestep
         sequence_data = []
         for log in latest_history:
             sequence_data.append([
                 getattr(log, "voltage", 11.0),
                 getattr(log, "current", 0.6),
-                abs(getattr(log, "power_consumption", 7.0)),  # Ensure positive
+                abs(getattr(log, "power_consumption", 7.0)),
                 getattr(log, "light_intensity", 200.0)
             ])
             
         sequence_data.append([
             iot_log.voltage,
             iot_log.current,
-            abs(iot_log.power_consumption),  # Ensure positive
+            abs(iot_log.power_consumption),
             iot_log.light_intensity
         ])
         
@@ -236,63 +215,34 @@ class MLPredictionService:
         with torch.no_grad():
             raw_output = self.lstm_model(input_tensor).item()
         
-        # Inverse-transform the normalized output back to real timestep count
         if self.lstm_target_scaler:
-            predicted_ttf = float(
-                self.lstm_target_scaler.inverse_transform(
-                    np.array([[raw_output]])
-                )[0, 0]
-            )
+            predicted_ttf = float(self.lstm_target_scaler.inverse_transform(np.array([[raw_output]]))[0, 0])
         else:
-            # Fallback: assume output is already in real units
             predicted_ttf = raw_output
 
-        # Clamp to valid range
         predicted_ttf = max(predicted_ttf, 0.0)
         
-        # Convert time-to-failure to failure probability
-        # Lower TTF = higher probability of failure
-        failure_prob = 1.0 - min(predicted_ttf / MAX_TTF, 1.0)
+        # Convert time-to-failure to failure probability using exponential decay.
+        # This maps the model's practical output range into meaningful bands:
+        #   TTF ≈ 0   → 100%  (faulty / imminent failure)
+        #   TTF ≈ 50  →  72%  (degrading)
+        #   TTF ≈ 150 →  37%  (moderate health)
+        #   TTF ≈ 264 →  17%  (healthy)
+        failure_prob = math.exp(-predicted_ttf / DECAY_SCALE)
         failure_prob = min(max(failure_prob, 0.0), 1.0)
         
         urgency_level = self._map_urgency(failure_prob)
         
-        # Each timestep approximates ~6 hours in a real deployment
-        hours_to_failure = predicted_ttf * 6.0
-        predicted_failure_date = datetime.utcnow() + timedelta(hours=hours_to_failure)
+        # Estimate a human-readable failure date from the TTF.
+        # Each TTF unit ≈ one dataset timestep; use 2-minute intervals
+        # (the model's effective temporal resolution from training data).
+        minutes_to_failure = predicted_ttf * 2.0
+        predicted_failure_date = datetime.utcnow() + timedelta(minutes=minutes_to_failure)
 
-        return {
-            "failure_probability": round(failure_prob, 4),
-            "predicted_failure_date": predicted_failure_date,
-            "urgency_level": urgency_level
-        }
-
-    def _mock_detect_fault(self, iot_log: IoTNodeLogCreate):
-        """Fallback for RF if model unavailable."""
-        failure_prob = 0.1
-        if iot_log.voltage < 200 or iot_log.voltage > 240:
-            failure_prob += 0.4
-        if iot_log.power_consumption > 150:
-            failure_prob += 0.3
-        
-        failure_prob = min(failure_prob, 0.99)
-        return {
-            "is_faulty": failure_prob > 0.5,
-            "confidence": round(failure_prob, 4),
-            "urgency_level": self._map_urgency(failure_prob)
-        }
-
-    def _mock_prediction(self, iot_log: IoTNodeLogCreate):
-        """Fallback for LSTM predictive maintenance if history or model unavailable."""
-        failure_prob = 0.1
-        if iot_log.voltage < 200 or iot_log.voltage > 240:
-            failure_prob += 0.4
-        if iot_log.power_consumption > 150:
-            failure_prob += 0.3
-        
-        failure_prob = min(failure_prob, 0.99)
-        urgency_level = self._map_urgency(failure_prob)
-        predicted_failure_date = datetime.utcnow() + timedelta(days=int((1 - failure_prob) * 365))
+        logger.debug(
+            "LSTM prediction — raw=%.4f, TTF=%.1f, prob=%.2f%%, urgency=%s",
+            raw_output, predicted_ttf, failure_prob * 100, urgency_level,
+        )
 
         return {
             "failure_probability": round(failure_prob, 4),
@@ -305,4 +255,6 @@ class MLPredictionService:
             return "low"
         elif probability < 0.7:
             return "medium"
-        return "high"
+        elif probability < 0.9:
+            return "high"
+        return "critical"
