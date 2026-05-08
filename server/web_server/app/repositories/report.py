@@ -94,3 +94,44 @@ class ReportRepository:
                 extract('year', StreetlightLog.timestamp) == year
             ).scalar()
         return float(result or 0)
+
+    def get_uptime_percentage(self, month: int, year: int) -> float:
+        """
+        Calculate uptime as the ratio of 'is_on' logs to expected log frequency,
+        or more simply, as the ratio of non-faulty logs.
+        """
+        total_logs = self.db.query(func.count(StreetlightLog.id))\
+            .filter(
+                extract('month', StreetlightLog.timestamp) == month,
+                extract('year', StreetlightLog.timestamp) == year
+            ).scalar() or 0
+        
+        if total_logs == 0:
+            return 0.0
+            
+        # Count logs that are 'Normal' (we'd ideally check mode, but since it's not in StreetlightLog model, 
+        # we can look for lack of associated critical alerts or just check if power > 0)
+        healthy_logs = self.db.query(func.count(StreetlightLog.id))\
+            .filter(
+                extract('month', StreetlightLog.timestamp) == month,
+                extract('year', StreetlightLog.timestamp) == year,
+                StreetlightLog.power_consumption > 0.5 # Basic proxy for functioning
+            ).scalar() or 0
+            
+        return (healthy_logs / total_logs) * 100.0
+
+    def get_energy_savings_data(self, month: int, year: int) -> str:
+        """
+        Calculate energy savings vs a baseline of 12W per device for 12 hours/day.
+        """
+        num_devices = self.db.query(func.count(StreetlightLog.streetlight_id.distinct())).scalar() or 1
+        total_actual = self.get_total_energy_for_month(month, year)
+        
+        # 12W * 12 hours * 30 days = 4.32 kWh per device per month
+        theoretical_baseline = num_devices * 4.32 
+        
+        if total_actual >= theoretical_baseline or theoretical_baseline == 0:
+            return "Optimal Usage"
+            
+        savings_pct = ((theoretical_baseline - total_actual) / theoretical_baseline) * 100
+        return f"{savings_pct:.1f}% vs Baseline"
