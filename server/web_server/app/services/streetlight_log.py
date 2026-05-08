@@ -109,20 +109,28 @@ class StreetlightLogService:
         if iot_log.fault_frequency is None:
             iot_log.fault_frequency = 0
 
-        # 1. Create the standard streetlight log (now with calculated features)
-        created_log = self.streetlight_log_repo.create(streetlight.id, iot_log)
-
         # 2. FAULT DETECTION (Random Forest)
+        fault_type = "NORMAL"
+        fault_result = None
+        
         if settings.ENABLE_ML:
             try:
-                # We pass the already-prepared iot_log (or created_log) to the ML service
+                # We pass the already-prepared iot_log to the ML service
                 fault_result = self.ml_service.detect_fault(iot_log, historical_logs, streetlight)
+                if fault_result:
+                    fault_type = fault_result.get("fault_type", "UNKNOWN_FAULT")
+                    iot_log.fault_type = fault_type
+
+                # 3. Create the standard streetlight log (now with calculated features AND fault_type)
+                # Note: We create the log AFTER detection so it includes the fault_type
+                created_log = self.streetlight_log_repo.create(streetlight.id, iot_log)
+
+                # 4. Handle Alerts and Status Updates
                 if fault_result and fault_result.get("is_faulty", False):
                     if streetlight.status != "maintenance":
                         self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))
                     
                     confidence = fault_result.get("confidence", 0.0)
-                    fault_type = fault_result.get("fault_type", "HARDWARE_FAULT")
                     
                     if fault_type == "SYSTEM_FAILURE":
                         fault_priority = "critical"
@@ -194,16 +202,13 @@ class StreetlightLogService:
                                 logger.info(f"Removing pending repair task {active_alert.repair_task.id} due to auto-recovery.")
                                 self.repair_task_repo.delete(active_alert.repair_task.id)
 
-                # 3. PREDICTIVE MAINTENANCE (LSTM)
-                # Run the prediction on every log to ensure we have the latest time-to-failure
+                # 5. PREDICTIVE MAINTENANCE (LSTM)
                 self.pm_service.analyze_node(streetlight.id)
 
             except Exception as e:
                 logger.exception("Error during ML flow")
 
-
         return created_log
-
 
     def get_streetlight_log_by_id(self, streetlight_log_id: int):
         """
