@@ -86,6 +86,13 @@ class RepairTaskUpdateStatus(BaseModel):
     description: Optional[str] = None
 
 
+class RepairTaskUpdate(BaseModel):
+    priority: Optional[RepairTaskPriorityEnum] = None
+    status: Optional[RepairTaskStatusEnum] = None
+    description: Optional[str] = None
+    technician_id: Optional[int] = None
+
+
 # --- Technician Schemas ---
 
 class TechnicianStatusUpdate(BaseModel):

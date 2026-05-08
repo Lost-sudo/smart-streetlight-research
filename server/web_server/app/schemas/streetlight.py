@@ -47,6 +47,7 @@ class IoTNodeLogCreate(BaseModel):
     current: float
     power_consumption: float
     light_intensity: float
+    pwm: Optional[float] = None
     timestamp: datetime
 
     operating_hours: Optional[float] = None
@@ -69,6 +70,7 @@ class StreetlightLogRead(BaseModel):
     current: float
     power_consumption: float
     light_intensity: float
+    pwm: Optional[float] = None
     timestamp: datetime
     # Advanced features
     operating_hours: Optional[float] = None
@@ -108,7 +110,10 @@ class AlertRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class AlertUpdate(BaseModel):
-    is_resolved: bool
+    is_resolved: Optional[bool] = None
+    severity: Optional[str] = None
+    message: Optional[str] = None
+
 
 class MaintenanceLogCreate(BaseModel):
     streetlight_id: int

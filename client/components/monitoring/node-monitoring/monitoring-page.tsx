@@ -27,7 +27,7 @@ import { EditNodeDialog } from "../EditNodeDialog";
 import { NodeDetailsDialog } from "../NodeDetailsDialog";
 import { getStatusConfig } from "./status-config";
 
-const ONLINE_WINDOW_MS = 120_000;
+const ONLINE_WINDOW_MS = 300_000; // 5 minutes window
 
 function isOnlineFromLastUpdated(lastUpdated: unknown, nowMs: number) {
   if (typeof lastUpdated !== "string" || lastUpdated.length === 0) return false;
@@ -68,24 +68,29 @@ export function NodeMonitoringPage() {
     return m;
   }, [pmLogs]);
 
-  // Automatic offline detection and status update
   useEffect(() => {
     // Only process if we have both data sources
     if (streetlights.length === 0 || pmByStreetlightId.size === 0) return;
 
     streetlights.forEach((node) => {
-      // Only update if it's currently active in the UI/Store
-      if (node.status === "active") {
-        const pm = pmByStreetlightId.get(node.id);
-        const isOnline = isOnlineFromLastUpdated(pm?.last_updated, nowTick);
+      const pm = pmByStreetlightId.get(node.id);
+      const isOnline = isOnlineFromLastUpdated(pm?.last_updated, nowTick);
 
-        if (!isOnline) {
-          console.log(`Node ${node.name} (${node.id}) detected offline. Updating status to inactive.`);
-          updateStreetlight({
-            id: node.id,
-            data: { status: "inactive" },
-          });
-        }
+      // Transition from active to inactive if offline
+      if (node.status === "active" && !isOnline) {
+        console.log(`Node ${node.name} (${node.id}) detected offline. Updating status to inactive.`);
+        updateStreetlight({
+          id: node.id,
+          data: { status: "inactive" },
+        });
+      } 
+      // Transition from inactive to active if online again
+      else if (node.status === "inactive" && isOnline) {
+        console.log(`Node ${node.name} (${node.id}) detected online. Updating status to active.`);
+        updateStreetlight({
+          id: node.id,
+          data: { status: "active" },
+        });
       }
     });
   }, [streetlights, pmByStreetlightId, nowTick, updateStreetlight]);

@@ -5,7 +5,7 @@ import { NodeStatusCard } from "@/components/dashboard/overview/parts/node-statu
 import { type Streetlight } from "@/lib/redux/api/streetlightApi";
 import { type PredictiveMaintenanceLog } from "@/lib/redux/api/predictiveMaintenanceApi";
 
-const ONLINE_WINDOW_MS = 120_000;
+const ONLINE_WINDOW_MS = 300_000; // 5 minutes window
 
 function isOnlineFromLastUpdated(lastUpdated: unknown, nowMs: number) {
   if (typeof lastUpdated !== "string" || lastUpdated.length === 0) return false;
