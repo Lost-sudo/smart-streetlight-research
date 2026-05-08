@@ -5,8 +5,9 @@ from app.repositories.alert import AlertRepository
 from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate, PredictiveMaintenanceCreate, PredictiveMaintenanceUpdate, AlertCreate, StreetlightUpdate, AlertUpdate
 from app.schemas.repair_task import RepairTaskCreate, RepairTaskUpdate
 from app.repositories.repair_task import RepairTaskRepository
-
+from app.services.predictive_maintenance_log import PredictiveMaintenanceService
 from app.services.ml_prediction import MLPredictionService
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -25,7 +26,9 @@ class StreetlightLogService:
         self.predictive_maintenance_repo = PredictiveMaintenanceRepository(db)
         self.alert_repo = AlertRepository(db)
         self.repair_task_repo = RepairTaskRepository(db)
+        self.pm_service = PredictiveMaintenanceService(db)
         self.ml_service = MLPredictionService()
+
 
     def add_log_from_iot(self, iot_log: IoTNodeLogCreate):
         """
@@ -114,7 +117,7 @@ class StreetlightLogService:
             try:
                 # We pass the already-prepared iot_log (or created_log) to the ML service
                 fault_result = self.ml_service.detect_fault(iot_log, historical_logs, streetlight)
-                if fault_result.get("is_faulty", False):
+                if fault_result and fault_result.get("is_faulty", False):
                     if streetlight.status != "maintenance":
                         self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))
                     
@@ -173,25 +176,9 @@ class StreetlightLogService:
                                 # Update associated Repair Task if it exists and is still pending
                                 if existing_active_fault.repair_task and existing_active_fault.repair_task.status == "pending":
                                     self.repair_task_repo.update(existing_active_fault.repair_task.id, RepairTaskUpdate(priority=new_priority))
-                else:
-                    # AUTO-RECOVERY LOGIC: If previously faulty but now normal
-                    if streetlight.status == "faulty":
-                        logger.info(f"Auto-recovery detected for streetlight {streetlight.id}. Restoring status to active.")
-                        self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="active"))
-                        
-                        # Find and resolve active alert
-                        active_alert = self.alert_repo.get_unresolved_by_streetlight_id(
-                            streetlight.id, alert_type="hardware_fault_alert"
-                        )
-                        if active_alert:
-                            self.alert_repo.update(active_alert.id, AlertUpdate(is_resolved=True))
-                            
-                            # Remove the repair task if it exists and is still pending
-                            if active_alert.repair_task and active_alert.repair_task.status == "pending":
-                                logger.info(f"Removing pending repair task {active_alert.repair_task.id} due to auto-recovery.")
-                                self.repair_task_repo.delete(active_alert.repair_task.id)
             except Exception as e:
-                logger.exception("Error during Fault Detection flow")
+                logger.exception("Error during ML flow")
+
 
         return created_log
 

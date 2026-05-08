@@ -20,9 +20,9 @@ class PredictiveMaintenanceService:
         self.ml_service = MLPredictionService()
 
     def _check_and_trigger_alert(self, streetlight_id: int, failure_probability: float, urgency_level: str):
-        """Helper to trigger an alert if the urgency is HIGH or MEDIUM."""
-        if urgency_level in [UrgencyLevel.high, UrgencyLevel.medium] or failure_probability >= 0.7:
-            # We trigger an alert
+        """Helper to trigger an alert if the urgency is HIGH/MEDIUM or resolve if LOW."""
+        if urgency_level in [UrgencyLevel.critical, UrgencyLevel.high, UrgencyLevel.medium] or failure_probability >= 0.7:
+            # We trigger or update an alert
             message = f"AI Prediction: High risk of hardware failure detected. Probability: {failure_probability*100:.0f}%."
             alert_in = PredictiveAlertCreate(
                 streetlight_id=streetlight_id,
@@ -31,6 +31,18 @@ class PredictiveMaintenanceService:
                 is_resolved=False
             )
             self.alert_service.create_alert(alert_in)
+        elif urgency_level == UrgencyLevel.low and failure_probability < 0.3:
+            # AUTO-RECOVERY: If probability drops significantly, resolve any existing predictive alert
+            existing_alert = self.alert_service.alert_repo.get_active_by_streetlight(streetlight_id)
+            if existing_alert:
+                logger.info(f"Predictive auto-recovery for streetlight {streetlight_id}. Resolving predictive alert.")
+                self.alert_service.resolve_alert(existing_alert.id)
+                
+                # Also delete pending repair task if it was a predictive task
+                if existing_alert.repair_task and existing_alert.repair_task.status == "pending":
+                    from app.repositories.repair_task import RepairTaskRepository
+                    repo = RepairTaskRepository(self.db)
+                    repo.delete(existing_alert.repair_task.id)
 
     def analyze_node(self, streetlight_id: int):
         """
@@ -49,6 +61,8 @@ class PredictiveMaintenanceService:
             historical_logs.reverse() # chronological order for LSTM
             
             prediction_result = self.ml_service.predict_failure(iot_log, historical_logs)
+            if not prediction_result:
+                return
             
             existing_pm = self.log_repo.get_by_streetlight_id(streetlight_id)
             if existing_pm:
