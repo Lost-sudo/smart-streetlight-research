@@ -58,9 +58,11 @@ export function ActivePredictiveAlerts({
             <div
               key={alert.id}
               className={`p-4 rounded-xl border flex flex-col justify-between ${
-                alert.urgency === "high"
+                alert.urgency === "critical"
                   ? "bg-red-50/50 border-red-200 dark:bg-red-950/20 dark:border-red-900"
-                  : "bg-orange-50/50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-900"
+                  : alert.urgency === "high"
+                  ? "bg-orange-50/50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-900"
+                  : "bg-yellow-50/50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-900"
               }`}
             >
               <div className="flex justify-between items-start">

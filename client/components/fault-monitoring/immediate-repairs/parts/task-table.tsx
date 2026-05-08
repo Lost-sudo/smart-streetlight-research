@@ -42,11 +42,13 @@ export function TaskTable({
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <AlertTriangle
                           className={`h-3 w-3 ${
-                            task.priority === "High"
+                            task.priority === "Critical"
                               ? "text-red-500"
-                              : task.priority === "Medium"
+                              : task.priority === "High"
                               ? "text-orange-500"
-                              : "text-yellow-500"
+                              : task.priority === "Medium"
+                              ? "text-yellow-500"
+                              : "text-emerald-500"
                           }`}
                         />
                         {task.faultType}

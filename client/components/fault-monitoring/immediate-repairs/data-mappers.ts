@@ -6,7 +6,7 @@ export interface MaintenanceTask {
   id: string;
   node: string;
   faultType: string;
-  priority: "High" | "Medium" | "Low";
+  priority: "Critical" | "High" | "Medium" | "Low";
   dateDetected: string;
   suggestedAction: string;
   explanation: string;
@@ -26,7 +26,10 @@ export function mapRepairTaskToMaintenanceTask({
   const alert = task.alert_id ? alertById.get(task.alert_id) : undefined;
   const sl = alert?.streetlight_id ? streetlightById.get(alert.streetlight_id) : undefined;
 
-  const priorityStr = alert?.severity === "critical" ? "High" : alert?.severity === "high" ? "Medium" : "Low";
+  const priorityStr: "Critical" | "High" | "Medium" | "Low" = 
+    alert?.severity === "critical" ? "Critical" : 
+    alert?.severity === "high" ? "High" : 
+    alert?.severity === "medium" ? "Medium" : "Low";
   return {
     id: String(task.id),
     node: sl?.name || "Unknown Node",

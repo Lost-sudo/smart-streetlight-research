@@ -2,7 +2,8 @@ import type { Alert } from "@/lib/redux/api/alertApi";
 import type { Streetlight } from "@/lib/redux/api/streetlightApi";
 
 export const urgencyConfig: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  high: { label: "Critical", color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/30" },
+  critical: { label: "Critical", color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/30" },
+  high: { label: "High", color: "text-orange-500", bg: "bg-orange-500/10", border: "border-orange-500/30" },
   medium: { label: "Warning", color: "text-yellow-500", bg: "bg-yellow-500/10", border: "border-yellow-500/30" },
   low: { label: "Normal", color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
 };

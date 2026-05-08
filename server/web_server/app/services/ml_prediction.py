@@ -34,10 +34,10 @@ LSTM_SCALER_PATH = MODELS_DIR / "lstm_scaler.joblib"
 LSTM_TARGET_SCALER_PATH = MODELS_DIR / "lstm_target_scaler.joblib"
 
 # Exponential decay scale for TTF → failure-probability conversion.
-# Calibrated to the model's observed output range (normal ≈ 200-270 TTF,
-# degrading ≈ 40-100 TTF, faulty ≈ 0 TTF).  A larger value makes the
-# curve decay more slowly (lower probabilities for healthy readings).
-DECAY_SCALE = 150.0
+# Dynamically calibrated from the target scaler's max range at load time.
+# Formula: scale = -max_ttf / ln(target_floor_prob)
+# This maps max TTF → ~5% probability, TTF=0 → 100%.
+DEFAULT_DECAY_SCALE = 600.0  # fallback if target scaler unavailable
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size: int, hidden_size: int = 64, dropout: float = 0.2):
@@ -103,6 +103,18 @@ class MLPredictionService:
                 logger.warning("LSTM model/scaler not found.")
         except Exception as e:
             logger.exception("Error loading ML artifacts.")
+
+        # Calibrate decay scale from the target scaler's actual data range.
+        # We want: exp(-max_ttf / scale) ≈ target_floor (e.g. 5%)
+        # So: scale = -max_ttf / ln(target_floor)
+        if self.lstm_target_scaler is not None:
+            max_ttf = float(self.lstm_target_scaler.data_max_[0])
+            target_floor = 0.05  # 5% probability at max TTF
+            self.decay_scale = -max_ttf / math.log(target_floor)
+            logger.info("Calibrated decay scale: %.1f (max_ttf=%.0f min)", self.decay_scale, max_ttf)
+        else:
+            self.decay_scale = DEFAULT_DECAY_SCALE
+            logger.warning("Using default decay scale: %.1f", self.decay_scale)
 
     def detect_fault(self, iot_log: IoTNodeLogCreate, historical_logs: list = None, streetlight_info: Any = None):
         """
@@ -183,11 +195,32 @@ class MLPredictionService:
         """
         Use LSTM to predict time-to-failure.
         Returns None if models missing or historical data < 9 logs.
+        Also returns None if the streetlight is currently OFF (zero power
+        readings), since the LSTM cannot distinguish "off by design" from
+        "system failure" — both produce identical zero-value sensor patterns.
         """
         if not self.use_lstm or not self.lstm_model or not self.lstm_scaler:
             return None
 
         if not historical_logs or len(historical_logs) < 9:
+            return None
+
+        # Guard: skip prediction when the streetlight is OFF.
+        # Zero voltage + zero current + zero power is the expected pattern
+        # for daytime-off mode, but the LSTM was trained with these same
+        # values for SYSTEM_FAILURE (mode=5). Running the model on off-state
+        # data would always return TTF≈0 → 100% failure probability.
+        voltage = getattr(iot_log, "voltage", None) or 0.0
+        current = getattr(iot_log, "current", None) or 0.0
+        power = abs(getattr(iot_log, "power_consumption", None) or 0.0)
+        is_on = getattr(iot_log, "is_on", None)
+
+        if voltage == 0 and current == 0 and power == 0:
+            logger.info(
+                "LSTM skipped — streetlight is OFF (V=0, I=0, P=0, is_on=%s). "
+                "Cannot distinguish off-state from system failure.",
+                is_on,
+            )
             return None
             
         latest_history = historical_logs[-9:]
@@ -223,25 +256,26 @@ class MLPredictionService:
         predicted_ttf = max(predicted_ttf, 0.0)
         
         # Convert time-to-failure to failure probability using exponential decay.
-        # This maps the model's practical output range into meaningful bands:
-        #   TTF ≈ 0   → 100%  (faulty / imminent failure)
-        #   TTF ≈ 50  →  72%  (degrading)
-        #   TTF ≈ 150 →  37%  (moderate health)
-        #   TTF ≈ 264 →  17%  (healthy)
-        failure_prob = math.exp(-predicted_ttf / DECAY_SCALE)
+        # The decay scale is calibrated from the target scaler's actual range
+        # so that max TTF → ~5% and TTF=0 → 100%.
+        failure_prob = math.exp(-predicted_ttf / self.decay_scale)
         failure_prob = min(max(failure_prob, 0.0), 1.0)
         
         urgency_level = self._map_urgency(failure_prob)
         
         # Estimate a human-readable failure date from the TTF.
-        # Each TTF unit ≈ one dataset timestep; use 2-minute intervals
-        # (the model's effective temporal resolution from training data).
-        minutes_to_failure = predicted_ttf * 2.0
-        predicted_failure_date = datetime.utcnow() + timedelta(minutes=minutes_to_failure)
+        # predicted_ttf is already in minutes after inverse-transform.
+        predicted_failure_date = datetime.utcnow() + timedelta(minutes=predicted_ttf)
 
-        logger.debug(
-            "LSTM prediction — raw=%.4f, TTF=%.1f, prob=%.2f%%, urgency=%s",
-            raw_output, predicted_ttf, failure_prob * 100, urgency_level,
+        logger.info(
+            "LSTM prediction — raw=%.4f, TTF=%.1f min (%.1f hr), decay_scale=%.1f, prob=%.2f%%, urgency=%s",
+            raw_output, predicted_ttf, predicted_ttf / 60.0, self.decay_scale,
+            failure_prob * 100, urgency_level,
+        )
+        logger.info(
+            "LSTM input sample — first=[V=%.2f,I=%.3f,P=%.2f,L=%.0f] last=[V=%.2f,I=%.3f,P=%.2f,L=%.0f]",
+            sequence_data[0][0], sequence_data[0][1], sequence_data[0][2], sequence_data[0][3],
+            sequence_data[-1][0], sequence_data[-1][1], sequence_data[-1][2], sequence_data[-1][3],
         )
 
         return {

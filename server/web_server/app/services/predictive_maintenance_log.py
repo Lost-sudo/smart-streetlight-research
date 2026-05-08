@@ -62,6 +62,22 @@ class PredictiveMaintenanceService:
             
             prediction_result = self.ml_service.predict_failure(iot_log, historical_logs)
             if not prediction_result:
+                # No prediction available (e.g. device off, not enough history).
+                # Reset any existing PM record to low probability so stale
+                # high-risk values don't persist while the device is inactive.
+                existing_pm = self.log_repo.get_by_streetlight_id(streetlight_id)
+                if existing_pm and existing_pm.failure_probability and existing_pm.failure_probability > 0.1:
+                    logger.info(
+                        "Resetting stale PM for streetlight %s (was %.0f%%) — prediction unavailable.",
+                        streetlight_id, existing_pm.failure_probability * 100,
+                    )
+                    from datetime import datetime, timedelta
+                    pm_update = PredictiveMaintenanceUpdate(
+                        failure_probability=0.0,
+                        predicted_failure_date=datetime.utcnow() + timedelta(days=365),
+                        urgency_level="low"
+                    )
+                    self.update_log(existing_pm.id, pm_update)
                 return
             
             existing_pm = self.log_repo.get_by_streetlight_id(streetlight_id)
