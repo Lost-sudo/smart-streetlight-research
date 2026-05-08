@@ -7,7 +7,8 @@ from app.models.repair_task import RepairTask, RepairTaskStatus, RepairTaskSourc
 from app.models.user import User, TechnicianAvailability, UserRole
 from app.models.alert import Alert
 from app.models.streetlight import Streetlight, StreetlightStatus
-from app.schemas.repair_task import RepairTaskCreate
+from app.schemas.repair_task import RepairTaskCreate, RepairTaskUpdate
+
 from typing import Optional
 
 
@@ -306,6 +307,27 @@ class RepairTaskRepository:
                 if technician:
                     technician.availability = TechnicianAvailability.available
 
+        self.db.commit()
+        self.db.refresh(db_task)
+        return db_task
+
+    def update(self, task_id: int, task: RepairTaskUpdate):
+        """
+        Generic update for a repair task.
+        """
+        db_task = self.get_by_id(task_id)
+        if not db_task:
+            return None
+            
+        update_data = task.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            if key == "status":
+                setattr(db_task, key, RepairTaskStatus(value))
+            elif key == "priority":
+                setattr(db_task, key, RepairTaskPriority(value))
+            else:
+                setattr(db_task, key, value)
+                
         self.db.commit()
         self.db.refresh(db_task)
         return db_task

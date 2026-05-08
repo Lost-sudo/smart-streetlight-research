@@ -78,7 +78,11 @@ class AlertRepository:
         db_alert = self.get_by_id(alert_id)
         if not db_alert:
             return None
-        db_alert.is_resolved = alert.is_resolved
+            
+        update_data = alert.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(db_alert, key, value)
+            
         self.db.commit()
         self.db.refresh(db_alert)
         return db_alert

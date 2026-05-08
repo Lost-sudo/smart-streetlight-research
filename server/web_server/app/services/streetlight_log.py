@@ -2,14 +2,15 @@ from app.repositories.streetlight_log import StreetlightLogRepository
 from app.repositories.streetlight import StreetlightRepository
 from app.repositories.predictive_maintenance_log import PredictiveMaintenanceRepository
 from app.repositories.alert import AlertRepository
-from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate, PredictiveMaintenanceCreate, PredictiveMaintenanceUpdate, AlertCreate, StreetlightUpdate
-from app.schemas.repair_task import RepairTaskCreate
+from app.schemas.streetlight import StreetlightLogRead, IoTNodeLogCreate, PredictiveMaintenanceCreate, PredictiveMaintenanceUpdate, AlertCreate, StreetlightUpdate, AlertUpdate
+from app.schemas.repair_task import RepairTaskCreate, RepairTaskUpdate
 from app.repositories.repair_task import RepairTaskRepository
+
 from app.services.ml_prediction import MLPredictionService
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import numpy as np
 from app.core.config import settings
@@ -118,15 +119,15 @@ class StreetlightLogService:
                         self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))
                     
                     confidence = fault_result.get("confidence", 0.0)
-                    if confidence >= 0.8:
+                    fault_type = fault_result.get("fault_type", "HARDWARE_FAULT")
+                    
+                    if fault_type == "SYSTEM_FAILURE":
                         fault_priority = "critical"
-                    elif confidence >= 0.7:
-                        fault_priority = "high"
                     else:
                         fault_priority = "medium"
 
-                    # Filter alerts: only store high and critical priority faults as alerts
-                    if fault_priority in ["high", "critical"]:
+                    # Filter alerts: store all detected faults (medium, high, critical)
+                    if fault_priority in ["medium", "high", "critical"]:
                         # Avoid spamming duplicate hardware fault alerts, BUT allow if previous was resolved
                         existing_active_fault = self.alert_repo.get_unresolved_by_streetlight_id(
                             streetlight.id, alert_type="hardware_fault_alert"
@@ -138,7 +139,7 @@ class StreetlightLogService:
                                 alert_type="FAULT",
                                 type="hardware_fault_alert",
                                 severity=fault_priority,
-                                message=f"Immediate hardware fault detected ({confidence*100:.1f}% confidence).",
+                                message=f"Immediate {fault_type.lower().replace('_', ' ')} detected ({confidence*100:.1f}% confidence).",
                                 is_resolved=False,
                                 created_at=datetime.utcnow()
                             )
@@ -151,6 +152,27 @@ class StreetlightLogService:
                                 source_type="FAULT",
                                 priority=fault_priority
                             ))
+                        else:
+                            # ESCALATION LOGIC: If repair task is not updated, upgrade priority over time
+                            time_elapsed = datetime.utcnow() - existing_active_fault.created_at
+                            current_severity = str(existing_active_fault.severity.value) if hasattr(existing_active_fault.severity, "value") else str(existing_active_fault.severity)
+                            
+                            new_priority = None
+                            # Escalate Medium -> High after 30 mins
+                            if current_severity == "medium" and time_elapsed > timedelta(minutes=30):
+                                new_priority = "high"
+                            # Escalate High -> Critical after 1 hour total
+                            elif current_severity == "high" and time_elapsed > timedelta(hours=1):
+                                new_priority = "critical"
+                                
+                            if new_priority:
+                                logger.info(f"Escalating alert {existing_active_fault.id} for streetlight {streetlight.id} to {new_priority} priority.")
+                                # Update Alert Severity
+                                self.alert_repo.update(existing_active_fault.id, AlertUpdate(severity=new_priority))
+                                
+                                # Update associated Repair Task if it exists and is still pending
+                                if existing_active_fault.repair_task and existing_active_fault.repair_task.status == "pending":
+                                    self.repair_task_repo.update(existing_active_fault.repair_task.id, RepairTaskUpdate(priority=new_priority))
             except Exception as e:
                 logger.exception("Error during Fault Detection flow")
 

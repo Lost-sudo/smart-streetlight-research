@@ -181,10 +181,16 @@ class MLPredictionService:
         if is_faulty:
             logger.warning(f"Fault details: V={voltage}, C={current}, P={power}, L={ldr}, PWM={pwm}")
 
+        # Identify "SYSTEM_FAILURE" (total power loss) for higher severity alerts
+        fault_type = "HARDWARE_FAULT"
+        if is_faulty and voltage == 0 and current == 0:
+            fault_type = "SYSTEM_FAILURE"
+
         return {
             "is_faulty": is_faulty,
             "confidence": round(failure_prob, 4),
-            "urgency_level": self._map_urgency(failure_prob)
+            "urgency_level": self._map_urgency(failure_prob),
+            "fault_type": fault_type
         }
 
     def predict_failure(self, iot_log: IoTNodeLogCreate, historical_logs=None):
