@@ -127,13 +127,13 @@ export function PredictiveAnalyticsPage() {
               const isCritical = !isOffline && ["critical", "high"].includes(node.statusLevel);
               const isWarning = !isOffline && node.statusLevel === "medium";
               const failureProb = node.pmData ? Math.round(node.pmData.failure_probability * 100) : 0;
-              const predictedDateText = node.pmData
+              const predictedDateText = node.pmData && failureProb > 0
                 ? new Date(node.pmData.predicted_failure_date).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "short",
                     day: "numeric",
                   })
-                : "Healthy";
+                : "Healthy / Off";
 
               const lastUpdatedTs = parsePossiblyNaiveUtc(node.pmData?.last_updated);
               const lastUpdatedText = lastUpdatedTs ? new Date(lastUpdatedTs).toLocaleString() : "Unknown";

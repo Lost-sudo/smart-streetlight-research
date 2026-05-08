@@ -4,7 +4,7 @@ import { baseQuery } from "@/lib/redux/api/baseQuery";
 export interface PredictiveAlert {
   id: number;
   streetlight_id: number;
-  urgency: "low" | "medium" | "high";
+  urgency: "low" | "medium" | "high" | "critical";
   message: string;
   is_resolved: boolean;
   created_at: string;

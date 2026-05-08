@@ -70,7 +70,7 @@ export function PredictiveMaintenancePage() {
       .sort((a, b) => b.failure_probability - a.failure_probability);
   }, [pmLogs, streetlightById]);
 
-  const criticalCount = useMemo(() => mergedNodes.filter((n) => n.urgency_level === "high").length, [mergedNodes]);
+  const criticalCount = useMemo(() => mergedNodes.filter((n) => n.urgency_level === "high" || n.urgency_level === "critical").length, [mergedNodes]);
   const warningCount = useMemo(() => mergedNodes.filter((n) => n.urgency_level === "medium").length, [mergedNodes]);
   const scheduledCount = useMemo(
     () => (predictiveTasks as MaintenanceTask[]).filter((t) => t.status !== "completed").length,
@@ -89,7 +89,7 @@ export function PredictiveMaintenancePage() {
     args: { scheduledAt?: string; description?: string }
   ) => {
     try {
-      const priority = pm.urgency_level === "high" ? "high" : "medium";
+      const priority = pm.urgency_level === "critical" ? "critical" : pm.urgency_level === "high" ? "high" : "medium";
       await scheduleTask({
         streetlight_id: pm.streetlight_id,
         description:

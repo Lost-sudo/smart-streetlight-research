@@ -72,11 +72,14 @@ export function PredictionsTable({
                       </TableCell>
                       <TableCell>
                         <span className="text-sm font-medium">
-                          {new Date(node.predicted_failure_date).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          {failureProb > 0
+                            ? new Date(node.predicted_failure_date).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : <span className="text-muted-foreground italic">N/A — Device Off</span>
+                          }
                         </span>
                       </TableCell>
                       <TableCell>
