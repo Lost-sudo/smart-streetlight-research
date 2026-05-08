@@ -22,8 +22,8 @@ RF_FEATURES = [
     "std_current_5", "std_voltage_5",
 ]
 
-# LSTM features — no 'timestep' (it leaks position, not sensor patterns)
-LSTM_FEATURES = ["voltage", "current", "power", "ldr"]
+# LSTM features — including 'elapsed_time' derived from timesteps
+LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time"]
 
 # server/web_server/app/services -> server
 SERVER_DIR = Path(__file__).resolve().parents[3]
@@ -231,14 +231,16 @@ class MLPredictionService:
                 getattr(log, "voltage", 11.0),
                 getattr(log, "current", 0.6),
                 abs(getattr(log, "power_consumption", 7.0)),
-                getattr(log, "light_intensity", 200.0)
+                getattr(log, "light_intensity", 200.0),
+                float(getattr(log, "timestep", 0)) # Using timestep as elapsed_time
             ])
             
         sequence_data.append([
             iot_log.voltage,
             iot_log.current,
             abs(iot_log.power_consumption),
-            iot_log.light_intensity
+            iot_log.light_intensity,
+            float(getattr(iot_log, "timestep", 0))
         ])
         
         df = pd.DataFrame(sequence_data, columns=LSTM_FEATURES)
