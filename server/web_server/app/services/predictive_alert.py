@@ -14,13 +14,32 @@ class PredictiveAlertService:
         """
         existing_alert = self.alert_repo.get_active_by_streetlight(alert_in.streetlight_id)
         if existing_alert:
-            # We already have an active alert. We could return it or update it.
-            # For now, we will just update the message/urgency if necessary.
-            update_data = PredictiveAlertUpdate(
-                urgency=alert_in.urgency,
-                message=alert_in.message
-            )
-            return self.alert_repo.update(existing_alert.id, update_data)
+            # ESCALATION LOGIC: If alert is still unresolved, upgrade urgency over time
+            from datetime import datetime, timedelta
+            time_elapsed = datetime.utcnow() - existing_alert.created_at
+            current_urgency = str(existing_alert.urgency.value) if hasattr(existing_alert.urgency, "value") else str(existing_alert.urgency)
+            
+            new_urgency = alert_in.urgency
+            
+            # Escalate Medium -> High after 24 hours
+            if current_urgency == "medium" and time_elapsed > timedelta(hours=24):
+                new_urgency = "high"
+            # Escalate High -> Critical after 3 days
+            elif current_urgency == "high" and time_elapsed > timedelta(days=3):
+                new_urgency = "critical"
+            
+            # NOISE REDUCTION: Only update if urgency changed OR if enough time has passed (e.g. 1 hour)
+            urgency_changed = new_urgency != current_urgency
+            time_to_refresh = (datetime.utcnow() - existing_alert.created_at) > timedelta(hours=1)
+            
+            if urgency_changed or time_to_refresh:
+                update_data = PredictiveAlertUpdate(
+                    urgency=new_urgency,
+                    message=alert_in.message
+                )
+                return self.alert_repo.update(existing_alert.id, update_data)
+            
+            return existing_alert
             
         return self.alert_repo.create(alert_in)
 

@@ -4,10 +4,11 @@ from app.core.database import Base
 from datetime import datetime
 from enum import Enum as PyEnum
 
-class UrgencyLevel(str,  PyEnum):
+class UrgencyLevel(str, PyEnum):
     low = "low"
     medium = "medium"
     high = "high"
+    critical = "critical"
 
 class PredictiveMaintenanceAlert(Base):
     __tablename__ = "predictive_alerts"

@@ -71,7 +71,13 @@ export function PredictionsTable({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm font-medium">{new Date(node.predicted_failure_date).toLocaleDateString()}</span>
+                        <span className="text-sm font-medium">
+                          {new Date(node.predicted_failure_date).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={`capitalize ${config.color} ${config.border} ${config.bg}`}>

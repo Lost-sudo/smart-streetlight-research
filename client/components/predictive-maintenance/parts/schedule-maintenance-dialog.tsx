@@ -29,7 +29,12 @@ export function ScheduleMaintenanceDialog({
 
   const failureProbPercent = useMemo(() => Math.round(failureProbability * 100), [failureProbability]);
   const predictedDateText = useMemo(
-    () => new Date(predictedFailureDate).toLocaleDateString(),
+    () =>
+      new Date(predictedFailureDate).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }),
     [predictedFailureDate]
   );
 
