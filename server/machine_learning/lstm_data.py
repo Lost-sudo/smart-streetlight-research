@@ -22,10 +22,10 @@ import pandas as pd
 #  Feature / target definitions                                       #
 # ------------------------------------------------------------------ #
 
-# Features the LSTM will use (real IoT sensor data)
-# No 'timestep' — it's a monotonically increasing counter that leaks position,
-# not sensor degradation patterns. The model must generalize across devices.
-LSTM_FEATURES = ["voltage", "current", "power", "ldr"]
+# Features the LSTM will use (real IoT sensor data + derived features)
+# We now include 'elapsed_time' derived from timesteps to help the model 
+# understand where it is in the lifecycle.
+LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time"]
 LSTM_TARGET = "time_to_failure"
 
 
@@ -34,7 +34,7 @@ LSTM_TARGET = "time_to_failure"
 # ------------------------------------------------------------------ #
 
 DATASET_PATH = os.path.join(
-    os.path.dirname(__file__), "datasets", "streetlight_dataset.csv"
+    os.path.dirname(__file__), "datasets", "streetlight_dataset_augmented.csv"
 )
 
 
@@ -65,11 +65,18 @@ def load_lstm_dataset(csv_path: str = DATASET_PATH) -> pd.DataFrame:
     # --- Ensure power is always positive ---
     df["power"] = df["power"].abs()
 
-    # --- Binary target: 0 = Normal, 1 = Faulty (any fault type) ---
-    df["failure_status"] = (df["mode"] > 0).astype(int)
+    # --- Define terminal failure state ---
+    # We ONLY treat mode 5 (SYSTEM_FAILURE) as the terminal EOL state (TTF=0).
+    # Other faults (1-4, 6) are considered "degraded" but not failed,
+    # which teaches the model to predict a "flow" of risk rather than 100% immediately.
+    df["failure_status"] = (df["mode"] == 5).astype(int)
 
     # --- Sort by device and timestep ---
     df = df.sort_values(["device_id", "timestep"]).reset_index(drop=True)
+
+    # --- Derived Feature: elapsed_time (utilize the timesteps) ---
+    # We calculate how many steps have passed since the device started.
+    df["elapsed_time"] = df.groupby("device_id")["timestep"].transform(lambda x: x - x.min())
 
     # --- Compute time_to_failure ---
     # For each device, we compute the reverse countdown to the next fault.
