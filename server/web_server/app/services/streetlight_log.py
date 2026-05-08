@@ -176,6 +176,28 @@ class StreetlightLogService:
                                 # Update associated Repair Task if it exists and is still pending
                                 if existing_active_fault.repair_task and existing_active_fault.repair_task.status == "pending":
                                     self.repair_task_repo.update(existing_active_fault.repair_task.id, RepairTaskUpdate(priority=new_priority))
+                elif fault_result:
+                    # AUTO-RECOVERY LOGIC: If previously faulty but now normal
+                    if streetlight.status == "faulty":
+                        logger.info(f"Auto-recovery detected for streetlight {streetlight.id}. Restoring status to active.")
+                        self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="active"))
+                        
+                        # Find and resolve active alert
+                        active_alert = self.alert_repo.get_unresolved_by_streetlight_id(
+                            streetlight.id, alert_type="hardware_fault_alert"
+                        )
+                        if active_alert:
+                            self.alert_repo.update(active_alert.id, AlertUpdate(is_resolved=True))
+                            
+                            # Remove the repair task if it exists and is still pending
+                            if active_alert.repair_task and active_alert.repair_task.status == "pending":
+                                logger.info(f"Removing pending repair task {active_alert.repair_task.id} due to auto-recovery.")
+                                self.repair_task_repo.delete(active_alert.repair_task.id)
+
+                # 3. PREDICTIVE MAINTENANCE (LSTM)
+                # Run the prediction on every log to ensure we have the latest time-to-failure
+                self.pm_service.analyze_node(streetlight.id)
+
             except Exception as e:
                 logger.exception("Error during ML flow")
 
