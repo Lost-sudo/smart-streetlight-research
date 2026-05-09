@@ -8,6 +8,7 @@ Usage:
     python run_all.py
 """
 
+import argparse
 from run_lstm import main as run_lstm
 from run_random_forest import main as run_rf
 
@@ -18,9 +19,11 @@ def main():
     print("#" * 60)
 
     print("\n>>> Training LSTM (Time-to-Failure) <<<\n")
+    # No arguments needed, now follows PROD automatically
     lstm_metrics = run_lstm()
 
     print("\n>>> Training Random Forest (Fault Detection) <<<\n")
+    # No arguments needed, now follows PROD automatically
     rf_metrics = run_rf()
 
     print("\n" + "#" * 60)

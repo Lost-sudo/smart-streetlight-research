@@ -255,74 +255,142 @@ class MLDataService:
     @staticmethod
     def sync_dataset_to_hf(db: Session, df_new: pd.DataFrame, base_name: str = "streetlight_dataset_augmented") -> "MLVersion":
         """
-        Cloud-First Synchronization:
-        1. Finds the latest version in the database.
-        2. Downloads previous snapshot from HF (if exists).
-        3. Merges with new data.
-        4. Uploads to HF as a new version.
-        5. Updates the database with the new version record.
+        Unified Synchronization (Local or Cloud):
+        - If PROD=True: Uses Hugging Face as the source of truth.
+        - If PROD=False: Uses local storage for demo/offline use.
         """
-        from huggingface_hub import hf_hub_download
-        
-        # 1. Find latest version
+        # Determine local storage path for both modes (used as target in local, or cache in cloud)
+        CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+        SERVER_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", ".."))
+        LOCAL_DATASETS_DIR = os.path.join(SERVER_ROOT, "machine_learning", "datasets")
+        os.makedirs(LOCAL_DATASETS_DIR, exist_ok=True)
+
+        # 1. Find latest version in DB
         latest_v = db.query(MLVersion).filter(
             MLVersion.version_type == "dataset",
             MLVersion.base_name == base_name
         ).order_by(MLVersion.version_number.desc()).first()
         
-        next_version = (latest_v.version_number + 1) if latest_v else 1
+        df_orig = pd.DataFrame()
+        found_version = 0
+
+        # Universal Bootstrap Logic: If DB is empty, scan for the latest physical file
+        if not latest_v:
+            print(f"[sync] No DB record found for {base_name}. Scanning for existing files...")
+            
+            if settings.PROD:
+                # Scan Hugging Face Repo
+                try:
+                    from huggingface_hub import HfApi
+                    api = HfApi()
+                    files = api.list_repo_files(repo_id=settings.HF_DATASET_REPO, repo_type="dataset", token=settings.HF_TOKEN)
+                    
+                    # Find highest V number in filenames like "base_name_V10.csv"
+                    version_files = [f for f in files if f.startswith(base_name) and "_V" in f and f.endswith(".csv")]
+                    if version_files:
+                        versions = [int(f.split("_V")[-1].split(".")[0]) for f in version_files]
+                        found_version = max(versions)
+                        latest_filename = f"{base_name}_V{found_version}.csv"
+                        
+                        from huggingface_hub import hf_hub_download
+                        print(f"[sync] Found V{found_version} in Cloud. Bootstrapping...")
+                        cloud_path = hf_hub_download(
+                            repo_id=settings.HF_DATASET_REPO,
+                            filename=latest_filename,
+                            repo_type="dataset",
+                            token=settings.HF_TOKEN
+                        )
+                        df_orig = pd.read_csv(cloud_path)
+                except Exception as e:
+                    print(f"[sync] Cloud scan failed: {e}")
+            else:
+                # Scan Local Directory
+                import glob
+                local_pattern = os.path.join(LOCAL_DATASETS_DIR, f"{base_name}_V*.csv")
+                local_files = glob.glob(local_pattern)
+                if local_files:
+                    versions = []
+                    for f in local_files:
+                        try:
+                            v = int(os.path.basename(f).split("_V")[-1].split(".")[0])
+                            versions.append(v)
+                        except: continue
+                    
+                    if versions:
+                        found_version = max(versions)
+                        print(f"[sync] Found V{found_version} locally. Bootstrapping...")
+                        df_orig = pd.read_csv(os.path.join(LOCAL_DATASETS_DIR, f"{base_name}_V{found_version}.csv"))
+
+        next_version = (found_version if found_version > 0 else (latest_v.version_number if latest_v else 0)) + 1
+        filename = f"{base_name}_V{next_version}.csv"
         
         # Format the new logs
         df_batch = MLDataService._format_dataset_for_csv(df_new)
         df_merged = df_batch
 
-        # 2. Download and Merge if history exists
-        if latest_v and latest_v.hf_url:
+        # 2. Retrieve previous version and merge
+        if not df_orig.empty:
+            # Already merged during bootstrap scan
+            df_merged = pd.concat([df_orig, df_batch], ignore_index=True)
+            print(f"[sync] Merged with found version V{found_version} ({len(df_orig)} rows)")
+        elif latest_v:
+            # Standard path: use DB record
             try:
-                print(f"[sync] Downloading previous version V{latest_v.version_number} from HF...")
-                local_prev_path = hf_hub_download(
-                    repo_id=settings.HF_DATASET_REPO,
-                    filename=latest_v.file_name,
-                    repo_type="dataset",
-                    token=settings.HF_TOKEN
-                )
-                df_orig = pd.read_csv(local_prev_path)
-                df_merged = pd.concat([df_orig, df_batch], ignore_index=True)
-                print(f"[sync] Successfully merged with V{latest_v.version_number} ({len(df_orig)} rows)")
+                if settings.PROD:
+                    # Cloud Mode: Download from HF
+                    from huggingface_hub import hf_hub_download
+                    print(f"[sync] PROD=True: Downloading V{latest_v.version_number} from HF...")
+                    local_prev_path = hf_hub_download(
+                        repo_id=settings.HF_DATASET_REPO,
+                        filename=latest_v.file_name,
+                        repo_type="dataset",
+                        token=settings.HF_TOKEN
+                    )
+                else:
+                    # Local Mode: Load from disk
+                    print(f"[sync] PROD=False: Loading V{latest_v.version_number} from local storage...")
+                    local_prev_path = os.path.join(LOCAL_DATASETS_DIR, latest_v.file_name)
+                
+                if os.path.exists(local_prev_path):
+                    df_orig = pd.read_csv(local_prev_path)
+                    df_merged = pd.concat([df_orig, df_batch], ignore_index=True)
+                    print(f"[sync] Successfully merged with V{latest_v.version_number} ({len(df_orig)} rows)")
+                else:
+                    print(f"[sync] Warning: Previous version file not found at {local_prev_path}")
             except Exception as e:
-                print(f"[sync] Warning: Could not load previous version: {e}")
+                print(f"[sync] Warning: Could not retrieve previous version: {e}")
 
-        # 3. Save to a temporary file for upload
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            tmp_path = tmp.name
-            df_merged.to_csv(tmp_path, index=False)
+        # 3. Save the new version
+        new_v_local_path = os.path.join(LOCAL_DATASETS_DIR, filename)
+        df_merged.to_csv(new_v_local_path, index=False)
+        print(f"[sync] Saved new version locally: {new_v_local_path}")
         
-        # 4. Upload to Hugging Face
-        filename = f"{base_name}_V{next_version}.csv"
-        hf = HuggingFaceService()
-        response = hf.upload_dataset(tmp_path, path_in_repo=filename, commit_message=f"Dataset Snapshot V{next_version}")
-        
-        # Clean up temp file
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-            
-        if not response:
-            print("[sync] Sync failed: Upload to Hugging Face failed.")
-            return None
+        hf_url = None
+        if settings.PROD:
+            # 4. Upload to Hugging Face
+            print(f"[sync] PROD=True: Uploading {filename} to HF...")
+            hf = HuggingFaceService()
+            response = hf.upload_dataset(new_v_local_path, path_in_repo=filename, commit_message=f"Dataset Snapshot V{next_version}")
+            if response:
+                hf_url = f"https://huggingface.co/datasets/{settings.HF_DATASET_REPO}/resolve/main/{filename}"
+            else:
+                print("[sync] Sync failed: Upload to Hugging Face failed.")
+                return None
             
         # 5. Update Database Record
-        hf_url = f"https://huggingface.co/datasets/{settings.HF_DATASET_REPO}/resolve/main/{filename}"
         new_v = MLVersion(
             version_type="dataset",
             version_number=next_version,
             file_name=filename,
             hf_url=hf_url,
             row_count=len(df_merged),
-            base_name=base_name
+            base_name=base_name,
+            status="active"
         )
         db.add(new_v)
         db.commit()
         db.refresh(new_v)
         
-        print(f"[sync] Success! Dataset synced to HF as V{next_version} ({len(df_merged)} rows)")
+        mode_str = "HF (Cloud)" if settings.PROD else "Local Storage"
+        print(f"[sync] Success! Dataset V{next_version} ({len(df_merged)} rows) registered via {mode_str}")
         return new_v

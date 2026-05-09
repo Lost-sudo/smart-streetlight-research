@@ -88,32 +88,118 @@ class MLPredictionService:
         self.lstm_scaler = None
         self.lstm_target_scaler = None
         self.decay_scale = DEFAULT_DECAY_SCALE
+        
+        # Version tracking for Hot-Reloading
+        self.rf_version = 0
+        self.lstm_version = 0
+        self.last_update_check = datetime.min
+        self.update_cooldown = timedelta(minutes=1) # Don't spam DB checks
+        
         self._load_artifacts()
+
+    def _check_for_updates(self):
+        """Checks if a newer model version exists in the database."""
+        now = datetime.utcnow()
+        if now - self.last_update_check < self.update_cooldown:
+            return
+
+        self.last_update_check = now
+        try:
+            from app.core.database import SessionLocal
+            from app.models.ml_version import MLVersion
+            db = SessionLocal()
+            
+            # Check RF
+            latest_rf = db.query(MLVersion).filter(
+                MLVersion.version_type == "model",
+                MLVersion.base_name == "random_forest_model"
+            ).order_by(MLVersion.version_number.desc()).first()
+            
+            if latest_rf and latest_rf.version_number > self.rf_version:
+                logger.info(f"New RF model detected (V{latest_rf.version_number}). Reloading...")
+                self._load_artifacts()
+                return
+
+            # Check LSTM
+            latest_lstm = db.query(MLVersion).filter(
+                MLVersion.version_type == "model",
+                MLVersion.base_name == "lstm_model"
+            ).order_by(MLVersion.version_number.desc()).first()
+            
+            if latest_lstm and latest_lstm.version_number > self.lstm_version:
+                logger.info(f"New LSTM model detected (V{latest_lstm.version_number}). Reloading...")
+                self._load_artifacts()
+                
+            db.close()
+        except Exception as e:
+            logger.error(f"Hot-reload check failed: {e}")
 
     def _load_artifacts(self):
         try:
-            if RF_MODEL_PATH.exists():
-                self.rf_model = joblib.load(RF_MODEL_PATH)
-                logger.info("Loaded Random Forest multi-class model.")
-            else:
-                logger.warning("Random Forest model not found.")
+            from app.core.config import settings
+            import sys
+            ML_PATH = str(SERVER_DIR / "machine_learning")
+            if ML_PATH not in sys.path:
+                sys.path.append(ML_PATH)
+            
+            from retrain_utils import get_latest_model_path
+            from app.core.database import SessionLocal
+            from app.models.ml_version import MLVersion
+            
+            mode_label = "PRODUCTION (Hugging Face)" if settings.PROD else "LOCAL (Filesystem)"
+            logger.info(f"ML Service initializing in {mode_label} mode.")
+            
+            db = SessionLocal()
+            
+            # 1. Load Random Forest
+            latest_rf_v = db.query(MLVersion).filter(
+                MLVersion.version_type == "model",
+                MLVersion.base_name == "random_forest_model"
+            ).order_by(MLVersion.version_number.desc()).first()
+            
+            rf_path = get_latest_model_path("random_forest_model")
+            if rf_path:
+                self.rf_model = joblib.load(rf_path)
+                self.rf_version = latest_rf_v.version_number if latest_rf_v else 1
+                source = "Hugging Face" if settings.PROD and latest_rf_v and latest_rf_v.hf_url else "Local Storage"
+                logger.info(f"Loaded RF Model V{self.rf_version} from {source}")
+            
+            # 2. Load LSTM
+            latest_lstm_v = db.query(MLVersion).filter(
+                MLVersion.version_type == "model",
+                MLVersion.base_name == "lstm_model"
+            ).order_by(MLVersion.version_number.desc()).first()
+            
+            lstm_path = get_latest_model_path("lstm_model")
+            if lstm_path:
+                self.lstm_version = latest_lstm_v.version_number if latest_lstm_v else 1
+                v_suffix = f"V{self.lstm_version}"
                 
-            if LSTM_MODEL_PATH.exists() and LSTM_SCALER_PATH.exists():
                 self.lstm_model = LSTMModel(input_size=len(LSTM_FEATURES))
-                self.lstm_model.load_state_dict(_torch_load_state_dict(LSTM_MODEL_PATH))
+                self.lstm_model.load_state_dict(_torch_load_state_dict(Path(lstm_path)))
                 self.lstm_model.eval()
-                self.lstm_scaler = joblib.load(LSTM_SCALER_PATH)
-                logger.info("Loaded LSTM model and feature scaler.")
-
-                if LSTM_TARGET_SCALER_PATH.exists():
-                    self.lstm_target_scaler = joblib.load(LSTM_TARGET_SCALER_PATH)
-                    logger.info("Loaded LSTM target scaler for inverse-transform.")
-                else:
-                    logger.warning("LSTM target scaler not found.")
-            else:
-                logger.warning("LSTM model/scaler not found.")
+                
+                # Use matching versioned scalers
+                s_path = MODELS_DIR / f"lstm_scaler_{v_suffix}.joblib"
+                ts_path = MODELS_DIR / f"lstm_target_scaler_{v_suffix}.joblib"
+                
+                if not s_path.exists(): s_path = LSTM_SCALER_PATH
+                if not ts_path.exists(): ts_path = LSTM_TARGET_SCALER_PATH
+                
+                if s_path.exists(): self.lstm_scaler = joblib.load(s_path)
+                if ts_path.exists(): self.lstm_target_scaler = joblib.load(ts_path)
+                
+                source = "Hugging Face" if settings.PROD and latest_lstm_v and latest_lstm_v.hf_url else "Local Storage"
+                logger.info(f"Loaded LSTM Package {v_suffix} from {source}")
+            
+            db.close()
         except Exception as e:
             logger.exception("Error loading ML artifacts.")
+
+        # Re-calibrate decay scale
+        if self.lstm_target_scaler is not None:
+            max_ttf = float(self.lstm_target_scaler.data_max_[0])
+            self.decay_scale = -max_ttf / math.log(0.05)
 
         # Calibrate decay scale from the target scaler's actual data range.
         # We want: exp(-max_ttf / scale) ≈ target_floor (e.g. 5%)
@@ -130,8 +216,8 @@ class MLPredictionService:
     def detect_fault(self, iot_log: IoTNodeLogCreate, historical_logs: list = None, streetlight_info: Any = None):
         """
         Detect if the streetlight is currently faulty using Random Forest.
-        Returns None if model is missing.
         """
+        self._check_for_updates()
         if not self.rf_model:
             return None
 
@@ -205,11 +291,8 @@ class MLPredictionService:
     def predict_failure(self, iot_log: IoTNodeLogCreate, historical_logs=None):
         """
         Use LSTM to predict time-to-failure.
-        Returns None if models missing or historical data < 9 logs.
-        Also returns None if the streetlight is currently OFF (zero power
-        readings), since the LSTM cannot distinguish "off by design" from
-        "system failure" — both produce identical zero-value sensor patterns.
         """
+        self._check_for_updates()
         if not self.use_lstm or not self.lstm_model or not self.lstm_scaler:
             return None
 

@@ -98,10 +98,35 @@ To keep the research project cost-effective and ML-native, we will use **Hugging
 3.  Add `HF_TOKEN` and `HF_REPO` to environment variables.
 4.  Update the training job to upload artifacts to the HF Hub upon successful completion.
 
-### Phase 3: Hot Reloading
-1.  Add a "Model Version" table to the database to track which model is "Active".
-2.  Update `MLPredictionService` to check this table periodically or on-demand.
-3.  Ensure thread-safety when replacing the model objects in memory.
+### Phase 4: Hybrid Retraining Workflow (Implemented)
+The system now supports both **Local** and **Remote** training via command-line flags in `run_random_forest.py` and `run_lstm.py`.
+
+#### 1. Data Sourcing
+- **Local Mode (Default)**: Uses datasets stored in `machine_learning/datasets/`.
+- **Remote Mode (`--remote`)**: 
+    - Queries the local database for the latest `MLVersion`.
+    - Automatically downloads the corresponding snapshot from Hugging Face Hub.
+    - Ensures training always happens on the most up-to-date augmented dataset.
+
+#### 2. Automated Model Versioning (`--upload`)
+When the `--upload` flag is provided:
+- The trained model is exported locally to `machine_learning/models/`.
+- The model is automatically pushed to the **Hugging Face Model Hub**.
+- A new record is created in the `ml_versions` database table, storing the version number, metrics (Accuracy, F1, MAE), and the Hugging Face download URL.
+
+#### 3. Execution Commands
+```bash
+# Retrain with cloud data and upload the new model
+python3 server/machine_learning/run_random_forest.py --remote --upload
+python3 server/machine_learning/run_lstm.py --remote --upload
+```
+
+---
+
+### Phase 5: Model Deployment & Hot-Reloading (Next Steps)
+- **Model Registry**: The `ml_versions` table now serves as a central registry for all production-ready models.
+- **Inference Service**: Update `MLPredictionService` to check the `ml_versions` table for the "active" model and download it from Hugging Face if the local version is outdated.
+- **Automated Retraining Trigger**: Schedule the full pipeline (Data Sync → Retrain → Upload) to run periodically or when data drift is detected.
 
 ## Open Questions
 *   **Data Volume**: How much historical data should be used for retraining? (e.g., last 30 days, or all time).

@@ -30,21 +30,22 @@ RF_TARGET = "fault_type"
 
 from typing import Optional
 
-def load_real_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+def load_real_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] = None, remote: bool = False) -> pd.DataFrame:
     """Load and prepare the real IoT dataset for Random Forest training.
-
-    Steps:
-      1. Load CSV (if df is not provided)
-      2. Fix negative power (absolute value)
-      3. Create binary target: failure_status (mode > 0 → 1)
-      4. Keep ALL data (no gray-zone removal — real observations are genuine)
-
-    Returns
-    -------
-    pd.DataFrame
-        Cleaned DataFrame ready for temporal feature engineering.
     """
     if df is None:
+        from retrain_utils import get_latest_dataset_from_hf
+        
+        # If remote is requested, OR if the default path doesn't exist, scan for latest
+        if remote or not os.path.exists(csv_path):
+            print(f"[rf_data] Scanning for latest dataset version...")
+            latest_path = get_latest_dataset_from_hf()
+            if latest_path:
+                csv_path = latest_path
+            else:
+                if not os.path.exists(csv_path):
+                    raise FileNotFoundError(f"[rf_data] No dataset found at {csv_path} and scan found no version history.")
+                
         df = pd.read_csv(csv_path)
 
     # --- Ensure power is always positive ---

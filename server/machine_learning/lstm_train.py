@@ -190,7 +190,7 @@ def train_model(
         print(f"[train] Restored best model weights (val_loss={best_val_loss:.4f})")
 
     print(f"[train] LSTM training completed after {len(history['train_loss'])} epochs.")
-    return history
+    return model
 
 
 # ------------------------------------------------------------------ #

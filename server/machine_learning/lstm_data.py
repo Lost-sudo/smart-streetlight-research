@@ -44,25 +44,22 @@ DATASET_PATH = os.path.join(
 
 from typing import Optional
 
-def load_lstm_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+def load_lstm_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] = None, remote: bool = False) -> pd.DataFrame:
     """Load the real IoT dataset and compute time_to_failure for LSTM training.
-
-    Steps:
-      1. Load CSV (if df is not provided)
-      2. Ensure power is always positive
-      3. Create binary failure_status from mode (mode > 0 → faulty)
-      4. Compute time_to_failure per device:
-         - For each row, count how many timesteps remain until the device
-           transitions from NORMAL to a fault state (mode > 0).
-         - Once in a fault state, time_to_failure = 0.
-      5. Add node_id column for grouping during sequence creation.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with LSTM features, time_to_failure target, and node_id.
     """
     if df is None:
+        from retrain_utils import get_latest_dataset_from_hf
+        
+        # If remote is requested, OR if the default path doesn't exist, scan for latest
+        if remote or not os.path.exists(csv_path):
+            print(f"[lstm_data] Scanning for latest dataset version...")
+            latest_path = get_latest_dataset_from_hf()
+            if latest_path:
+                csv_path = latest_path
+            else:
+                if not os.path.exists(csv_path):
+                    raise FileNotFoundError(f"[lstm_data] No dataset found at {csv_path} and scan found no version history.")
+                
         df = pd.read_csv(csv_path)
 
     # --- Ensure power is always positive ---
