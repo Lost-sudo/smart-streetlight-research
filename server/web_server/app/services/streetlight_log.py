@@ -107,30 +107,30 @@ class StreetlightLogService:
                 iot_log.current_deviation = 0.0
 
         if iot_log.fault_frequency is None:
-            iot_log.fault_frequency = 0
-
-        # 2. FAULT DETECTION (Random Forest)
-        fault_type = "NORMAL"
+            iot_log.fault_frequency = 0        # 2. FAULT DETECTION (Random Forest)
         fault_result = None
-        
         if settings.ENABLE_ML:
             try:
                 # We pass the already-prepared iot_log to the ML service
                 fault_result = self.ml_service.detect_fault(iot_log, historical_logs, streetlight)
                 if fault_result:
-                    fault_type = fault_result.get("fault_type", "UNKNOWN_FAULT")
-                    iot_log.fault_type = fault_type
+                    iot_log.fault_type = fault_result.get("fault_type", "UNKNOWN_FAULT")
+            except Exception as e:
+                logger.exception("Error during ML fault detection")
 
-                # 3. Create the standard streetlight log (now with calculated features AND fault_type)
-                # Note: We create the log AFTER detection so it includes the fault_type
-                created_log = self.streetlight_log_repo.create(streetlight.id, iot_log)
+        # 3. Create the standard streetlight log (now with calculated features AND fault_type)
+        # Note: We create the log AFTER detection so it includes the fault_type
+        created_log = self.streetlight_log_repo.create(streetlight.id, iot_log)
 
-                # 4. Handle Alerts and Status Updates
-                if fault_result and fault_result.get("is_faulty", False):
+        # 4. Handle Alerts and Status Updates
+        if settings.ENABLE_ML and fault_result:
+            try:
+                if fault_result.get("is_faulty", False):
                     if streetlight.status != "maintenance":
                         self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="faulty"))
                     
                     confidence = fault_result.get("confidence", 0.0)
+                    fault_type = iot_log.fault_type
                     
                     if fault_type == "SYSTEM_FAILURE":
                         fault_priority = "critical"
@@ -184,7 +184,7 @@ class StreetlightLogService:
                                 # Update associated Repair Task if it exists and is still pending
                                 if existing_active_fault.repair_task and existing_active_fault.repair_task.status == "pending":
                                     self.repair_task_repo.update(existing_active_fault.repair_task.id, RepairTaskUpdate(priority=new_priority))
-                elif fault_result:
+                else:
                     # AUTO-RECOVERY LOGIC: If previously faulty but now normal
                     if streetlight.status == "faulty":
                         logger.info(f"Auto-recovery detected for streetlight {streetlight.id}. Restoring status to active.")
@@ -206,7 +206,7 @@ class StreetlightLogService:
                 self.pm_service.analyze_node(streetlight.id)
 
             except Exception as e:
-                logger.exception("Error during ML flow")
+                logger.exception("Error during ML alert flow")
 
         return created_log
 

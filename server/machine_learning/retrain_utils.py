@@ -7,6 +7,8 @@ from typing import Optional, List
 # This ensures that we can always find the web_server/app modules 
 # regardless of which directory we run the script from.
 ML_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(ML_DIR, "models")
+DATASETS_DIR = os.path.join(ML_DIR, "datasets")
 SERVER_DIR = os.path.dirname(ML_DIR)
 WEB_SERVER_DIR = os.path.join(SERVER_DIR, "web_server")
 
@@ -105,9 +107,7 @@ def get_latest_dataset_from_hf(base_name: str = "streetlight_dataset_augmented")
                         latest_filename = f"{base_name}_V{found_version}.csv"
                 except Exception as e:
                     print(f"[retrain_utils] Cloud scan failed: {e}")
-            else:
-                import glob
-                local_pattern = os.path.join(ML_DIR, "datasets", f"{base_name}_V*.csv")
+                local_pattern = os.path.join(DATASETS_DIR, f"{base_name}_V*.csv")
                 local_files = glob.glob(local_pattern)
                 if local_files:
                     versions = []
@@ -135,9 +135,7 @@ def get_latest_dataset_from_hf(base_name: str = "streetlight_dataset_augmented")
                 token=settings.HF_TOKEN
             )
             print(f"[retrain_utils] Successfully downloaded from HF to {local_path}")
-        else:
-            # Use local path
-            local_path = os.path.join(ML_DIR, "datasets", latest_filename)
+            local_path = os.path.join(DATASETS_DIR, latest_filename)
             if not os.path.exists(local_path):
                 print(f"[retrain_utils] Error: Local file not found at {local_path}")
                 return None
@@ -163,7 +161,7 @@ def upload_trained_model_to_hf(model_path: str, version_number: int, base_name: 
         filename = f"{base_name}_V{version_number}{ext}"
         
         # Physical Versioning locally
-        versioned_local_path = os.path.join(os.path.dirname(model_path), filename)
+        versioned_local_path = os.path.join(MODELS_DIR, filename)
         if os.path.abspath(model_path) != os.path.abspath(versioned_local_path):
             import shutil
             shutil.copy2(model_path, versioned_local_path)
@@ -253,6 +251,180 @@ def upload_lstm_artifacts(model_path: str, scaler_path: str, target_scaler_path:
         db.close()
     return None
 
+
+def get_latest_model_path(base_name: str) -> Optional[str]:
+    """
+    Finds the latest versioned model path for inference.
+    - Scans DB for the latest 'active' version.
+    - If PROD=True: Downloads from HF if not local.
+    - If PROD=False: Uses local versioned file.
+    """
+    db = SessionLocal()
+    try:
+        latest_v = db.query(MLVersion).filter(
+            MLVersion.version_type == "model",
+            MLVersion.base_name == base_name
+        ).order_by(MLVersion.version_number.desc()).first()
+        
+        if not latest_v:
+            # Universal Bootstrap for Inference: Scan storage if DB is empty
+            print(f"[retrain_utils] Inference: No DB record for {base_name}. Scanning storage...")
+            import glob
+            ext = ".pt" if "lstm" in base_name else ".joblib"
+            local_pattern = os.path.join(MODELS_DIR, f"{base_name}_V*{ext}")
+            local_files = glob.glob(local_pattern)
+            if local_files:
+                versions = []
+                for f in local_files:
+                    try:
+                        v = int(os.path.basename(f).split("_V")[-1].split(".")[0])
+                        versions.append(v)
+                    except: continue
+                if versions:
+                    found_version = max(versions)
+                    latest_filename = f"{base_name}_V{found_version}{ext}"
+                    local_path = os.path.join(MODELS_DIR, latest_filename)
+                    print(f"[retrain_utils] Inference: Bootstrapped to local {latest_filename}")
+                    return local_path
+            return None
+            
+        filename = latest_v.file_name
+        print(f"[retrain_utils] Inference: Using {base_name} V{latest_v.version_number} ({filename})")
+        
+        if settings.PROD and latest_v.hf_url:
+            # Ensure it exists locally via HF download
+            local_path = hf_hub_download(
+                repo_id=settings.HF_MODEL_REPO,
+                filename=filename,
+                repo_type="model",
+                token=settings.HF_TOKEN
+            )
+            return local_path
+        else:
+            local_path = os.path.join(MODELS_DIR, filename)
+            if os.path.exists(local_path):
+                return local_path
+            
+        return None
+    except Exception as e:
+        print(f"[retrain_utils] Error getting model path: {e}")
+        return None
+    finally:
+        db.close()
+
+def get_and_register_next_dataset(base_name: str) -> str:
+    """
+    Ensures a new dataset version is created and registered for the current run.
+    1. Finds latest version (e.g. V1).
+    2. Downloads it (if PROD and missing).
+    3. Fetches NEW logs from DB.
+    4. Saves as V2.
+    5. Registers V2 in DB/Cloud.
+    Returns the path to the NEW versioned dataset.
+    """
+    # Fix pathing
+    import sys
+    import pandas as pd
+    if str(SERVER_DIR / "web_server") not in sys.path:
+        sys.path.append(str(SERVER_DIR / "web_server"))
+    
+    from app.services.ml_data_service import MLDataService
+    
+    # A. Get current latest
+    latest_path = get_latest_dataset_path(base_name)
+    current_v = 0
+    if latest_path:
+        try:
+            current_v = int(os.path.basename(latest_path).split("_V")[-1].split(".")[0])
+        except: pass
+    
+    next_v = current_v + 1
+    new_filename = f"{base_name}_V{next_v}.csv"
+    new_local_path = os.path.join(DATASETS_DIR, new_filename)
+    
+    print(f"[retrain_utils] Preparing Dataset {new_filename} for this run...")
+    
+    # B. Load existing data
+    if latest_path and os.path.exists(latest_path):
+        df = pd.read_csv(latest_path)
+    else:
+        # Fallback to base if V1 doesn't exist
+        fallback = os.path.join(DATASETS_DIR, f"{base_name}.csv")
+        df = pd.read_csv(fallback) if os.path.exists(fallback) else pd.DataFrame()
+
+    # C. Try to append NEW logs from DB
+    try:
+        data_service = MLDataService()
+        new_df = data_service.get_latest_logs_as_df()
+        if not new_df.empty:
+            print(f"[retrain_utils] Appending {len(new_df)} new logs from DB.")
+            df = pd.concat([df, new_df], ignore_index=True)
+        else:
+            print(f"[retrain_utils] No new logs in DB. Aligning version {next_v} with existing data.")
+    except Exception as e:
+        print(f"[retrain_utils] Warning: Could not fetch new logs from DB: {e}")
+
+    # D. Save the new version
+    df.to_csv(new_local_path, index=False)
+    
+    # E. Register the new version
+    hf_url = None
+    if settings.PROD:
+        from hf_service import upload_to_hf
+        hf_url = upload_to_hf(new_local_path, settings.HF_DATASET_REPO, repo_type="dataset")
+    
+    db = SessionLocal()
+    try:
+        new_record = MLVersion(
+            version_type="dataset",
+            version_number=next_v,
+            file_name=new_filename,
+            hf_url=hf_url,
+            row_count=len(df),
+            base_name=base_name,
+            status="active"
+        )
+        db.add(new_record)
+        db.commit()
+        print(f"[retrain_utils] Dataset {new_filename} registered successfully.")
+    finally:
+        db.close()
+        
+    return new_local_path
+
+def update_dataset_from_db(base_name: str = "streetlight_dataset_augmented") -> str:
+    """
+    Fetches new logs from DB, merges with latest version, and ALWAYS 
+    creates a new dataset version (V_n+1).
+    Returns the path to the new versioned CSV.
+    """
+    from app.services.ml_data_service import MLDataService
+    db = SessionLocal()
+    try:
+        # 1. Fetch new data from DB (last 3 months)
+        print(f"[retrain_utils] Fetching new telemetry from database...")
+        df_new = MLDataService.fetch_training_data(db, n_months=3)
+        
+        if df_new.empty:
+            print("[retrain_utils] No new logs found in database. Creating a new version from existing data...")
+        else:
+            print(f"[retrain_utils] Found {len(df_new)} new logs to append.")
+            
+        # 2. Sync/Version (This always increments the version)
+        new_v_record = MLDataService.sync_dataset_to_hf(db, df_new, base_name=base_name)
+        
+        if not new_v_record:
+            raise Exception("Failed to sync/version dataset.")
+            
+        new_path = os.path.join(DATASETS_DIR, new_v_record.file_name)
+        return new_path
+        
+    except Exception as e:
+        print(f"[retrain_utils] Error during dataset update: {e}")
+        # Fallback to just loading latest if update fails
+        return get_latest_dataset_from_hf(base_name)
+    finally:
+        db.close()
 
 def get_latest_model_path(base_name: str) -> Optional[str]:
     """
