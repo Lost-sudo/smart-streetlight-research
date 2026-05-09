@@ -30,7 +30,7 @@ from random_forest_data import RF_FEATURES
 import retrain_utils
 
 
-def main(args=None):
+def main(csv_path: str = None):
     from app.core.config import settings
     
     print("=" * 60)
@@ -41,8 +41,14 @@ def main(args=None):
     # ---------------------------------------------------------- #
     # Step 1: Load real IoT sensor data                           #
     # ---------------------------------------------------------- #
-    print("\n[Step 1] Loading dataset...")
-    df = load_real_dataset() # Now automatically uses PROD inside
+    if not csv_path:
+        # --- [Step 1] Incremental Data Update ---
+        # Fetch new logs from DB and create a NEW version (V_n+1)
+        from retrain_utils import update_dataset_from_db
+        csv_path = update_dataset_from_db("streetlight_dataset_augmented")
+    
+    print(f"\n[Step 2] Loading dataset from: {csv_path}")
+    df = load_real_dataset(csv_path=csv_path)
     print(f"  -> Dataset shape: {df.shape}")
 
     # ---------------------------------------------------------- #

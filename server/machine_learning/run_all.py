@@ -16,15 +16,21 @@ from run_random_forest import main as run_rf
 def main():
     print("\n" + "#" * 60)
     print("#  Training All Models")
-    print("#" * 60)
+    # --- Step 0: Centralized Data Update ---
+    # We update the dataset ONCE at the start so both models use the same fresh version
+    print("\n" + "="*60)
+    print("  [Step 0] Synchronizing Dataset Versions")
+    print("="*60)
+    from retrain_utils import update_dataset_from_db
+    shared_csv_path = update_dataset_from_db("streetlight_dataset_augmented")
+    
+    # --- Step 1: LSTM Training ---
+    print("\n>>> Training LSTM (Time-to-Failure) <<<")
+    lstm_metrics = run_lstm(csv_path=shared_csv_path)
 
-    print("\n>>> Training LSTM (Time-to-Failure) <<<\n")
-    # No arguments needed, now follows PROD automatically
-    lstm_metrics = run_lstm()
-
-    print("\n>>> Training Random Forest (Fault Detection) <<<\n")
-    # No arguments needed, now follows PROD automatically
-    rf_metrics = run_rf()
+    # --- Step 2: Random Forest Training ---
+    print("\n>>> Training Random Forest (Fault Detection) <<<")
+    rf_metrics = run_rf(csv_path=shared_csv_path)
 
     print("\n" + "#" * 60)
     print("#  All Models Trained Successfully!")

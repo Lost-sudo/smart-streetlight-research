@@ -27,8 +27,8 @@ from lstm_train import (
 import retrain_utils
 
 
-def main(args=None):
-    from app.core.config import settingsS
+def main(csv_path: str = None):
+    from app.core.config import settings
     
     print("=" * 60)
     print("  Smart Streetlight - LSTM Time-to-Failure Training")
@@ -38,8 +38,15 @@ def main(args=None):
     # ---------------------------------------------------------- #
     # Step 1: Load real IoT sequential data                      #
     # ---------------------------------------------------------- #
-    print("\n[Step 1] Loading sequential data...")
-    df = load_lstm_dataset()
+    if not csv_path:
+        # --- [Step 1] Incremental Data Update ---
+        # Fetch new logs from DB and create a NEW version (V_n+1)
+        from retrain_utils import update_dataset_from_db
+        csv_path = update_dataset_from_db("streetlight_dataset_augmented")
+    
+    print(f"\n[Step 2] Loading dataset from: {csv_path}")
+    from lstm_data import load_lstm_dataset
+    df = load_lstm_dataset(csv_path=csv_path)
     print(f"  -> Dataset shape: {df.shape}")
     print(f"  -> time_to_failure range: [{df['time_to_failure'].min()}, {df['time_to_failure'].max()}]")
 

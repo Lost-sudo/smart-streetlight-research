@@ -104,10 +104,9 @@ class MLPredictionService:
             return
 
         self.last_update_check = now
+        db = SessionLocal()
         try:
-            from app.core.database import SessionLocal
             from app.models.ml_version import MLVersion
-            db = SessionLocal()
             
             # Check RF
             latest_rf = db.query(MLVersion).filter(
@@ -130,9 +129,10 @@ class MLPredictionService:
                 logger.info(f"New LSTM model detected (V{latest_lstm.version_number}). Reloading...")
                 self._load_artifacts()
                 
-            db.close()
         except Exception as e:
             logger.error(f"Hot-reload check failed: {e}")
+        finally:
+            db.close()
 
     def _load_artifacts(self):
         try:
