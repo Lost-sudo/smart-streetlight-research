@@ -17,6 +17,7 @@ from app.models.predictive_maintenance_alert import PredictiveMaintenanceAlert
 from app.models.predictive_maintenance_log import PredictiveMaintenanceLog
 from app.models.repair_task import RepairTask
 from app.models.repair_log import RepairLog
+from app.models.ml_version import MLVersion
 from app.core.config import settings
 
 # this is the Alembic Config object, which provides

@@ -9,3 +9,4 @@ from .alert import Alert
 from .maintenance_log import MaintenanceLog
 from .predictive_maintenance_log import PredictiveMaintenanceLog
 from .predictive_maintenance_alert import PredictiveMaintenanceAlert
+from .ml_version import MLVersion
