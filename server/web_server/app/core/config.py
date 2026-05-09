@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     HF_TOKEN: str = ""
     HF_DATASET_REPO: str = ""
     HF_MODEL_REPO: str = ""
+    PROD: bool = False
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

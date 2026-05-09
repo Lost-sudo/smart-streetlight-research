@@ -21,8 +21,9 @@ except ImportError:
 
 def get_latest_dataset_from_hf(base_name: str = "streetlight_dataset_augmented") -> Optional[str]:
     """
-    Finds the latest version of the dataset in the DB and downloads it from HF.
-    Returns the local path to the downloaded file.
+    Finds the latest version of the dataset in the DB and retrieves it.
+    - If PROD=True: Downloads from HF.
+    - If PROD=False: Loads from local machine_learning/datasets/.
     """
     db = SessionLocal()
     try:
@@ -37,93 +38,118 @@ def get_latest_dataset_from_hf(base_name: str = "streetlight_dataset_augmented")
             
         print(f"[retrain_utils] Found latest version: V{latest_v.version_number} ({latest_v.file_name})")
         
-        # Download from HF
-        local_path = hf_hub_download(
-            repo_id=settings.HF_DATASET_REPO,
-            filename=latest_v.file_name,
-            repo_type="dataset",
-            token=settings.HF_TOKEN
-        )
-        print(f"[retrain_utils] Successfully downloaded to {local_path}")
+        if settings.PROD:
+            # Download from HF
+            local_path = hf_hub_download(
+                repo_id=settings.HF_DATASET_REPO,
+                filename=latest_v.file_name,
+                repo_type="dataset",
+                token=settings.HF_TOKEN
+            )
+            print(f"[retrain_utils] Successfully downloaded from HF to {local_path}")
+        else:
+            # Use local path
+            local_path = os.path.join(ML_DIR, "datasets", latest_v.file_name)
+            if not os.path.exists(local_path):
+                print(f"[retrain_utils] Error: Local file not found at {local_path}")
+                return None
+            print(f"[retrain_utils] Using local file: {local_path}")
+            
         return local_path
         
     except Exception as e:
-        print(f"[retrain_utils] Error fetching remote dataset: {e}")
+        print(f"[retrain_utils] Error fetching dataset: {e}")
         return None
     finally:
         db.close()
 
 def upload_trained_model_to_hf(model_path: str, version_number: int, base_name: str = "random_forest_model", metrics: dict = None):
     """
-    Uploads a newly trained model to HF and records it in the DB.
+    Handles model registration:
+    - If PROD=True: Uploads to HF and records in DB.
+    - If PROD=False: Records local path in DB.
     """
     db = SessionLocal()
     try:
-        from app.services.hugging_face_service import HuggingFaceService
-        
         filename = f"{base_name}_V{version_number}.joblib"
         if model_path.endswith(".pt") or model_path.endswith(".pth"):
             filename = f"{base_name}_V{version_number}.pt"
             
-        hf = HuggingFaceService()
-        response = hf.upload_model(model_path, path_in_repo=filename, commit_message=f"Model Retraining V{version_number}")
+        hf_url = None
+        if settings.PROD:
+            from app.services.hugging_face_service import HuggingFaceService
+            hf = HuggingFaceService()
+            response = hf.upload_model(model_path, path_in_repo=filename, commit_message=f"Model Retraining V{version_number}")
+            if response:
+                hf_url = f"https://huggingface.co/{settings.HF_MODEL_REPO}/resolve/main/{filename}"
+            else:
+                print("[retrain_utils] Sync failed: Upload to Hugging Face failed.")
+                return None
         
-        if response:
-            hf_url = f"https://huggingface.co/{settings.HF_MODEL_REPO}/resolve/main/{filename}"
-            new_v = MLVersion(
-                version_type="model",
-                version_number=version_number,
-                file_name=filename,
-                hf_url=hf_url,
-                metrics=metrics,
-                base_name=base_name
-            )
-            db.add(new_v)
-            db.commit()
-            print(f"[retrain_utils] Model V{version_number} uploaded and recorded.")
-            return new_v
+        new_v = MLVersion(
+            version_type="model",
+            version_number=version_number,
+            file_name=filename,
+            hf_url=hf_url,
+            metrics=metrics,
+            base_name=base_name,
+            status="active"
+        )
+        db.add(new_v)
+        db.commit()
+        
+        mode_str = "HF (Cloud)" if settings.PROD else "Local Storage"
+        print(f"[retrain_utils] Model V{version_number} registered via {mode_str}.")
+        return new_v
     except Exception as e:
-        print(f"[retrain_utils] Error uploading model: {e}")
+        print(f"[retrain_utils] Error registering model: {e}")
     finally:
         db.close()
     return None
 
 def upload_lstm_artifacts(model_path: str, scaler_path: str, target_scaler_path: str, version_number: int, metrics: dict = None):
     """
-    Uploads the LSTM model AND its associated scalers to HF.
+    Handles LSTM artifact registration (Model + Scalers).
     """
     db = SessionLocal()
     try:
-        from app.services.hugging_face_service import HuggingFaceService
-        hf = HuggingFaceService()
-        
-        # 1. Upload Model
         model_filename = f"lstm_model_V{version_number}.pt"
-        hf.upload_model(model_path, path_in_repo=model_filename, commit_message=f"LSTM Model V{version_number}")
+        hf_url = None
         
-        # 2. Upload Scalers
-        scaler_filename = f"lstm_scaler_V{version_number}.joblib"
-        hf.upload_model(scaler_path, path_in_repo=scaler_filename, commit_message=f"LSTM Scaler V{version_number}")
+        if settings.PROD:
+            from app.services.hugging_face_service import HuggingFaceService
+            hf = HuggingFaceService()
+            
+            # Upload Model
+            hf.upload_model(model_path, path_in_repo=model_filename, commit_message=f"LSTM Model V{version_number}")
+            
+            # Upload Scalers
+            scaler_filename = f"lstm_scaler_V{version_number}.joblib"
+            hf.upload_model(scaler_path, path_in_repo=scaler_filename, commit_message=f"LSTM Scaler V{version_number}")
+            
+            target_scaler_filename = f"lstm_target_scaler_V{version_number}.joblib"
+            hf.upload_model(target_scaler_path, path_in_repo=target_scaler_filename, commit_message=f"LSTM Target Scaler V{version_number}")
+            
+            hf_url = f"https://huggingface.co/{settings.HF_MODEL_REPO}/resolve/main/{model_filename}"
         
-        target_scaler_filename = f"lstm_target_scaler_V{version_number}.joblib"
-        hf.upload_model(target_scaler_path, path_in_repo=target_scaler_filename, commit_message=f"LSTM Target Scaler V{version_number}")
-        
-        # 3. Record in DB
-        hf_url = f"https://huggingface.co/{settings.HF_MODEL_REPO}/resolve/main/{model_filename}"
+        # Record in DB
         new_v = MLVersion(
             version_type="model",
             version_number=version_number,
             file_name=model_filename,
             hf_url=hf_url,
             metrics=metrics,
-            base_name="lstm_model"
+            base_name="lstm_model",
+            status="active"
         )
         db.add(new_v)
         db.commit()
-        print(f"[retrain_utils] LSTM Package V{version_number} (Model + 2 Scalers) uploaded.")
+        
+        mode_str = "HF (Cloud)" if settings.PROD else "Local Storage"
+        print(f"[retrain_utils] LSTM Package V{version_number} registered via {mode_str}.")
         return new_v
     except Exception as e:
-        print(f"[retrain_utils] Error uploading LSTM artifacts: {e}")
+        print(f"[retrain_utils] Error registering LSTM artifacts: {e}")
     finally:
         db.close()
     return None
