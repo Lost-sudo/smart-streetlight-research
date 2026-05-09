@@ -221,4 +221,4 @@ def preprocess_pipeline(
 
     print(f"[lstm_preprocess] Sequences created: X={X.shape}, y={y.shape}")
     print(f"[lstm_preprocess] Target (normalized) range: [{y.min():.4f}, {y.max():.4f}]")
-    return X, y
+    return X, y, feature_scaler, target_scaler

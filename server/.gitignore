@@ -6,3 +6,8 @@ __pycache__
 .env.*
 
 scratch/
+
+# Machine Learning Artifacts (Versioned in DB/Cloud)
+machine_learning/datasets/
+machine_learning/models/
+machine_learning/plots/

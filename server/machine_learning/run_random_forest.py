@@ -19,33 +19,30 @@ Usage:
 from random_forest_data import load_real_dataset
 from random_forest_preprocess import preprocess_pipeline
 from random_forest_train import (
-    split_data,
     build_model,
     train_model,
     evaluate_model,
-    save_model,
     save_predictions,
+    save_model,
+    split_data
 )
 from random_forest_data import RF_FEATURES
+import retrain_utils
 
 
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="Retrain Random Forest model.")
-    parser.add_argument("--remote", action="store_true", help="Download latest dataset from Hugging Face.")
-    parser.add_argument("--upload", action="store_true", help="Upload trained model to Hugging Face.")
-    args = parser.parse_args()
-
+def main(args=None):
+    from app.core.config import settings
+    
     print("=" * 60)
     print("  Smart Streetlight - Random Forest Fault Detection Training")
-    print(f"  Mode: {'REMOTE' if args.remote else 'LOCAL'}")
+    print(f"  Mode: {'PRODUCTION (Cloud)' if settings.PROD else 'LOCAL (Demo)'}")
     print("=" * 60)
 
     # ---------------------------------------------------------- #
     # Step 1: Load real IoT sensor data                           #
     # ---------------------------------------------------------- #
     print("\n[Step 1] Loading dataset...")
-    df = load_real_dataset(remote=args.remote)
+    df = load_real_dataset() # Now automatically uses PROD inside
     print(f"  -> Dataset shape: {df.shape}")
 
     # ---------------------------------------------------------- #
@@ -89,21 +86,13 @@ def main():
     model_path = save_model(model)
 
     # ---------------------------------------------------------- #
-    # Step 8: Cloud Upload (Optional)                             #
+    # Step 8: Registration & Versioning                           #
     # ---------------------------------------------------------- #
-    if args.upload:
-        print("\n[Step 8] Uploading model to Hugging Face...")
-        from retrain_utils import upload_trained_model_to_hf
-        from app.models.ml_version import MLVersion
-        from app.core.database import SessionLocal
-        
-        # Get next version number from DB
-        db = SessionLocal()
-        latest_m = db.query(MLVersion).filter(MLVersion.version_type == "model").order_by(MLVersion.version_number.desc()).first()
-        db.close()
-        next_m_version = (latest_m.version_number + 1) if latest_m else 1
-        
-        upload_trained_model_to_hf(model_path, next_m_version, metrics=test_metrics)
+    print("\n[Step 8] Registering model in registry...")
+    from retrain_utils import upload_trained_model_to_hf, get_next_model_version
+    
+    next_m_version = get_next_model_version("random_forest_model")
+    upload_trained_model_to_hf(model_path, next_m_version, base_name="random_forest_model", metrics=test_metrics)
 
     # ---------------------------------------------------------- #
     # Step 9: Feature Importance                                  #

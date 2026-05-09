@@ -24,34 +24,29 @@ from lstm_train import (
     evaluate_model,
     save_model,
 )
+import retrain_utils
 
 
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="Retrain LSTM TTF model.")
-    parser.add_argument("--remote", action="store_true", help="Download latest dataset from Hugging Face.")
-    parser.add_argument("--upload", action="store_true", help="Upload trained model to Hugging Face.")
-    args = parser.parse_args()
-
+def main(args=None):
+    from app.core.config import settingsS
+    
     print("=" * 60)
     print("  Smart Streetlight - LSTM Time-to-Failure Training")
-    print(f"  Mode: {'REMOTE' if args.remote else 'LOCAL'}")
+    print(f"  Mode: {'PRODUCTION (Cloud)' if settings.PROD else 'LOCAL (Demo)'}")
     print("=" * 60)
 
     # ---------------------------------------------------------- #
     # Step 1: Load real IoT sequential data                      #
     # ---------------------------------------------------------- #
     print("\n[Step 1] Loading sequential data...")
-    df = load_lstm_dataset(remote=args.remote)
+    df = load_lstm_dataset()
     print(f"  -> Dataset shape: {df.shape}")
     print(f"  -> time_to_failure range: [{df['time_to_failure'].min()}, {df['time_to_failure'].max()}]")
 
     # ---------------------------------------------------------- #
     # Step 2: Preprocess (scale + create sequences)               #
     # ---------------------------------------------------------- #
-    LOOKBACK = 10
-    print(f"\n[Step 2] Preprocessing (lookback={LOOKBACK})...")
-    X, y = preprocess_pipeline(df, lookback=LOOKBACK, fit=True)
+    X, y, scaler, target_scaler = preprocess_pipeline(df)
 
     # ---------------------------------------------------------- #
     # Step 3: Split dataset (70 / 15 / 15)                        #
@@ -63,20 +58,16 @@ def main():
     # Step 4: Build and train LSTM model                          #
     # ---------------------------------------------------------- #
     print("\n[Step 4] Building LSTM model...")
-    input_size = X_train.shape[2]  # number of features per timestep
-    model = build_lstm_model(input_size, hidden_size=64, dropout=0.2)
+    model = build_lstm_model(input_size=X.shape[2])
 
     print("\n[Step 4b] Training LSTM model...")
-    history = train_model(
-        model, X_train, y_train, X_val, y_val,
-        epochs=50, batch_size=32,
-    )
+    model = train_model(model, X_train, y_train, X_val, y_val)
 
     # ---------------------------------------------------------- #
     # Step 5: Evaluate on Validation and Test sets                #
     # ---------------------------------------------------------- #
     print("\n[Step 5] Evaluating model...")
-    val_metrics = evaluate_model(model, X_val, y_val, split_name="Validation")
+    evaluate_model(model, X_val, y_val, split_name="Validation")
     test_metrics = evaluate_model(model, X_test, y_test, split_name="Test")
 
     # ---------------------------------------------------------- #
@@ -86,36 +77,26 @@ def main():
     model_path = save_model(model)
 
     # ---------------------------------------------------------- #
-    # Step 7: Cloud Upload (Optional)                             #
+    # Step 7: Registration & Versioning                           #
     # ---------------------------------------------------------- #
-    if args.upload:
-        print("\n[Step 7] Uploading model and scalers to Hugging Face...")
-        from retrain_utils import upload_lstm_artifacts
-        from app.models.ml_version import MLVersion
-        from app.core.database import SessionLocal
-        import os
-        
-        # Artifact paths
-        MODELS_DIR = os.path.dirname(model_path)
-        scaler_path = os.path.join(MODELS_DIR, "lstm_scaler.joblib")
-        target_scaler_path = os.path.join(MODELS_DIR, "lstm_target_scaler.joblib")
-        
-        # Get next version number from DB
-        db = SessionLocal()
-        latest_m = db.query(MLVersion).filter(
-            MLVersion.version_type == "model",
-            MLVersion.base_name == "lstm_model"
-        ).order_by(MLVersion.version_number.desc()).first()
-        db.close()
-        next_m_version = (latest_m.version_number + 1) if latest_m else 1
-        
-        upload_lstm_artifacts(
-            model_path, 
-            scaler_path, 
-            target_scaler_path, 
-            next_m_version, 
-            metrics=test_metrics
-        )
+    print("\n[Step 7] Registering model and scalers in registry...")
+    from retrain_utils import upload_lstm_artifacts, get_next_model_version
+    import os
+    
+    # Artifact paths
+    MODELS_DIR = os.path.dirname(model_path)
+    scaler_path = os.path.join(MODELS_DIR, "lstm_scaler.joblib")
+    target_scaler_path = os.path.join(MODELS_DIR, "lstm_target_scaler.joblib")
+    
+    next_m_version = get_next_model_version("lstm_model")
+    
+    upload_lstm_artifacts(
+        model_path, 
+        scaler_path, 
+        target_scaler_path, 
+        next_m_version, 
+        metrics=test_metrics
+    )
 
     # ---------------------------------------------------------- #
     # Summary                                                     #
