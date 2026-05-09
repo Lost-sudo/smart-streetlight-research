@@ -30,16 +30,22 @@ from random_forest_data import RF_FEATURES
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Retrain Random Forest model.")
+    parser.add_argument("--remote", action="store_true", help="Download latest dataset from Hugging Face.")
+    parser.add_argument("--upload", action="store_true", help="Upload trained model to Hugging Face.")
+    args = parser.parse_args()
+
     print("=" * 60)
     print("  Smart Streetlight - Random Forest Fault Detection Training")
-    print("  (Trained on Real IoT Data)")
+    print(f"  Mode: {'REMOTE' if args.remote else 'LOCAL'}")
     print("=" * 60)
 
     # ---------------------------------------------------------- #
     # Step 1: Load real IoT sensor data                           #
     # ---------------------------------------------------------- #
-    print("\n[Step 1] Loading real IoT dataset...")
-    df = load_real_dataset()
+    print("\n[Step 1] Loading dataset...")
+    df = load_real_dataset(remote=args.remote)
     print(f"  -> Dataset shape: {df.shape}")
 
     # ---------------------------------------------------------- #
@@ -79,13 +85,30 @@ def main():
     # ---------------------------------------------------------- #
     # Step 7: Export model                                        #
     # ---------------------------------------------------------- #
-    print("[Step 7] Exporting model...")
+    print("[Step 7] Exporting model locally...")
     model_path = save_model(model)
 
     # ---------------------------------------------------------- #
-    # Step 8: Feature Importance                                  #
+    # Step 8: Cloud Upload (Optional)                             #
     # ---------------------------------------------------------- #
-    print("\n[Step 8] Feature Importance:")
+    if args.upload:
+        print("\n[Step 8] Uploading model to Hugging Face...")
+        from retrain_utils import upload_trained_model_to_hf
+        from app.models.ml_version import MLVersion
+        from app.core.database import SessionLocal
+        
+        # Get next version number from DB
+        db = SessionLocal()
+        latest_m = db.query(MLVersion).filter(MLVersion.version_type == "model").order_by(MLVersion.version_number.desc()).first()
+        db.close()
+        next_m_version = (latest_m.version_number + 1) if latest_m else 1
+        
+        upload_trained_model_to_hf(model_path, next_m_version, metrics=test_metrics)
+
+    # ---------------------------------------------------------- #
+    # Step 9: Feature Importance                                  #
+    # ---------------------------------------------------------- #
+    print("\n[Step 9] Feature Importance:")
     importances = model.feature_importances_
     for fname, imp in sorted(zip(RF_FEATURES, importances), key=lambda x: -x[1]):
         bar = "#" * int(imp * 50)

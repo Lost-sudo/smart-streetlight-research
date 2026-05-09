@@ -27,16 +27,22 @@ from lstm_train import (
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Retrain LSTM TTF model.")
+    parser.add_argument("--remote", action="store_true", help="Download latest dataset from Hugging Face.")
+    parser.add_argument("--upload", action="store_true", help="Upload trained model to Hugging Face.")
+    args = parser.parse_args()
+
     print("=" * 60)
     print("  Smart Streetlight - LSTM Time-to-Failure Training")
-    print("  (Trained on Real IoT Data)")
+    print(f"  Mode: {'REMOTE' if args.remote else 'LOCAL'}")
     print("=" * 60)
 
     # ---------------------------------------------------------- #
     # Step 1: Load real IoT sequential data                      #
     # ---------------------------------------------------------- #
-    print("\n[Step 1] Loading real IoT sequential data...")
-    df = load_lstm_dataset()
+    print("\n[Step 1] Loading sequential data...")
+    df = load_lstm_dataset(remote=args.remote)
     print(f"  -> Dataset shape: {df.shape}")
     print(f"  -> time_to_failure range: [{df['time_to_failure'].min()}, {df['time_to_failure'].max()}]")
 
@@ -76,8 +82,40 @@ def main():
     # ---------------------------------------------------------- #
     # Step 6: Export model                                        #
     # ---------------------------------------------------------- #
-    print("[Step 6] Exporting model...")
+    print("[Step 6] Exporting model locally...")
     model_path = save_model(model)
+
+    # ---------------------------------------------------------- #
+    # Step 7: Cloud Upload (Optional)                             #
+    # ---------------------------------------------------------- #
+    if args.upload:
+        print("\n[Step 7] Uploading model and scalers to Hugging Face...")
+        from retrain_utils import upload_lstm_artifacts
+        from app.models.ml_version import MLVersion
+        from app.core.database import SessionLocal
+        import os
+        
+        # Artifact paths
+        MODELS_DIR = os.path.dirname(model_path)
+        scaler_path = os.path.join(MODELS_DIR, "lstm_scaler.joblib")
+        target_scaler_path = os.path.join(MODELS_DIR, "lstm_target_scaler.joblib")
+        
+        # Get next version number from DB
+        db = SessionLocal()
+        latest_m = db.query(MLVersion).filter(
+            MLVersion.version_type == "model",
+            MLVersion.base_name == "lstm_model"
+        ).order_by(MLVersion.version_number.desc()).first()
+        db.close()
+        next_m_version = (latest_m.version_number + 1) if latest_m else 1
+        
+        upload_lstm_artifacts(
+            model_path, 
+            scaler_path, 
+            target_scaler_path, 
+            next_m_version, 
+            metrics=test_metrics
+        )
 
     # ---------------------------------------------------------- #
     # Summary                                                     #

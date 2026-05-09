@@ -30,7 +30,7 @@ RF_TARGET = "fault_type"
 
 from typing import Optional
 
-def load_real_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+def load_real_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] = None, remote: bool = False) -> pd.DataFrame:
     """Load and prepare the real IoT dataset for Random Forest training.
 
     Steps:
@@ -45,6 +45,14 @@ def load_real_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] =
         Cleaned DataFrame ready for temporal feature engineering.
     """
     if df is None:
+        if remote:
+            from retrain_utils import get_latest_dataset_from_hf
+            remote_path = get_latest_dataset_from_hf()
+            if remote_path:
+                csv_path = remote_path
+            else:
+                print("[rf_data] Falling back to local dataset...")
+                
         df = pd.read_csv(csv_path)
 
     # --- Ensure power is always positive ---

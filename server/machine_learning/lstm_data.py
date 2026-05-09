@@ -44,7 +44,7 @@ DATASET_PATH = os.path.join(
 
 from typing import Optional
 
-def load_lstm_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+def load_lstm_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] = None, remote: bool = False) -> pd.DataFrame:
     """Load the real IoT dataset and compute time_to_failure for LSTM training.
 
     Steps:
@@ -63,6 +63,14 @@ def load_lstm_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] =
         DataFrame with LSTM features, time_to_failure target, and node_id.
     """
     if df is None:
+        if remote:
+            from retrain_utils import get_latest_dataset_from_hf
+            remote_path = get_latest_dataset_from_hf()
+            if remote_path:
+                csv_path = remote_path
+            else:
+                print("[lstm_data] Falling back to local dataset...")
+                
         df = pd.read_csv(csv_path)
 
     # --- Ensure power is always positive ---
