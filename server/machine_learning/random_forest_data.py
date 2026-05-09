@@ -28,38 +28,46 @@ RF_FEATURES = [
 RF_TARGET = "fault_type"
 
 
-def load_real_dataset(csv_path: str = DATASET_PATH) -> pd.DataFrame:
+from typing import Optional
+
+def load_real_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] = None, remote: bool = False) -> pd.DataFrame:
     """Load and prepare the real IoT dataset for Random Forest training.
-
-    Steps:
-      1. Load CSV
-      2. Fix negative power (absolute value)
-      3. Create binary target: failure_status (mode > 0 → 1)
-      4. Keep ALL data (no gray-zone removal — real observations are genuine)
-
-    Returns
-    -------
-    pd.DataFrame
-        Cleaned DataFrame ready for temporal feature engineering.
     """
-    df = pd.read_csv(csv_path)
+    if df is None:
+        from retrain_utils import get_latest_dataset_from_hf
+        
+        # If remote is requested, OR if the default path doesn't exist, scan for latest
+        if remote or not os.path.exists(csv_path):
+            print(f"[rf_data] Scanning for latest dataset version...")
+            latest_path = get_latest_dataset_from_hf()
+            if latest_path:
+                csv_path = latest_path
+            else:
+                if not os.path.exists(csv_path):
+                    raise FileNotFoundError(f"[rf_data] No dataset found at {csv_path} and scan found no version history.")
+                
+        df = pd.read_csv(csv_path)
 
     # --- Ensure power is always positive ---
-    df["power"] = df["power"].abs()
+    if "power" in df.columns:
+        df["power"] = df["power"].abs()
 
     # --- Multi-class target: 0-6 modes ---
-    df["fault_type"] = df["mode"].astype(int)
+    if "mode" in df.columns:
+        df["fault_type"] = df["mode"].astype(int)
 
     # For backward compatibility or binary needs, we can still see normal vs faulty
     normal_count = (df["fault_type"] == 0).sum()
     faulty_count = (df["fault_type"] > 0).sum()
 
-    print(f"[rf_data] Loaded multi-class dataset: {csv_path}")
+    print(f"[rf_data] Loaded multi-class dataset")
     print(f"[rf_data] Total samples: {len(df)}")
     print(f"[rf_data] Normal: {normal_count}, Faulty: {faulty_count}")
-    print(f"[rf_data] Multi-class distribution:")
-    for _, row in df.groupby(["mode", "fault_name"]).size().reset_index(name="count").iterrows():
-        print(f"          mode={int(row['mode'])} ({row['fault_name']}): {row['count']}")
+    
+    if "fault_name" in df.columns:
+        print(f"[rf_data] Multi-class distribution:")
+        for _, row in df.groupby(["mode", "fault_name"]).size().reset_index(name="count").iterrows():
+            print(f"          mode={int(row['mode'])} ({row['fault_name']}): {row['count']}")
 
     return df
 

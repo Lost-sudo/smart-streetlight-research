@@ -19,27 +19,36 @@ Usage:
 from random_forest_data import load_real_dataset
 from random_forest_preprocess import preprocess_pipeline
 from random_forest_train import (
-    split_data,
     build_model,
     train_model,
     evaluate_model,
-    save_model,
     save_predictions,
+    save_model,
+    split_data
 )
 from random_forest_data import RF_FEATURES
+import retrain_utils
 
 
-def main():
+def main(csv_path: str = None):
+    from app.core.config import settings
+    
     print("=" * 60)
     print("  Smart Streetlight - Random Forest Fault Detection Training")
-    print("  (Trained on Real IoT Data)")
+    print(f"  Mode: {'PRODUCTION (Cloud)' if settings.PROD else 'LOCAL (Demo)'}")
     print("=" * 60)
 
     # ---------------------------------------------------------- #
     # Step 1: Load real IoT sensor data                           #
     # ---------------------------------------------------------- #
-    print("\n[Step 1] Loading real IoT dataset...")
-    df = load_real_dataset()
+    if not csv_path:
+        # --- [Step 1] Incremental Data Update ---
+        # Fetch new logs from DB and create a NEW version (V_n+1)
+        from retrain_utils import update_dataset_from_db
+        csv_path = update_dataset_from_db("streetlight_dataset_augmented")
+    
+    print(f"\n[Step 2] Loading dataset from: {csv_path}")
+    df = load_real_dataset(csv_path=csv_path)
     print(f"  -> Dataset shape: {df.shape}")
 
     # ---------------------------------------------------------- #
@@ -79,13 +88,22 @@ def main():
     # ---------------------------------------------------------- #
     # Step 7: Export model                                        #
     # ---------------------------------------------------------- #
-    print("[Step 7] Exporting model...")
+    print("[Step 7] Exporting model locally...")
     model_path = save_model(model)
 
     # ---------------------------------------------------------- #
-    # Step 8: Feature Importance                                  #
+    # Step 8: Registration & Versioning                           #
     # ---------------------------------------------------------- #
-    print("\n[Step 8] Feature Importance:")
+    print("\n[Step 8] Registering model in registry...")
+    from retrain_utils import upload_trained_model_to_hf, get_next_model_version
+    
+    next_m_version = get_next_model_version("random_forest_model")
+    upload_trained_model_to_hf(model_path, next_m_version, base_name="random_forest_model", metrics=test_metrics)
+
+    # ---------------------------------------------------------- #
+    # Step 9: Feature Importance                                  #
+    # ---------------------------------------------------------- #
+    print("\n[Step 9] Feature Importance:")
     importances = model.feature_importances_
     for fname, imp in sorted(zip(RF_FEATURES, importances), key=lambda x: -x[1]):
         bar = "#" * int(imp * 50)

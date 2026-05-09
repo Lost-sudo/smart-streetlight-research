@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     REFRESH_COOKIE_NAME: str = "refresh_token"
     REFRESH_COOKIE_SAMESITE: str = "strict"
     ENABLE_ML: bool = True
+    
+    # Hugging Face Configuration
+    HF_TOKEN: str = ""
+    HF_DATASET_REPO: str = ""
+    HF_MODEL_REPO: str = ""
+    PROD: bool = False
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
