@@ -15,6 +15,11 @@ from app.routes.report import router as report_router
 
 from app.core.config import settings
 import uvicorn
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Web-Based Smart Streetlight Automation and Predictive Maintenance System",
@@ -56,6 +61,22 @@ def root():
 @app.get("/health")
 def health():
     return {"message": "OK"}
+    
+@app.on_event("startup")
+def startup_event():
+    logger.info("Starting Web-Based Smart Streetlight Automation and Predictive Maintenance System...")
+    if settings.ENABLE_ML:
+        logger.info("ML features are ENABLED.")
+        try:
+            from app.services.ml_prediction import MLPredictionService
+            # Pre-load models at startup
+            ml_service = MLPredictionService()
+            logger.info(f"Active Models: Random Forest (V{ml_service.rf_version}), LSTM (V{ml_service.lstm_version})")
+            logger.info("ML Predictive models initialized successfully.")
+        except Exception as e:
+            logger.error(f"Failed to initialize ML models at startup: {e}")
+    else:
+        logger.info("ML features are DISABLED.")
 
 if __name__ == "__main__":
     uvicorn.run(
