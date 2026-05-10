@@ -134,17 +134,28 @@ The system follows a client–server architecture with a layered design:
 
 ## 9. DevOps and Deployment Stack
 
-### 9.1 Containerization
+### 9.1 Source Control & CI/CD
 
-- **Docker**
-- **Docker Compose**
+- **GitHub:** Source code management, version control, and CI/CD pipelines (via GitHub Actions).
 
-### 9.2 Deployment Environment
+### 9.2 Containerization
 
-- Cloud Server (AWS / GCP / Azure)
-- On-Premise LGU Server (optional)
+- **Docker:** Containerization of the backend API and ML environment.
+- **Docker Compose:** Local development orchestration.
 
-### 9.3 Web Server
+### 9.3 Client Deployment
+
+- **Vercel:** Hosting for the Next.js frontend, providing automated CI/CD and Edge CDN delivery.
+
+### 9.4 Backend & Database Deployment
+
+- **Railway:** Hosting for the Dockerized FastAPI backend and managed PostgreSQL relational database.
+
+### 9.5 Machine Learning Storage (MLOps)
+
+- **Hugging Face:** Centralized repository for dataset storage and model registry (versioning for Random Forest and LSTM models).
+
+### 9.6 Web Server
 
 - **Nginx:** Reverse proxy
 - **Uvicorn:** ASGI server for FastAPI

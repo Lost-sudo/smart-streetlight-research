@@ -11,6 +11,7 @@ import { repairLogApi } from "./api/repairLogApi";
 import { maintenanceTaskApi } from "./api/maintenanceTaskApi";
 import { maintenanceLogApi } from "./api/maintenanceLogApi";
 import { reportApi } from "./api/reportApi";
+import { mlApi } from "./api/mlApi";
 
 
 
@@ -28,6 +29,7 @@ export const store = configureStore({
     [maintenanceTaskApi.reducerPath]: maintenanceTaskApi.reducer,
     [maintenanceLogApi.reducerPath]: maintenanceLogApi.reducer,
     [reportApi.reducerPath]: reportApi.reducer,
+    [mlApi.reducerPath]: mlApi.reducer,
 
   },
   middleware: (getDefaultMiddleware) =>
@@ -42,7 +44,8 @@ export const store = configureStore({
       repairLogApi.middleware,
       maintenanceTaskApi.middleware,
       maintenanceLogApi.middleware,
-      reportApi.middleware
+      reportApi.middleware,
+      mlApi.middleware
 
     ),
 });
