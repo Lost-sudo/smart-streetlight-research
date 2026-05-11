@@ -1,0 +1,1799 @@
+openapi: 3.0.3
+info:
+  title: Web-Based Smart Streetlight Automation and Predictive Maintenance System API
+  version: 1.0.0
+  description: |
+    API specification for the Smart Streetlight backend.
+    This document follows OpenAPI 3.0.3 and covers all current API endpoints in `server/web_server/app/routes` and `main.py`.
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+tags:
+  - name: System
+  - name: Authentication
+  - name: User
+  - name: Streetlight
+  - name: Streetlight Log
+  - name: Alert
+  - name: Predictive Alert
+  - name: Predictive Maintenance
+  - name: Maintenance Log
+  - name: Maintenance Tasks
+  - name: Repair Tasks
+  - name: Repair Logs
+  - name: Reports
+  - name: ML Management
+
+security:
+  - bearerAuth: []
+
+paths:
+  /:
+    get:
+      tags: [System]
+      summary: Root endpoint
+      security: []
+      responses:
+        '200':
+          description: Welcome message
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: API health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '200':
+          description: Registered user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login (OAuth2 password)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Authenticated; access/refresh tokens returned by server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenServiceResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      security: []
+      responses:
+        '200':
+          description: New access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout current session
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+
+  /user/:
+    get:
+      tags: [User]
+      summary: List users (admin)
+      responses:
+        '200':
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserRead'
+    post:
+      tags: [User]
+      summary: Create user (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '200':
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+
+  /user/{user_id}:
+    get:
+      tags: [User]
+      summary: Get user by ID (admin)
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+    put:
+      tags: [User]
+      summary: Update user (admin)
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+    delete:
+      tags: [User]
+      summary: Delete user (admin)
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User deleted
+
+  /user/username/{username}:
+    get:
+      tags: [User]
+      summary: Get user by username (admin)
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+
+  /streetlight/create:
+    post:
+      tags: [Streetlight]
+      summary: Create streetlight (admin/operator)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StreetlightCreate'
+      responses:
+        '200':
+          description: Created streetlight
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreetlightRead'
+
+  /streetlight/:
+    get:
+      tags: [Streetlight]
+      summary: List streetlights
+      responses:
+        '200':
+          description: Streetlight list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StreetlightRead'
+
+  /streetlight/{streetlight_id}:
+    get:
+      tags: [Streetlight]
+      summary: Get streetlight by ID
+      parameters:
+        - $ref: '#/components/parameters/StreetlightId'
+      responses:
+        '200':
+          description: Streetlight
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreetlightRead'
+    put:
+      tags: [Streetlight]
+      summary: Update streetlight (admin)
+      parameters:
+        - $ref: '#/components/parameters/StreetlightId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StreetlightUpdate'
+      responses:
+        '200':
+          description: Updated streetlight
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreetlightRead'
+    delete:
+      tags: [Streetlight]
+      summary: Delete streetlight (admin)
+      parameters:
+        - $ref: '#/components/parameters/StreetlightId'
+      responses:
+        '200':
+          description: Streetlight deleted
+
+  /streetlight_log/telemetry:
+    post:
+      tags: [Streetlight Log]
+      summary: Ingest telemetry from IoT node
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IoTNodeLogCreate'
+      responses:
+        '200':
+          description: Created log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreetlightLogRead'
+
+  /streetlight_log/:
+    get:
+      tags: [Streetlight Log]
+      summary: List streetlight logs
+      responses:
+        '200':
+          description: Logs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StreetlightLogRead'
+
+  /streetlight_log/{streetlight_log_id}:
+    get:
+      tags: [Streetlight Log]
+      summary: Get streetlight log by ID
+      parameters:
+        - in: path
+          name: streetlight_log_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Streetlight log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreetlightLogRead'
+
+  /streetlight_log/by-streetlight/{streetlight_id}:
+    get:
+      tags: [Streetlight Log]
+      summary: Get logs by streetlight ID
+      parameters:
+        - $ref: '#/components/parameters/StreetlightId'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        '200':
+          description: Logs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StreetlightLogRead'
+
+  /alert/:
+    post:
+      tags: [Alert]
+      summary: Create alert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertCreate'
+      responses:
+        '200':
+          description: Created alert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRead'
+    get:
+      tags: [Alert]
+      summary: List alerts
+      parameters:
+        - in: query
+          name: alert_type
+          schema:
+            type: string
+          description: Filter by alert type (FAULT or PREDICTIVE)
+      responses:
+        '200':
+          description: Alert list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertRead'
+
+  /alert/{alert_id}:
+    get:
+      tags: [Alert]
+      summary: Get alert by ID
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Alert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRead'
+    patch:
+      tags: [Alert]
+      summary: Update alert
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertUpdate'
+      responses:
+        '200':
+          description: Updated alert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRead'
+    delete:
+      tags: [Alert]
+      summary: Delete alert
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Alert deleted
+
+  /predictive-alert/:
+    post:
+      tags: [Predictive Alert]
+      summary: Create predictive alert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictiveAlertCreate'
+      responses:
+        '200':
+          description: Created predictive alert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictiveAlertRead'
+    get:
+      tags: [Predictive Alert]
+      summary: List predictive alerts
+      parameters:
+        - in: query
+          name: skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+      responses:
+        '200':
+          description: Predictive alert list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PredictiveAlertRead'
+
+  /predictive-alert/{alert_id}:
+    get:
+      tags: [Predictive Alert]
+      summary: Get predictive alert by ID
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Predictive alert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictiveAlertRead'
+
+  /predictive-alert/{alert_id}/resolve:
+    patch:
+      tags: [Predictive Alert]
+      summary: Resolve predictive alert
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Resolved predictive alert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictiveAlertRead'
+
+  /predictive-maintenance/analyze-all:
+    post:
+      tags: [Predictive Maintenance]
+      summary: Analyze all nodes
+      responses:
+        '200':
+          description: Analysis completed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /predictive-maintenance/:
+    post:
+      tags: [Predictive Maintenance]
+      summary: Create predictive maintenance log
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictiveMaintenanceCreate'
+      responses:
+        '200':
+          description: Created predictive maintenance log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictiveMaintenanceRead'
+    get:
+      tags: [Predictive Maintenance]
+      summary: List predictive maintenance logs
+      responses:
+        '200':
+          description: Predictive maintenance list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PredictiveMaintenanceRead'
+
+  /predictive-maintenance/{log_id}:
+    get:
+      tags: [Predictive Maintenance]
+      summary: Get predictive maintenance log by ID
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        '200':
+          description: Predictive maintenance log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictiveMaintenanceRead'
+    patch:
+      tags: [Predictive Maintenance]
+      summary: Update predictive maintenance log
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictiveMaintenanceUpdate'
+      responses:
+        '200':
+          description: Updated predictive maintenance log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictiveMaintenanceRead'
+    delete:
+      tags: [Predictive Maintenance]
+      summary: Delete predictive maintenance log
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        '200':
+          description: Predictive maintenance log deleted
+
+  /maintenance/:
+    post:
+      tags: [Maintenance Log]
+      summary: Create maintenance log
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceLogCreate'
+      responses:
+        '200':
+          description: Created maintenance log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceLogRead'
+    get:
+      tags: [Maintenance Log]
+      summary: List maintenance logs
+      responses:
+        '200':
+          description: Maintenance logs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaintenanceLogRead'
+
+  /maintenance/{log_id}:
+    get:
+      tags: [Maintenance Log]
+      summary: Get maintenance log by ID
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        '200':
+          description: Maintenance log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceLogRead'
+    patch:
+      tags: [Maintenance Log]
+      summary: Update maintenance log
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceLogUpdate'
+      responses:
+        '200':
+          description: Updated maintenance log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceLogRead'
+    delete:
+      tags: [Maintenance Log]
+      summary: Delete maintenance log
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        '200':
+          description: Maintenance log deleted
+
+  /maintenance-tasks/:
+    post:
+      tags: [Maintenance Tasks]
+      summary: Create maintenance task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceTaskCreate'
+      responses:
+        '200':
+          description: Created maintenance task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceTaskRead'
+    get:
+      tags: [Maintenance Tasks]
+      summary: List maintenance tasks
+      responses:
+        '200':
+          description: Maintenance tasks list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaintenanceTaskRead'
+
+  /maintenance-tasks/active:
+    get:
+      tags: [Maintenance Tasks]
+      summary: List active maintenance tasks
+      responses:
+        '200':
+          description: Active maintenance tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaintenanceTaskRead'
+
+  /maintenance-tasks/my-tasks:
+    get:
+      tags: [Maintenance Tasks]
+      summary: List tasks assigned to current technician
+      responses:
+        '200':
+          description: My maintenance tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaintenanceTaskRead'
+
+  /maintenance-tasks/{task_id}:
+    get:
+      tags: [Maintenance Tasks]
+      summary: Get maintenance task by ID
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Maintenance task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceTaskRead'
+    delete:
+      tags: [Maintenance Tasks]
+      summary: Delete maintenance task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Maintenance task deleted
+
+  /maintenance-tasks/{task_id}/assign:
+    post:
+      tags: [Maintenance Tasks]
+      summary: Assign technician to maintenance task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceTaskAssign'
+      responses:
+        '200':
+          description: Updated maintenance task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceTaskRead'
+
+  /maintenance-tasks/{task_id}/status:
+    patch:
+      tags: [Maintenance Tasks]
+      summary: Update maintenance task status
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - in: query
+          name: status_update
+          required: true
+          schema:
+            type: string
+            enum: [pending, assigned, in_progress, completed]
+      responses:
+        '200':
+          description: Updated maintenance task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceTaskRead'
+
+  /maintenance-tasks/{task_id}/complete:
+    post:
+      tags: [Maintenance Tasks]
+      summary: Complete maintenance task and create maintenance log
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceTaskComplete'
+      responses:
+        '200':
+          description: Completed maintenance task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceTaskRead'
+
+  /repair-tasks/:
+    post:
+      tags: [Repair Tasks]
+      summary: Create repair task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepairTaskCreate'
+      responses:
+        '200':
+          description: Created repair task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepairTaskRead'
+    get:
+      tags: [Repair Tasks]
+      summary: List repair tasks
+      responses:
+        '200':
+          description: Repair task list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RepairTaskRead'
+
+  /repair-tasks/schedule:
+    post:
+      tags: [Repair Tasks]
+      summary: Schedule predictive repair task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepairTaskSchedule'
+      responses:
+        '200':
+          description: Scheduled repair task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepairTaskRead'
+
+  /repair-tasks/active:
+    get:
+      tags: [Repair Tasks]
+      summary: List active repair tasks
+      responses:
+        '200':
+          description: Active repair tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RepairTaskRead'
+
+  /repair-tasks/{task_id}/assign:
+    post:
+      tags: [Repair Tasks]
+      summary: Assign repair task to technician
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepairTaskAssign'
+      responses:
+        '200':
+          description: Updated repair task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepairTaskRead'
+
+  /repair-tasks/technicians/available:
+    get:
+      tags: [Repair Tasks]
+      summary: List available technicians
+      responses:
+        '200':
+          description: Technician list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TechnicianRead'
+
+  /repair-tasks/technicians/{technician_id}/availability:
+    patch:
+      tags: [Repair Tasks]
+      summary: Update technician availability
+      parameters:
+        - in: path
+          name: technician_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TechnicianStatusUpdate'
+      responses:
+        '200':
+          description: Updated technician
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TechnicianRead'
+
+  /repair-tasks/{task_id}:
+    get:
+      tags: [Repair Tasks]
+      summary: Get repair task by ID
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Repair task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepairTaskRead'
+    delete:
+      tags: [Repair Tasks]
+      summary: Delete repair task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Repair task deleted
+
+  /repair-tasks/stats/resolved-today:
+    get:
+      tags: [Repair Tasks]
+      summary: Count of tasks resolved today
+      responses:
+        '200':
+          description: Integer count
+          content:
+            application/json:
+              schema:
+                type: integer
+
+  /repair-tasks/unassigned:
+    get:
+      tags: [Repair Tasks]
+      summary: List unassigned repair tasks
+      responses:
+        '200':
+          description: Unassigned tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RepairTaskRead'
+
+  /repair-tasks/{task_id}/claim:
+    post:
+      tags: [Repair Tasks]
+      summary: Self-claim repair task (technician)
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Claimed repair task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepairTaskRead'
+
+  /repair-tasks/{task_id}/status:
+    patch:
+      tags: [Repair Tasks]
+      summary: Update repair task status
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepairTaskUpdateStatus'
+      responses:
+        '200':
+          description: Updated repair task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepairTaskRead'
+
+  /repair-tasks/my-tasks:
+    get:
+      tags: [Repair Tasks]
+      summary: List repair tasks assigned to current technician
+      responses:
+        '200':
+          description: My repair tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RepairTaskRead'
+
+  /repair-tasks/by-type/{source_type}:
+    get:
+      tags: [Repair Tasks]
+      summary: List repair tasks by source type
+      parameters:
+        - in: path
+          name: source_type
+          required: true
+          schema:
+            type: string
+            enum: [FAULT, PREDICTIVE]
+      responses:
+        '200':
+          description: Filtered repair task list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RepairTaskRead'
+
+  /repair-logs/:
+    post:
+      tags: [Repair Logs]
+      summary: Create repair log
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepairLogCreate'
+      responses:
+        '200':
+          description: Created repair log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepairLogRead'
+    get:
+      tags: [Repair Logs]
+      summary: List repair logs
+      responses:
+        '200':
+          description: Repair logs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RepairLogRead'
+
+  /repair-logs/by-task/{repair_task_id}:
+    get:
+      tags: [Repair Logs]
+      summary: Get repair log by repair task
+      parameters:
+        - in: path
+          name: repair_task_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Repair log or null
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RepairLogRead'
+                  - type: 'null'
+
+  /repair-logs/by-streetlight/{streetlight_id}:
+    get:
+      tags: [Repair Logs]
+      summary: List repair logs by streetlight
+      parameters:
+        - $ref: '#/components/parameters/StreetlightId'
+      responses:
+        '200':
+          description: Repair logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RepairLogRead'
+
+  /repair-logs/my-logs:
+    get:
+      tags: [Repair Logs]
+      summary: List current technician repair logs
+      responses:
+        '200':
+          description: Repair logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RepairLogRead'
+
+  /repair-logs/{log_id}:
+    get:
+      tags: [Repair Logs]
+      summary: Get repair log by ID
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        '200':
+          description: Repair log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepairLogRead'
+    patch:
+      tags: [Repair Logs]
+      summary: Update repair log
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepairLogUpdate'
+      responses:
+        '200':
+          description: Updated repair log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepairLogRead'
+    delete:
+      tags: [Repair Logs]
+      summary: Delete repair log
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        '200':
+          description: Repair log deleted
+
+  /reports/system-metrics:
+    get:
+      tags: [Reports]
+      summary: Get system metrics report
+      parameters:
+        - in: query
+          name: month
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+        - in: query
+          name: year
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Report data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+
+  /ml/versions:
+    get:
+      tags: [ML Management]
+      summary: Get ML model versions
+      responses:
+        '200':
+          description: Model versions
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /ml/data-stats:
+    get:
+      tags: [ML Management]
+      summary: Get data stats
+      responses:
+        '200':
+          description: Data statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /ml/datasets:
+    get:
+      tags: [ML Management]
+      summary: Get dataset versions
+      responses:
+        '200':
+          description: Dataset versions
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /ml/datasets/download:
+    get:
+      tags: [ML Management]
+      summary: Download dataset file
+      parameters:
+        - in: query
+          name: file_name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dataset download response
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /ml/status:
+    get:
+      tags: [ML Management]
+      summary: Get ML training status
+      responses:
+        '200':
+          description: ML status
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /ml/export:
+    get:
+      tags: [ML Management]
+      summary: Export ML data
+      parameters:
+        - in: query
+          name: format
+          schema:
+            type: string
+            default: csv
+      responses:
+        '200':
+          description: Export response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /ml/retrain:
+    post:
+      tags: [ML Management]
+      summary: Trigger retraining
+      responses:
+        '200':
+          description: Retraining trigger response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserId:
+      in: path
+      name: user_id
+      required: true
+      schema:
+        type: integer
+    StreetlightId:
+      in: path
+      name: streetlight_id
+      required: true
+      schema:
+        type: integer
+    AlertId:
+      in: path
+      name: alert_id
+      required: true
+      schema:
+        type: integer
+    LogId:
+      in: path
+      name: log_id
+      required: true
+      schema:
+        type: integer
+    TaskId:
+      in: path
+      name: task_id
+      required: true
+      schema:
+        type: integer
+
+  schemas:
+    UserRole:
+      type: string
+      enum: [admin, operator, technician, viewer]
+
+    UserCreate:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+
+    UserRead:
+      type: object
+      required: [id, username, role, is_active]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_active:
+          type: boolean
+
+    UserUpdate:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_active:
+          type: boolean
+
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, user]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+        user:
+          $ref: '#/components/schemas/UserRead'
+
+    TokenServiceResponse:
+      type: object
+      required: [access_token, refresh_token, token_type, user]
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+        user:
+          $ref: '#/components/schemas/UserRead'
+
+    StreetlightCreate:
+      type: object
+      required: [name, latitude, longitude, status, is_on]
+      properties:
+        name: { type: string }
+        device_id: { type: string, nullable: true }
+        latitude: { type: number }
+        longitude: { type: number }
+        model_info: { type: string, nullable: true }
+        installation_date: { type: string, format: date-time, nullable: true }
+        status: { type: string }
+        is_on: { type: boolean }
+
+    StreetlightUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        device_id: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        model_info: { type: string }
+        installation_date: { type: string, format: date-time }
+        status: { type: string }
+        is_on: { type: boolean }
+
+    StreetlightRead:
+      type: object
+      required: [id, name, latitude, longitude, status, is_on, created_at, has_telemetry]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        device_id: { type: string, nullable: true }
+        latitude: { type: number }
+        longitude: { type: number }
+        model_info: { type: string, nullable: true }
+        installation_date: { type: string, format: date-time, nullable: true }
+        status: { type: string }
+        is_on: { type: boolean }
+        created_at: { type: string, format: date-time }
+        has_telemetry: { type: boolean }
+
+    IoTNodeLogCreate:
+      type: object
+      required: [device_id, voltage, current, power_consumption, light_intensity, timestamp]
+      properties:
+        device_id: { type: string }
+        voltage: { type: number }
+        current: { type: number }
+        power_consumption: { type: number }
+        light_intensity: { type: number }
+        pwm: { type: number, nullable: true }
+        timestamp: { type: string, format: date-time }
+        operating_hours: { type: number, nullable: true }
+        voltage_fluctuation: { type: number, nullable: true }
+        current_deviation: { type: number, nullable: true }
+        power_trend: { type: number, nullable: true }
+        fault_frequency: { type: integer, nullable: true }
+        d_voltage: { type: number, nullable: true }
+        d_current: { type: number, nullable: true }
+        d_power: { type: number, nullable: true }
+        std_voltage_5: { type: number, nullable: true }
+        std_current_5: { type: number, nullable: true }
+        fault_type: { type: string, nullable: true }
+
+    StreetlightLogRead:
+      type: object
+      required: [id, streetlight_id, voltage, current, power_consumption, light_intensity, timestamp]
+      properties:
+        id: { type: integer }
+        streetlight_id: { type: integer }
+        voltage: { type: number }
+        current: { type: number }
+        power_consumption: { type: number }
+        light_intensity: { type: number }
+        pwm: { type: number, nullable: true }
+        timestamp: { type: string, format: date-time }
+        operating_hours: { type: number, nullable: true }
+        voltage_fluctuation: { type: number, nullable: true }
+        current_deviation: { type: number, nullable: true }
+        power_trend: { type: number, nullable: true }
+        fault_frequency: { type: integer, nullable: true }
+        d_voltage: { type: number, nullable: true }
+        d_current: { type: number, nullable: true }
+        d_power: { type: number, nullable: true }
+        std_voltage_5: { type: number, nullable: true }
+        std_current_5: { type: number, nullable: true }
+        fault_type: { type: string, nullable: true }
+
+    AlertCreate:
+      type: object
+      required: [streetlight_id, type, severity, message, is_resolved, created_at]
+      properties:
+        streetlight_id: { type: integer }
+        alert_type: { type: string, default: FAULT }
+        type: { type: string }
+        severity: { type: string }
+        message: { type: string }
+        is_resolved: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    AlertRead:
+      type: object
+      required: [id, alert_type, type, severity, message, is_resolved, created_at]
+      properties:
+        id: { type: integer }
+        streetlight_id: { type: integer, nullable: true }
+        alert_type: { type: string }
+        type: { type: string }
+        severity: { type: string }
+        message: { type: string }
+        is_resolved: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    AlertUpdate:
+      type: object
+      properties:
+        is_resolved: { type: boolean }
+        severity: { type: string }
+        message: { type: string }
+
+    MaintenanceLogCreate:
+      type: object
+      required: [streetlight_id, technician_id, description, parts_replaced, scheduled_date, status]
+      properties:
+        streetlight_id: { type: integer }
+        technician_id: { type: integer }
+        description: { type: string }
+        parts_replaced: { type: string }
+        scheduled_date: { type: string, format: date-time }
+        completion_date: { type: string, format: date-time, nullable: true }
+        status: { type: string }
+
+    MaintenanceLogRead:
+      type: object
+      required: [id, streetlight_id, technician_id, description, parts_replaced, scheduled_date, status]
+      properties:
+        id: { type: integer }
+        streetlight_id: { type: integer }
+        technician_id: { type: integer }
+        description: { type: string }
+        parts_replaced: { type: string }
+        scheduled_date: { type: string, format: date-time }
+        completion_date: { type: string, format: date-time, nullable: true }
+        status: { type: string }
+
+    MaintenanceLogUpdate:
+      type: object
+      properties:
+        description: { type: string }
+        parts_replaced: { type: string }
+        scheduled_date: { type: string, format: date-time }
+        completion_date: { type: string, format: date-time }
+        status: { type: string }
+
+    PredictiveMaintenanceCreate:
+      type: object
+      required: [streetlight_id, failure_probability, predicted_failure_date, urgency_level]
+      properties:
+        streetlight_id: { type: integer }
+        failure_probability: { type: number }
+        predicted_failure_date: { type: string, format: date-time }
+        urgency_level: { type: string }
+
+    PredictiveMaintenanceRead:
+      type: object
+      required: [id, failure_probability, predicted_failure_date, urgency_level, last_updated]
+      properties:
+        id: { type: integer }
+        streetlight_id: { type: integer, nullable: true }
+        failure_probability: { type: number }
+        predicted_failure_date: { type: string, format: date-time }
+        urgency_level: { type: string }
+        last_updated: { type: string, format: date-time }
+
+    PredictiveMaintenanceUpdate:
+      type: object
+      properties:
+        failure_probability: { type: number }
+        predicted_failure_date: { type: string, format: date-time }
+        urgency_level: { type: string }
+
+    PredictiveAlertCreate:
+      type: object
+      required: [streetlight_id, urgency, message]
+      properties:
+        streetlight_id: { type: integer }
+        urgency: { type: string, enum: [low, medium, high] }
+        message: { type: string }
+        is_resolved: { type: boolean, default: false }
+
+    PredictiveAlertRead:
+      type: object
+      required: [id, streetlight_id, urgency, message, is_resolved, created_at]
+      properties:
+        id: { type: integer }
+        streetlight_id: { type: integer }
+        urgency: { type: string, enum: [low, medium, high] }
+        message: { type: string }
+        is_resolved: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    RepairTaskCreate:
+      type: object
+      required: [streetlight_id]
+      properties:
+        streetlight_id: { type: integer }
+        alert_id: { type: integer, nullable: true }
+        description: { type: string, nullable: true }
+        source_type: { type: string, enum: [FAULT, PREDICTIVE], default: FAULT }
+        priority: { type: string, enum: [critical, high, medium, low], default: high }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+
+    RepairTaskRead:
+      type: object
+      required: [id, streetlight_id, status, source_type, priority, created_at, version]
+      properties:
+        id: { type: integer }
+        streetlight_id: { type: integer }
+        alert_id: { type: integer, nullable: true }
+        technician_id: { type: integer, nullable: true }
+        assigned_by_user_id: { type: integer, nullable: true }
+        assigned_by_type: { type: string, enum: [admin, operator, self_assigned], nullable: true }
+        status: { type: string, enum: [pending, assigned, in_progress, completed] }
+        source_type: { type: string, enum: [FAULT, PREDICTIVE] }
+        priority: { type: string, enum: [critical, high, medium, low] }
+        description: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        assigned_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+        version: { type: integer }
+
+    RepairTaskSchedule:
+      type: object
+      required: [streetlight_id]
+      properties:
+        streetlight_id: { type: integer }
+        alert_id: { type: integer, nullable: true }
+        description: { type: string, nullable: true }
+        priority: { type: string, enum: [critical, high, medium, low], default: medium }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+
+    RepairTaskAssign:
+      type: object
+      required: [technician_id]
+      properties:
+        technician_id: { type: integer }
+
+    RepairTaskUpdateStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [pending, assigned, in_progress, completed] }
+        description: { type: string, nullable: true }
+
+    TechnicianStatusUpdate:
+      type: object
+      required: [availability]
+      properties:
+        availability: { type: string, enum: [available, busy, offline] }
+
+    TechnicianRead:
+      type: object
+      required: [id, username]
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        availability: { type: string, enum: [available, busy, offline], nullable: true }
+
+    RepairLogCreate:
+      type: object
+      required: [repair_task_id]
+      properties:
+        repair_task_id: { type: integer }
+        diagnosis: { type: string, nullable: true }
+        action_taken: { type: string, nullable: true }
+        parts_replaced: { type: string, nullable: true }
+        repair_duration_minutes: { type: number, nullable: true }
+        notes: { type: string, nullable: true }
+
+    RepairLogRead:
+      type: object
+      required: [id, repair_task_id, streetlight_id, technician_id, created_at]
+      properties:
+        id: { type: integer }
+        repair_task_id: { type: integer }
+        streetlight_id: { type: integer }
+        technician_id: { type: integer }
+        diagnosis: { type: string, nullable: true }
+        action_taken: { type: string, nullable: true }
+        parts_replaced: { type: string, nullable: true }
+        repair_duration_minutes: { type: number, nullable: true }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    RepairLogUpdate:
+      type: object
+      properties:
+        diagnosis: { type: string }
+        action_taken: { type: string }
+        parts_replaced: { type: string }
+        repair_duration_minutes: { type: number }
+        notes: { type: string }
+
+    MaintenanceTaskCreate:
+      type: object
+      required: [streetlight_id]
+      properties:
+        streetlight_id: { type: integer }
+        predictive_alert_id: { type: integer, nullable: true }
+        description: { type: string, nullable: true }
+        priority: { type: string, enum: [critical, high, medium, low], default: medium }
+        scheduled_date: { type: string, format: date-time, nullable: true }
+
+    MaintenanceTaskRead:
+      type: object
+      required: [id, streetlight_id, status, priority, created_at]
+      properties:
+        id: { type: integer }
+        predictive_alert_id: { type: integer, nullable: true }
+        streetlight_id: { type: integer }
+        technician_id: { type: integer, nullable: true }
+        status: { type: string, enum: [pending, assigned, in_progress, completed] }
+        priority: { type: string, enum: [critical, high, medium, low] }
+        description: { type: string, nullable: true }
+        scheduled_date: { type: string, format: date-time, nullable: true }
+        assigned_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    MaintenanceTaskAssign:
+      type: object
+      required: [technician_id]
+      properties:
+        technician_id: { type: integer }
+        scheduled_date: { type: string, format: date-time, nullable: true }
+
+    MaintenanceTaskComplete:
+      type: object
+      properties:
+        description: { type: string, nullable: true }
+        parts_replaced: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    EnergyData:
+      type: object
+      required: [month, consumption]
+      properties:
+        month: { type: string }
+        consumption: { type: number }
+
+    FaultFrequency:
+      type: object
+      required: [name, value]
+      properties:
+        name: { type: string }
+        value: { type: integer }
+
+    SystemMetrics:
+      type: object
+      required: [energy_consumption, energy_savings, uptime_percentage, uptime_status, mttr, mttr_target, reporting_period, reporting_filter]
+      properties:
+        energy_consumption: { type: string }
+        energy_savings: { type: string }
+        uptime_percentage: { type: string }
+        uptime_status: { type: string }
+        mttr: { type: string }
+        mttr_target: { type: string }
+        reporting_period: { type: string }
+        reporting_filter: { type: string }
+
+    MaintenancePerformance:
+      type: object
+      required: [response_time_compliance, pm_completion, status]
+      properties:
+        response_time_compliance: { type: integer }
+        pm_completion: { type: integer }
+        status: { type: string }
+
+    ReportResponse:
+      type: object
+      required: [energy_data, fault_frequency_data, metrics, maintenance_performance]
+      properties:
+        energy_data:
+          type: array
+          items: { $ref: '#/components/schemas/EnergyData' }
+        fault_frequency_data:
+          type: array
+          items: { $ref: '#/components/schemas/FaultFrequency' }
+        metrics:
+          $ref: '#/components/schemas/SystemMetrics'
+        maintenance_performance:
+          $ref: '#/components/schemas/MaintenancePerformance'

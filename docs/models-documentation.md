@@ -1,62 +1,59 @@
 # System Models Documentation
 
-This document outlines the data models required for the Web-Based Smart Streetlight Automation and Predictive Maintenance System. These models are designed to support user management, streetlight monitoring, fault detection, and machine learning-based predictive maintenance.
+This document defines all current system models for the Web-Based Smart Streetlight Automation and Predictive Maintenance System, including:
 
-> [!NOTE]
-> This documentation currently focuses on the Backend/Web Server models. The IoT hardware component implementation is not included in this document as it is currently pending.
+- Backend data models (database entities)
+- IoT data exchange models (telemetry and control payloads)
+- Machine learning models defined in project documents
 
-## 1. Authentication and User Management
+## 1. Backend Data Models
 
 ### 1.1 User Model
 
-Stores information about the system users and their roles for Role-Based Access Control (RBAC).
+Stores account and role information for RBAC.
 
-| Field             | Type     | Description                                            |
-| :---------------- | :------- | :----------------------------------------------------- |
-| `id`              | Integer  | Primary Key                                            |
-| `username`        | String   | Unique username for login                              |
-| `hashed_password` | String   | Encrypted password                                     |
-| `role`            | Enum     | User role: `admin`, `operator`, `technician`, `viewer` |
-| `is_active`       | Boolean  | Whether the account is active                          |
-| `created_at`      | DateTime | Account creation timestamp                             |
-| `updated_at`      | DateTime | Last update timestamp                                  |
+| Field             | Type     | Description                                             |
+| :---------------- | :------- | :------------------------------------------------------ |
+| `id`              | Integer  | Primary key                                             |
+| `username`        | String   | Unique login username                                   |
+| `hashed_password` | String   | Encrypted password hash                                 |
+| `role`            | Enum     | `admin`, `operator`, `technician`, `viewer`            |
+| `is_active`       | Boolean  | Account status                                          |
+| `created_at`      | DateTime | Creation timestamp                                      |
+| `updated_at`      | DateTime | Last update timestamp                                   |
 
 **Relationships:**
 
 - One-to-Many with `RefreshToken`
-- One-to-Many with `MaintenanceLog` (as the technician)
+- One-to-Many with `MaintenanceLog` (as technician)
 
 ### 1.2 RefreshToken Model
 
-Used for managing secure user sessions and JWT refresh logic.
+Handles secure session continuation.
 
 | Field        | Type     | Description                        |
 | :----------- | :------- | :--------------------------------- |
-| `id`         | Integer  | Primary Key                        |
-| `token`      | String   | The refresh token string           |
-| `user_id`    | Integer  | Foreign Key to `User`              |
-| `expires_at` | DateTime | Token expiration timestamp         |
-| `is_revoked` | Boolean  | Whether the token has been revoked |
-| `created_at` | DateTime | Token generation timestamp         |
+| `id`         | Integer  | Primary key                        |
+| `token`      | String   | Refresh token value                |
+| `user_id`    | Integer  | Foreign key to `User`              |
+| `expires_at` | DateTime | Expiration timestamp               |
+| `is_revoked` | Boolean  | Revocation status                  |
+| `created_at` | DateTime | Issued timestamp                   |
 
----
+### 1.3 Streetlight Model
 
-## 2. Streetlight Management
-
-### 2.1 Streetlight Model
-
-Stores metadata and current status of each streetlight node in the system.
+Stores node metadata and current operational state.
 
 | Field               | Type     | Description                                                   |
 | :------------------ | :------- | :------------------------------------------------------------ |
-| `id`                | Integer  | Primary Key                                                   |
-| `name`              | String   | Descriptive name (e.g., "Streetlight A-101")                  |
-| `latitude`          | Float    | GPS Latitude for map visualization                            |
-| `longitude`         | Float    | GPS Longitude for map visualization                           |
-| `model_info`        | String   | Hardware model details                                        |
-| `installation_date` | Date     | Date the streetlight was installed                            |
-| `status`            | Enum     | Current status: `active`, `inactive`, `faulty`, `maintenance` |
-| `is_on`             | Boolean  | Real-time state (ON/OFF)                                      |
+| `id`                | Integer  | Primary key                                                   |
+| `name`              | String   | Node name (example: `Streetlight A-101`)                     |
+| `latitude`          | Float    | Geo latitude                                                  |
+| `longitude`         | Float    | Geo longitude                                                 |
+| `model_info`        | String   | Hardware profile (ESP32 + sensor details)                    |
+| `installation_date` | Date     | Installation date                                             |
+| `status`            | Enum     | `active`, `inactive`, `faulty`, `maintenance`                |
+| `is_on`             | Boolean  | Lamp state (relay ON/OFF)                                    |
 | `created_at`        | DateTime | Record creation timestamp                                     |
 
 **Relationships:**
@@ -66,73 +63,129 @@ Stores metadata and current status of each streetlight node in the system.
 - One-to-Many with `Alert`
 - One-to-One with `PredictiveMaintenance`
 
-### 2.2 StreetlightLog Model
+### 1.4 StreetlightLog Model
 
-Stores historical sensor data and power usage readings for monitoring and ML training.
+Stores historical telemetry readings.
 
-| Field               | Type     | Description                  |
-| :------------------ | :------- | :--------------------------- |
-| `id`                | Integer  | Primary Key                  |
-| `streetlight_id`    | Integer  | Foreign Key to `Streetlight` |
-| `voltage`           | Float    | Measured voltage (V)         |
-| `current`           | Float    | Measured current (A)         |
-| `power_consumption` | Float    | Calculated power (W)         |
-| `light_intensity`   | Float    | Ambient light level from LDR |
-| `timestamp`         | DateTime | Time of measurement          |
+| Field               | Type     | Description                                  |
+| :------------------ | :------- | :------------------------------------------- |
+| `id`                | Integer  | Primary key                                  |
+| `streetlight_id`    | Integer  | Foreign key to `Streetlight`                 |
+| `voltage`           | Float    | Voltage reading in volts                     |
+| `current`           | Float    | Current reading in amperes                   |
+| `power_consumption` | Float    | Computed power in watts                      |
+| `light_intensity`   | Float    | LDR/ambient light value                      |
+| `timestamp`         | DateTime | Measurement timestamp                        |
 
----
+### 1.5 Alert Model
 
-## 3. Maintenance and Alerts
+Stores fault, threshold, and prediction-based alerts.
 
-### 3.1 Alert Model
-
-Stores system-generated alerts for faults or predicted failures.
-
-| Field            | Type     | Description                                                      |
-| :--------------- | :------- | :--------------------------------------------------------------- |
-| `id`             | Integer  | Primary Key                                                      |
-| `streetlight_id` | Integer  | Foreign Key to `Streetlight`                                     |
-| `type`           | String   | Alert type (e.g., "Burnout", "Overvoltage", "Predicted Failure") |
+| Field            | Type     | Description                                                       |
+| :--------------- | :------- | :---------------------------------------------------------------- |
+| `id`             | Integer  | Primary key                                                       |
+| `streetlight_id` | Integer  | Foreign key to `Streetlight`                                      |
+| `type`           | String   | Example: `Overvoltage`, `Overcurrent`, `Predicted Failure`       |
 | `severity`       | Enum     | `low`, `medium`, `high`, `critical`                              |
-| `message`        | Text     | Human-readable alert description                                 |
-| `is_resolved`    | Boolean  | Whether the alert has been addressed                             |
-| `created_at`     | DateTime | Alert generation timestamp                                       |
+| `message`        | Text     | Alert message                                                     |
+| `is_resolved`    | Boolean  | Resolution status                                                 |
+| `created_at`     | DateTime | Alert creation timestamp                                          |
 
-### 3.2 MaintenanceLog Model
+### 1.6 MaintenanceLog Model
 
-Records maintenance activities performed on streetlights.
+Stores preventive/corrective maintenance actions.
 
 | Field             | Type    | Description                              |
 | :---------------- | :------ | :--------------------------------------- |
-| `id`              | Integer | Primary Key                              |
-| `streetlight_id`  | Integer | Foreign Key to `Streetlight`             |
-| `technician_id`   | Integer | Foreign Key to `User` (Role: technician) |
-| `description`     | Text    | Details of maintenance work performed    |
-| `parts_replaced`  | String  | List of components replaced              |
-| `scheduled_date`  | Date    | Date the maintenance was scheduled       |
-| `completion_date` | Date    | Date the maintenance was completed       |
+| `id`              | Integer | Primary key                              |
+| `streetlight_id`  | Integer | Foreign key to `Streetlight`             |
+| `technician_id`   | Integer | Foreign key to `User`                    |
+| `description`     | Text    | Work performed                           |
+| `parts_replaced`  | String  | Replaced components                      |
+| `scheduled_date`  | Date    | Scheduled date                           |
+| `completion_date` | Date    | Completion date                          |
 | `status`          | Enum    | `pending`, `in_progress`, `completed`    |
 
----
+### 1.7 PredictiveMaintenance Model
 
-## 4. Machine Learning Outputs
-
-### 4.1 PredictiveMaintenance Model
-
-Stores the latest results from the Machine Learning predictive model.
+Stores latest ML inference output per streetlight.
 
 | Field                    | Type     | Description                                    |
 | :----------------------- | :------- | :--------------------------------------------- |
-| `id`                     | Integer  | Primary Key                                    |
-| `streetlight_id`         | Integer  | Foreign Key to `Streetlight` (One-to-One)      |
-| `failure_probability`    | Float    | Calculated probability of failure (0.0 to 1.0) |
-| `predicted_failure_date` | Date     | Estimated date of failure                      |
+| `id`                     | Integer  | Primary key                                    |
+| `streetlight_id`         | Integer  | Foreign key to `Streetlight` (One-to-One)      |
+| `failure_probability`    | Float    | Failure risk score from `0.0` to `1.0`         |
+| `predicted_failure_date` | Date     | Estimated failure date                          |
 | `urgency_level`          | Enum     | `low`, `medium`, `high`                        |
-| `last_updated`           | DateTime | Last model inference timestamp                 |
+| `last_updated`           | DateTime | Inference timestamp                             |
 
----
+## 2. IoT Data Exchange Models
 
-## 5. Summary of Relationships
+### 2.1 TelemetryPayload Model
+
+Represents data sent by each ESP32 node to the backend API.
+
+| Field          | Type      | Required | Description                              |
+| :------------- | :-------- | :------- | :--------------------------------------- |
+| `node_id`      | String    | Yes      | Unique ESP32/node identifier             |
+| `timestamp`    | DateTime  | Yes      | Device sample time                       |
+| `light_level`  | Float     | Yes      | LDR reading                              |
+| `voltage`      | Float     | Yes      | Voltage reading                          |
+| `current`      | Float     | Yes      | Current reading                          |
+| `power`        | Float     | Yes      | Computed electrical power                |
+| `relay_state`  | Boolean   | Yes      | Current relay state                      |
+| `device_status`| String    | Yes      | `online`, `warning`, `fault`, `offline` |
+
+### 2.2 ControlCommand Model
+
+Represents commands issued from dashboard/backend to streetlight nodes.
+
+| Field        | Type     | Required | Description                               |
+| :----------- | :------- | :------- | :---------------------------------------- |
+| `command_id` | String   | Yes      | Unique command identifier                 |
+| `node_id`    | String   | Yes      | Target node ID                            |
+| `action`     | Enum     | Yes      | `relay_on`, `relay_off`                   |
+| `issued_by`  | Integer  | Yes      | User ID who initiated command             |
+| `issued_at`  | DateTime | Yes      | Command creation time                     |
+| `status`     | Enum     | Yes      | `queued`, `sent`, `acknowledged`, `failed` |
+
+### 2.3 NodeHeartbeat Model
+
+Represents periodic node health pings for online/offline tracking.
+
+| Field         | Type     | Required | Description                 |
+| :------------ | :------- | :------- | :-------------------------- |
+| `node_id`     | String   | Yes      | Node identifier             |
+| `timestamp`   | DateTime | Yes      | Last heartbeat time         |
+| `wifi_rssi`   | Integer  | No       | Wi-Fi signal strength (dBm) |
+| `firmware_ver`| String   | No       | Firmware version            |
+
+## 3. Machine Learning Models (Defined)
+
+These are the ML model types defined across the project documents.
+
+### 3.1 Random Forest Model
+
+- **Purpose:** Failure classification for streetlight condition states
+- **Library:** Scikit-learn
+- **Typical Input Features:** Voltage/current/power trends, light behavior, fault history
+- **Output:** Predicted fault class and/or failure risk score
+
+### 3.2 Support Vector Machine (SVM) Model
+
+- **Purpose:** Anomaly detection on electrical behavior patterns
+- **Library:** Scikit-learn
+- **Typical Input Features:** Normalized voltage/current/power and deviation features
+- **Output:** Normal vs anomaly flag (with confidence/proxy score)
+
+### 3.3 LSTM Model
+
+- **Purpose:** Time-series failure prediction from sequential telemetry
+- **Library:** TensorFlow or PyTorch
+- **Typical Input Features:** Ordered windows of voltage/current/power/light readings
+- **Output:** Future failure likelihood and maintenance urgency support
+
+## 4. Relationships Overview
 
 ```mermaid
 erDiagram
@@ -144,5 +197,9 @@ erDiagram
     STREETLIGHT ||--|| PREDICTIVE_MAINTENANCE : analyzed_by
 ```
 
-> [!TIP]
-> Use `STREETLIGHT_LOG` data to train the `PREDICTIVE_MAINTENANCE` models periodically. High `failure_probability` in the predictive model should automatically trigger a `high` severity `ALERT`.
+## 5. Implementation Notes
+
+- Backend entities are designed for PostgreSQL with ORM support (SQLAlchemy/Alembic).
+- IoT payload models should be validated via FastAPI schema models before persistence.
+- ML models should be versioned and tracked in the model registry used by the project workflow.
+- High `failure_probability` should auto-create or elevate related `Alert` severity.
