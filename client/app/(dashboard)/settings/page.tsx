@@ -39,26 +39,76 @@ import {
   Activity,
   Calendar
 } from "lucide-react";
+import { 
+  useGetMLVersionsQuery, 
+  useGetMLStatusQuery, 
+  useGetMLDataStatsQuery, 
+  useGetMLDatasetsQuery,
+  useTriggerRetrainingMutation 
+} from "@/lib/redux/api/mlApi";
+import { formatDistanceToNow, format } from "date-fns";
+import { toast } from "sonner";
+import { useEffect } from "react";
+
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/redux/store";
 
 export default function SettingsPage() {
-  const [training, setTraining] = useState(false);
-  const [trainingProgress, setTrainingProgress] = useState(0);
+  const { data: mlVersions, isLoading: isLoadingVersions, refetch: refetchVersions } = useGetMLVersionsQuery();
+  const { data: dataStats } = useGetMLDataStatsQuery();
+  const { data: datasets } = useGetMLDatasetsQuery();
+  const { data: mlStatus } = useGetMLStatusQuery(undefined, {
+    pollingInterval: 2000, // Poll every 2 seconds
+  });
+  const [triggerRetrain, { isLoading: isRetrainingRequest }] = useTriggerRetrainingMutation();
+  const [activeModel, setActiveModel] = useState("random-forest");
+  const accessToken = useSelector((state: RootState) => state.auth.accessToken);
 
-  const handleRetrain = () => {
-    setTraining(true);
-    setTrainingProgress(0);
-    
-    const interval = setInterval(() => {
-      setTrainingProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTraining(false);
-          return 100;
-        }
-        return prev + 5;
-      });
-    }, 200);
+  // Handle Export
+  const handleExport = (format: 'csv' | 'json') => {
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    window.open(`${baseUrl}/ml/export?format=${format}&token=${accessToken}`, '_blank');
   };
+
+  // Handle Dataset Download
+  const handleDownloadDataset = (fileName: string) => {
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    window.open(`${baseUrl}/ml/datasets/download?file_name=${fileName}&token=${accessToken}`, '_blank');
+  };
+
+  // Sync the local UI state with the real server status
+  const training = mlStatus?.is_training || false;
+  const trainingProgress = mlStatus?.progress || 0;
+  const statusMessage = mlStatus?.status_message || "Idle";
+
+  // When training finishes (goes from true to false), refresh the versions
+  useEffect(() => {
+    if (mlStatus && !mlStatus.is_training && mlStatus.progress === 100) {
+      refetchVersions();
+    }
+  }, [mlStatus?.is_training, mlStatus?.progress, refetchVersions]);
+
+  const handleRetrain = async () => {
+    try {
+      // Call actual backend trigger
+      await triggerRetrain().unwrap();
+      
+      toast.success("Retraining pipeline initiated", {
+        description: "The models are being retrained in the background using the latest telemetry data."
+      });
+    } catch (error) {
+      toast.error("Failed to initiate retraining", {
+        description: "An error occurred while communicating with the ML engine."
+      });
+    }
+  };
+
+  const currentModelData = activeModel === "random-forest" ? mlVersions?.random_forest : mlVersions?.lstm;
+  const accuracy = currentModelData?.metrics?.accuracy 
+    ? (currentModelData.metrics.accuracy * 100).toFixed(1) + "%" 
+    : currentModelData?.metrics?.mae 
+      ? "MAE: " + currentModelData.metrics.mae.toFixed(4)
+      : "N/A";
 
   return (
     <div className="flex-1 space-y-8 p-8 pt-6">
@@ -97,26 +147,36 @@ export default function SettingsPage() {
             <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Active Prediction Model</Label>
-                  <Select defaultValue="random-forest">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-sm font-semibold">Active Prediction Model</Label>
+                    {currentModelData && (
+                      <Badge variant="secondary" className="text-[10px] h-5">
+                        Version {currentModelData.version}
+                      </Badge>
+                    )}
+                  </div>
+                  <Select value={activeModel} onValueChange={setActiveModel}>
                     <SelectTrigger className="bg-muted/50 border-none h-11">
                       <SelectValue placeholder="Select model" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="random-forest">Random Forest Classifier (Production)</SelectItem>
-                      <SelectItem value="lstm">LSTM Neural Network (Experimental)</SelectItem>
-                      <SelectItem value="xgboost">XGBoost Regression</SelectItem>
+                      <SelectItem value="random-forest">Random Forest Classifier (V{mlVersions?.random_forest?.version || '?'})</SelectItem>
+                      <SelectItem value="lstm">LSTM Neural Network (V{mlVersions?.lstm?.version || '?'})</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-2xl bg-muted/30 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Model Accuracy</span>
-                    <p className="text-2xl font-bold">98.4%</p>
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Model Performance</span>
+                    <p className="text-2xl font-bold">{isLoadingVersions ? "..." : accuracy}</p>
                   </div>
                   <div className="p-4 rounded-2xl bg-muted/30 space-y-1">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Last Trained</span>
-                    <p className="text-sm font-semibold mt-2">24h ago</p>
+                    <p className="text-sm font-semibold mt-2">
+                      {currentModelData?.created_at 
+                        ? formatDistanceToNow(new Date(currentModelData.created_at)) + " ago"
+                        : "Never"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -128,7 +188,7 @@ export default function SettingsPage() {
                 <div className="space-y-2 relative z-10">
                   <h4 className="font-bold flex items-center gap-2">
                     Model Retraining
-                    {training && <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />}
+                    {(training || isRetrainingRequest) && <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />}
                   </h4>
                   <p className="text-xs text-zinc-400 leading-relaxed">
                     Triggering a retrain will process all newly collected telemetry data to refine the predictive maintenance algorithms.
@@ -139,7 +199,7 @@ export default function SettingsPage() {
                   {training && (
                     <div className="space-y-1.5">
                        <div className="flex justify-between text-[10px] font-mono text-zinc-400">
-                         <span>PROCESS_DATA_CHUNKS</span>
+                         <span className="uppercase">{statusMessage}</span>
                          <span>{trainingProgress}%</span>
                        </div>
                        <Progress value={trainingProgress} className="h-1.5 bg-zinc-800" />
@@ -147,15 +207,15 @@ export default function SettingsPage() {
                   )}
                   <Button 
                     onClick={handleRetrain} 
-                    disabled={training}
+                    disabled={training || isRetrainingRequest}
                     className="w-full bg-blue-600 hover:bg-blue-500 text-white border-none shadow-lg shadow-blue-600/20"
                   >
-                    {training ? (
+                    {training || isRetrainingRequest ? (
                       <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <Zap className="mr-2 h-4 w-4 fill-current" />
                     )}
-                    {training ? "Training Pipeline Active..." : "Initiate Retraining"}
+                    {training || isRetrainingRequest ? "Training Pipeline Active..." : "Initiate Retraining"}
                   </Button>
                 </div>
               </div>
@@ -181,28 +241,78 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl">
                  <div className="space-y-0.5">
                     <p className="text-sm font-bold">Total Telemetry Points</p>
-                    <p className="text-2xl font-black">1.2M+</p>
+                    <p className="text-2xl font-black">
+                      {dataStats?.total_points.toLocaleString() || "0"}
+                    </p>
                  </div>
                  <div className="text-right">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase">Storage Use</p>
-                    <p className="text-sm font-mono">154.2 MB</p>
+                    <p className="text-sm font-mono">{dataStats?.storage_size || "0 KB"}</p>
                  </div>
               </div>
               
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Export Options</Label>
                 <div className="grid grid-cols-2 gap-3">
-                   <Button variant="outline" className="border-none bg-muted/50 hover:bg-muted font-bold text-xs h-12">
+                   <Button 
+                    variant="outline" 
+                    onClick={() => handleExport('json')}
+                    className="border-none bg-muted/50 hover:bg-muted font-bold text-xs h-12"
+                   >
                       <Download className="mr-2 h-4 w-4" />
                       JSON
                    </Button>
-                   <Button variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 font-bold text-xs h-12 shadow-none">
+                   <Button 
+                    variant="secondary" 
+                    onClick={() => handleExport('csv')}
+                    className="bg-primary/10 text-primary hover:bg-primary/20 font-bold text-xs h-12 shadow-none"
+                   >
                       <Download className="mr-2 h-4 w-4" />
                       CSV (Excel)
                    </Button>
                 </div>
               </div>
             </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Dataset Snapshots</Label>
+                <div className="rounded-2xl border border-border/50 bg-muted/20 overflow-hidden">
+                  <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
+                    {datasets && datasets.length > 0 ? (
+                      <div className="divide-y divide-border/30">
+                        {datasets.map((ds) => (
+                          <div key={ds.id} className="p-3 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold">V{ds.version}</span>
+                                <Badge variant="outline" className="text-[9px] h-4 px-1 py-0 border-primary/20 text-primary bg-primary/5">
+                                  {ds.row_count?.toLocaleString() || "0"} rows
+                                </Badge>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground">
+                                {format(new Date(ds.created_at), 'MMM dd, yyyy HH:mm')}
+                              </p>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-muted-foreground hover:text-primary"
+                              onClick={() => handleDownloadDataset(ds.file_name)}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center space-y-2">
+                        <History className="h-8 w-8 mx-auto text-muted-foreground/30" />
+                        <p className="text-xs text-muted-foreground">No dataset snapshots recorded yet.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
             <Separator className="bg-border/50" />
             

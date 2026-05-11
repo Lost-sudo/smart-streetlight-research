@@ -104,6 +104,7 @@ class MLPredictionService:
             return
 
         self.last_update_check = now
+        from app.core.database import SessionLocal
         db = SessionLocal()
         try:
             from app.models.ml_version import MLVersion
@@ -161,8 +162,10 @@ class MLPredictionService:
             if rf_path:
                 self.rf_model = joblib.load(rf_path)
                 self.rf_version = latest_rf_v.version_number if latest_rf_v else 1
+                db_filename = latest_rf_v.file_name if latest_rf_v else "N/A"
                 source = "Hugging Face" if settings.PROD and latest_rf_v and latest_rf_v.hf_url else "Local Storage"
-                logger.info(f"Loaded RF Model V{self.rf_version} from {source}")
+                logger.info(f"Loaded RF Model V{self.rf_version} ({db_filename}) from {source}")
+                logger.info(f"RF model file path: {rf_path}")
             
             # 2. Load LSTM
             latest_lstm_v = db.query(MLVersion).filter(
@@ -190,7 +193,9 @@ class MLPredictionService:
                 if ts_path.exists(): self.lstm_target_scaler = joblib.load(ts_path)
                 
                 source = "Hugging Face" if settings.PROD and latest_lstm_v and latest_lstm_v.hf_url else "Local Storage"
-                logger.info(f"Loaded LSTM Package {v_suffix} from {source}")
+                db_filename = latest_lstm_v.file_name if latest_lstm_v else "N/A"
+                logger.info(f"Loaded LSTM Package {v_suffix} ({db_filename}) from {source}")
+                logger.info(f"LSTM model file path: {lstm_path}")
             
             db.close()
         except Exception as e:

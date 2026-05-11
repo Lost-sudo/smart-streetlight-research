@@ -144,6 +144,7 @@ def evaluate_model(
     print(f"  Weighted F1: {f1:.4f}")
     
     # --- Classification Report ---
+    labels = [0, 1, 2, 3, 4, 5, 6]
     target_names = [
         "NORMAL", 
         "VOLTAGE_FLUCTUATION", 
@@ -154,7 +155,7 @@ def evaluate_model(
         "INTERMITTENT_FAULT"
     ]
     print(f"\n  Classification Report:")
-    print(classification_report(y, y_pred, target_names=target_names))
+    print(classification_report(y, y_pred, labels=labels, target_names=target_names, zero_division=0))
     print(f"{'=' * 55}\n")
 
     return metrics
