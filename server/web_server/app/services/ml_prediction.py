@@ -20,10 +20,13 @@ RF_FEATURES = [
     "voltage", "current", "power", "ldr",
     "d_voltage", "d_current", "d_power",
     "std_current_5", "std_voltage_5",
+    # Discriminative features for multi-class fault separation
+    "abs_d_voltage", "abs_d_current",
+    "voltage_range_5", "current_range_5",
 ]
 
 # LSTM features — including 'elapsed_time' derived from timesteps
-LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time"]
+LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time", "fault_code"]
 
 FAULT_TYPE_MAP = {
     0: "NORMAL",
@@ -41,13 +44,9 @@ MODELS_DIR = SERVER_DIR / "machine_learning" / "models"
 RF_MODEL_PATH = MODELS_DIR / "random_forest_model.joblib"
 LSTM_MODEL_PATH = MODELS_DIR / "lstm_model.pt"
 LSTM_SCALER_PATH = MODELS_DIR / "lstm_scaler.joblib"
-LSTM_TARGET_SCALER_PATH = MODELS_DIR / "lstm_target_scaler.joblib"
-
-# Exponential decay scale for TTF → failure-probability conversion.
-# Dynamically calibrated from the target scaler's max range at load time.
-# Formula: scale = -max_ttf / ln(target_floor_prob)
-# This maps max TTF → ~5% probability, TTF=0 → 100%.
-DEFAULT_DECAY_SCALE = 600.0  # fallback if target scaler unavailable
+LSTM_THRESHOLD_PATH = MODELS_DIR / "lstm_threshold.joblib"
+LSTM_INFERENCE_CONFIG_PATH = MODELS_DIR / "lstm_inference_config.joblib"
+DEFAULT_LSTM_THRESHOLD = 0.65
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size: int, hidden_size: int = 64, dropout: float = 0.2):
@@ -86,8 +85,8 @@ class MLPredictionService:
         self.rf_model = None
         self.lstm_model = None
         self.lstm_scaler = None
-        self.lstm_target_scaler = None
-        self.decay_scale = DEFAULT_DECAY_SCALE
+        self.lstm_threshold = DEFAULT_LSTM_THRESHOLD
+        self.lstm_inference_config = {"horizon_hours": 24, "horizon_steps": 144}
         
         # Version tracking for Hot-Reloading
         self.rf_version = 0
@@ -184,13 +183,16 @@ class MLPredictionService:
                 
                 # Use matching versioned scalers
                 s_path = MODELS_DIR / f"lstm_scaler_{v_suffix}.joblib"
-                ts_path = MODELS_DIR / f"lstm_target_scaler_{v_suffix}.joblib"
+                ts_path = MODELS_DIR / f"lstm_threshold_{v_suffix}.joblib"
+                cfg_path = MODELS_DIR / f"lstm_inference_config_{v_suffix}.joblib"
                 
                 if not s_path.exists(): s_path = LSTM_SCALER_PATH
-                if not ts_path.exists(): ts_path = LSTM_TARGET_SCALER_PATH
+                if not ts_path.exists(): ts_path = LSTM_THRESHOLD_PATH
+                if not cfg_path.exists(): cfg_path = LSTM_INFERENCE_CONFIG_PATH
                 
                 if s_path.exists(): self.lstm_scaler = joblib.load(s_path)
-                if ts_path.exists(): self.lstm_target_scaler = joblib.load(ts_path)
+                if ts_path.exists(): self.lstm_threshold = float(joblib.load(ts_path))
+                if cfg_path.exists(): self.lstm_inference_config = joblib.load(cfg_path)
                 
                 source = "Hugging Face" if settings.PROD and latest_lstm_v and latest_lstm_v.hf_url else "Local Storage"
                 db_filename = latest_lstm_v.file_name if latest_lstm_v else "N/A"
@@ -201,22 +203,7 @@ class MLPredictionService:
         except Exception as e:
             logger.exception("Error loading ML artifacts.")
 
-        # Re-calibrate decay scale
-        if self.lstm_target_scaler is not None:
-            max_ttf = float(self.lstm_target_scaler.data_max_[0])
-            self.decay_scale = -max_ttf / math.log(0.05)
-
-        # Calibrate decay scale from the target scaler's actual data range.
-        # We want: exp(-max_ttf / scale) ≈ target_floor (e.g. 5%)
-        # So: scale = -max_ttf / ln(target_floor)
-        if self.lstm_target_scaler is not None:
-            max_ttf = float(self.lstm_target_scaler.data_max_[0])
-            target_floor = 0.05  # 5% probability at max TTF
-            self.decay_scale = -max_ttf / math.log(target_floor)
-            logger.info("Calibrated decay scale: %.1f (max_ttf=%.0f min)", self.decay_scale, max_ttf)
-        else:
-            self.decay_scale = DEFAULT_DECAY_SCALE
-            logger.warning("Using default decay scale: %.1f", self.decay_scale)
+        logger.info("LSTM threshold loaded: %.3f", self.lstm_threshold)
 
     def detect_fault(self, iot_log: IoTNodeLogCreate, historical_logs: list = None, streetlight_info: Any = None):
         """
@@ -259,6 +246,23 @@ class MLPredictionService:
                 std_voltage_5 = float(pd.Series(recent_voltages).std())
                 std_current_5 = float(pd.Series(recent_currents).std())
 
+        # --- NEW DISCRIMINATIVE FEATURES ---
+        abs_d_voltage = abs(d_voltage)
+        abs_d_current = abs(d_current)
+
+        voltage_range_5 = 0.0
+        current_range_5 = 0.0
+        if historical_logs and len(historical_logs) >= 4:
+            recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:4]] + [voltage]
+            recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:4]] + [current]
+            voltage_range_5 = max(recent_voltages) - min(recent_voltages)
+            current_range_5 = max(recent_currents) - min(recent_currents)
+        elif historical_logs and len(historical_logs) > 0:
+            recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs] + [voltage]
+            recent_currents = [float(getattr(l, "current", current)) for l in historical_logs] + [current]
+            voltage_range_5 = max(recent_voltages) - min(recent_voltages)
+            current_range_5 = max(recent_currents) - min(recent_currents)
+
         df = pd.DataFrame([{
             "voltage": voltage,
             "current": current,
@@ -270,6 +274,10 @@ class MLPredictionService:
             "d_power": d_power,
             "std_current_5": std_current_5,
             "std_voltage_5": std_voltage_5,
+            "abs_d_voltage": abs_d_voltage,
+            "abs_d_current": abs_d_current,
+            "voltage_range_5": voltage_range_5,
+            "current_range_5": current_range_5,
         }])
 
         try:
@@ -278,7 +286,12 @@ class MLPredictionService:
             
             # Get confidence (probability of the predicted class)
             probas = self.rf_model.predict_proba(df[RF_FEATURES])[0]
-            confidence = float(probas[pred_mode])
+            class_order = list(getattr(self.rf_model, "classes_", []))
+            if pred_mode in class_order:
+                pred_idx = class_order.index(pred_mode)
+                confidence = float(probas[pred_idx])
+            else:
+                confidence = float(np.max(probas))
         except Exception as e:
             logger.exception("Random Forest multi-class prediction error.")
             return None
@@ -286,14 +299,27 @@ class MLPredictionService:
         is_faulty = pred_mode > 0
         fault_name = FAULT_TYPE_MAP.get(pred_mode, "UNKNOWN_FAULT")
 
+        class_order = list(getattr(self.rf_model, "classes_", []))
+        if 0 in class_order:
+            normal_idx = class_order.index(0)
+            p_normal = float(probas[normal_idx])
+        else:
+            p_normal = 0.0
+
+        rf_urgency = self._map_urgency(1.0 - p_normal)
+
+        # Only SYSTEM_FAILURE can reach "critical" — others cap at "high" (warning)
+        if fault_name != "SYSTEM_FAILURE" and rf_urgency == "critical":
+            rf_urgency = "high"
+
         return {
             "is_faulty": is_faulty,
             "confidence": round(confidence, 4),
-            "urgency_level": self._map_urgency(1.0 - probas[0]), # Probability of ANY fault
+            "urgency_level": rf_urgency,
             "fault_type": fault_name
         }
 
-    def predict_failure(self, iot_log: IoTNodeLogCreate, historical_logs=None):
+    def predict_failure(self, iot_log: IoTNodeLogCreate, historical_logs=None, fault_context: dict | None = None):
         """
         Use LSTM to predict time-to-failure.
         """
@@ -321,17 +347,31 @@ class MLPredictionService:
                 is_on,
             )
             return None
+
+        if not fault_context or not fault_context.get("is_faulty"):
+            logger.info("LSTM skipped - healthy RF context.")
+            return None
+        fault_type = str(fault_context.get("fault_type", "UNKNOWN"))
+        if fault_type == "NORMAL":
+            logger.info("LSTM skipped - RF classified NORMAL.")
+            return None
+        logger.info("LSTM running due to RF fault trigger: %s", fault_type)
+        fault_code_map = {v: k for k, v in FAULT_TYPE_MAP.items()}
+        current_fault_code = float(fault_code_map.get(fault_type, 1))
             
         latest_history = historical_logs[-9:]
         
         sequence_data = []
         for log in latest_history:
+            hist_ft = getattr(log, "fault_type", None)
+            hist_fault_code = float(fault_code_map.get(str(hist_ft), current_fault_code))
             sequence_data.append([
                 getattr(log, "voltage", 11.0),
                 getattr(log, "current", 0.6),
                 abs(getattr(log, "power_consumption", 7.0)),
                 getattr(log, "light_intensity", 200.0),
-                float(getattr(log, "timestep", 0)) # Using timestep as elapsed_time
+                float(getattr(log, "timestep", 0)), # Using timestep as elapsed_time
+                hist_fault_code
             ])
             
         sequence_data.append([
@@ -339,7 +379,8 @@ class MLPredictionService:
             iot_log.current,
             abs(iot_log.power_consumption),
             iot_log.light_intensity,
-            float(getattr(iot_log, "timestep", 0))
+            float(getattr(iot_log, "timestep", 0)),
+            current_fault_code
         ])
         
         df = pd.DataFrame(sequence_data, columns=LSTM_FEATURES)
@@ -348,30 +389,27 @@ class MLPredictionService:
         
         with torch.no_grad():
             raw_output = self.lstm_model(input_tensor).item()
-        
-        if self.lstm_target_scaler:
-            predicted_ttf = float(self.lstm_target_scaler.inverse_transform(np.array([[raw_output]]))[0, 0])
-        else:
-            predicted_ttf = raw_output
 
-        predicted_ttf = max(predicted_ttf, 0.0)
-        
-        # Convert time-to-failure to failure probability using exponential decay.
-        # The decay scale is calibrated from the target scaler's actual range
-        # so that max TTF → ~5% and TTF=0 → 100%.
-        failure_prob = math.exp(-predicted_ttf / self.decay_scale)
-        failure_prob = min(max(failure_prob, 0.0), 1.0)
+        failure_prob = 1.0 / (1.0 + math.exp(-raw_output))
+        failure_prob = min(max(float(failure_prob), 0.0), 1.0)
         
         urgency_level = self._map_urgency(failure_prob)
+
+        # Only SYSTEM_FAILURE can reach "critical" urgency.
+        # All other fault types are capped at "high" (warning level).
+        if fault_type != "SYSTEM_FAILURE" and urgency_level == "critical":
+            logger.info(
+                "LSTM urgency capped: %s → high (fault_type=%s is not SYSTEM_FAILURE)",
+                urgency_level, fault_type,
+            )
+            urgency_level = "high"
         
-        # Estimate a human-readable failure date from the TTF.
-        # predicted_ttf is already in minutes after inverse-transform.
-        predicted_failure_date = datetime.utcnow() + timedelta(minutes=predicted_ttf)
+        horizon_hours = int(self.lstm_inference_config.get("horizon_hours", 24))
+        predicted_failure_date = datetime.utcnow() + timedelta(hours=horizon_hours)
 
         logger.info(
-            "LSTM prediction — raw=%.4f, TTF=%.1f min (%.1f hr), decay_scale=%.1f, prob=%.2f%%, urgency=%s",
-            raw_output, predicted_ttf, predicted_ttf / 60.0, self.decay_scale,
-            failure_prob * 100, urgency_level,
+            "LSTM prediction — raw=%.4f, prob=%.2f%%, threshold=%.2f, urgency=%s, rf_fault=%s",
+            raw_output, failure_prob * 100, self.lstm_threshold, urgency_level, fault_type
         )
         logger.info(
             "LSTM input sample — first=[V=%.2f,I=%.3f,P=%.2f,L=%.0f] last=[V=%.2f,I=%.3f,P=%.2f,L=%.0f]",

@@ -25,8 +25,8 @@ import pandas as pd
 # Features the LSTM will use (real IoT sensor data + derived features)
 # We now include 'elapsed_time' derived from timesteps to help the model 
 # understand where it is in the lifecycle.
-LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time"]
-LSTM_TARGET = "time_to_failure"
+LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time", "fault_code"]
+LSTM_TARGET = "imminent_failure"
 
 
 # ------------------------------------------------------------------ #
@@ -72,6 +72,9 @@ def load_lstm_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] =
     # which teaches the model to predict a "flow" of risk rather than 100% immediately.
     if "mode" in df.columns:
         df["failure_status"] = (df["mode"] == 5).astype(int)
+        df["fault_code"] = df["mode"].astype(float)
+    else:
+        df["fault_code"] = 0.0
 
     # --- Sort by device and timestep ---
     if "device_id" in df.columns and "timestep" in df.columns:
@@ -105,6 +108,9 @@ def load_lstm_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] =
             ttf_values[idx] = ttf
 
         df["time_to_failure"] = ttf_values
+
+    # Binary target for LSTM classifier is created in preprocessing where
+    # horizon-to-steps is derived from dataset cadence.
 
     # --- Assign node_id (needed for LSTM sequence grouping) ---
     # Use the device_id directly, but map to integer for compatibility

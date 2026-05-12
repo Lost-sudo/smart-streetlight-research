@@ -14,6 +14,7 @@ class RepairTaskStatusEnum(str, Enum):
 class RepairTaskSourceTypeEnum(str, Enum):
     FAULT = "FAULT"
     PREDICTIVE = "PREDICTIVE"
+    COMMUNICATION = "COMMUNICATION"
 
 
 class RepairTaskPriorityEnum(str, Enum):

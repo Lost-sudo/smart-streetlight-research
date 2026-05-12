@@ -36,11 +36,8 @@ export type LoginInput = z.infer<typeof LoginSchema>;
 export const ROLE_PERMISSIONS = {
   admin: [
     "dashboard",
-    "monitoring",
-    "analytics",
     "immediate-repairs",
     "predictive-maintenance",
-    "repair-tasks",
     "my-assigned-tasks",
     "reports",
     "users",
@@ -49,11 +46,8 @@ export const ROLE_PERMISSIONS = {
   ],
   operator: [
     "dashboard",
-    "monitoring",
-    "analytics",
     "immediate-repairs",
     "predictive-maintenance",
-    "repair-tasks",
     "my-assigned-tasks",
     "reports",
     "settings",
@@ -61,13 +55,10 @@ export const ROLE_PERMISSIONS = {
   ],
   technician: [
     "dashboard",
-    "monitoring",
     "immediate-repairs",
-    "repair-tasks",
     "my-assigned-tasks",
     "settings",
     "map",
   ],
   viewer: ["dashboard", "reports", "map"],
 } as const;
-

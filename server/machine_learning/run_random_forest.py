@@ -67,7 +67,7 @@ def main(csv_path: str = None):
     # Step 4: Build and train Random Forest                       #
     # ---------------------------------------------------------- #
     print("\n[Step 4] Building Random Forest model...")
-    model = build_model(n_estimators=100, max_depth=15)
+    model = build_model(n_estimators=200, max_depth=25)
 
     print("\n[Step 4b] Training Random Forest model...")
     model = train_model(model, X_train, y_train)

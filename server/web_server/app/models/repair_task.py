@@ -8,6 +8,7 @@ from enum import Enum as PyEnum
 class RepairTaskSourceType(str, PyEnum):
     FAULT = "FAULT"
     PREDICTIVE = "PREDICTIVE"
+    COMMUNICATION = "COMMUNICATION"
 
 class RepairTaskPriority(str, PyEnum):
     critical = "critical"
