@@ -79,8 +79,8 @@ def split_data(
 # ------------------------------------------------------------------ #
 
 def build_model(
-    n_estimators: int = 100,
-    max_depth: int = 15,
+    n_estimators: int = 200,
+    max_depth: int = 25,
     random_state: int = 42,
 ) -> RandomForestClassifier:
     """Builds a Random Forest classifier for fault detection."""
@@ -89,6 +89,7 @@ def build_model(
         max_depth=max_depth,
         random_state=random_state,
         class_weight="balanced",  # Handle imbalanced classes
+        min_samples_leaf=2,       # Reduce overfitting on majority class
         n_jobs=-1,
     )
     print(f"[build] Random Forest: n_estimators={n_estimators}, max_depth={max_depth}")

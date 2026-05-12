@@ -16,7 +16,6 @@ export function RouteProtected({ children }: { children: React.ReactNode }) {
     if (isLoading || !user) return null;
 
     // Role-based path authorization
-    // Extract first segment: /monitoring -> monitoring, / -> dashboard
     const segment = pathname === "/" ? "dashboard" : pathname.split("/")[1];
     
     // Type-safe lookup for roles

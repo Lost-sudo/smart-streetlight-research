@@ -35,7 +35,14 @@ def main():
     print("\n" + "#" * 60)
     print("#  All Models Trained Successfully!")
     print("#" * 60)
-    print(f"  LSTM  - Test MAE: {lstm_metrics['mae']:.4f}, R2: {lstm_metrics['r2']:.4f}")
+    print(
+        "  LSTM  - Test PR-AUC: "
+        f"{lstm_metrics.get('pr_auc', 0.0):.4f}, "
+        f"ROC-AUC: {lstm_metrics.get('roc_auc', 0.0):.4f}, "
+        f"F1: {lstm_metrics.get('f1', 0.0):.4f}, "
+        f"Recall: {lstm_metrics.get('recall', 0.0):.4f}, "
+        f"Threshold: {lstm_metrics.get('threshold', 0.0):.2f}"
+    )
     print(f"  RF    - Test Accuracy: {rf_metrics['accuracy']*100:.2f}%, F1: {rf_metrics['f1']:.4f}")
     print("#" * 60)
 

@@ -1,16 +1,15 @@
 """
 lstm_preprocess.py
 ==================
-Preprocessing pipeline for the LSTM Time-to-Failure Prediction model.
+Preprocessing pipeline for the LSTM imminent-failure classifier.
 
 Handles:
   - MinMaxScaler normalization for features (standard for neural networks)
-  - MinMaxScaler normalization for target (prevents loss-scale mismatch)
   - Sliding-window sequence creation for LSTM input
   - Scaler persistence for inference-time reuse
 
 The LSTM expects input shaped as (samples, timesteps, features).
-Target: time_to_failure (regression - how many timesteps until failure)
+Target: imminent_failure (binary classification)
 """
 
 import os
@@ -19,7 +18,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 
-from lstm_data import LSTM_FEATURES, LSTM_TARGET
+from lstm_data import LSTM_FEATURES
 
 # Directory where fitted artifacts are saved
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
@@ -73,53 +72,28 @@ def scale_features(
     return scaled, scaler
 
 
-def scale_target(
-    y: np.ndarray,
-    fit: bool = True,
-    scaler_filename: str = "lstm_target_scaler.joblib",
-) -> tuple:
-    """
-    Applies MinMaxScaler to the time_to_failure target.
+def derive_horizon_steps(df: pd.DataFrame, horizon_hours: int = 24) -> int:
+    """Derive horizon steps from median timestep delta in the dataset."""
+    if "device_id" not in df.columns or "timestep" not in df.columns:
+        return max(1, horizon_hours * 6)
+    deltas = (
+        df.sort_values(["device_id", "timestep"])
+        .groupby("device_id")["timestep"]
+        .diff()
+        .dropna()
+    )
+    median_delta = float(deltas.median()) if len(deltas) else 10.0
+    if median_delta <= 0:
+        median_delta = 10.0
+    horizon_minutes = horizon_hours * 60.0
+    return max(1, int(round(horizon_minutes / median_delta)))
 
-    Normalizing the target to [0, 1] prevents loss-scale mismatch:
-    raw counts (0–1732) against MinMax-scaled [0,1] features would cause
-    the MSE loss to be dominated by the large target range, destabilizing
-    gradient updates.
 
-    Parameters
-    ----------
-    y : np.ndarray
-        1D array of raw time_to_failure values.
-    fit : bool
-        If True, fits a new scaler and saves it. If False, loads existing.
-    scaler_filename : str
-        Filename for the target scaler artifact.
-
-    Returns
-    -------
-    tuple of (scaled_y, scaler)
-        - scaled_y: np.ndarray of shape (n_samples,) in [0, 1]
-        - scaler: the fitted MinMaxScaler instance
-    """
-    scaler_path = os.path.join(MODELS_DIR, scaler_filename)
-
-    if fit:
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        scaled = scaler.fit_transform(y.reshape(-1, 1)).ravel()
-        os.makedirs(MODELS_DIR, exist_ok=True)
-        joblib.dump(scaler, scaler_path)
-        print(f"[lstm_preprocess] Target scaler fitted and saved to {scaler_path}")
-        print(f"[lstm_preprocess] Target range mapped: [{y.min():.1f}, {y.max():.1f}] -> [0.0, 1.0]")
-    else:
-        if not os.path.exists(scaler_path):
-            raise FileNotFoundError(
-                f"Target scaler not found at {scaler_path}. Train the LSTM first."
-            )
-        scaler = joblib.load(scaler_path)
-        scaled = scaler.transform(y.reshape(-1, 1)).ravel()
-        print(f"[lstm_preprocess] Target scaler loaded from {scaler_path}")
-
-    return scaled, scaler
+def build_imminent_failure_target(df: pd.DataFrame, horizon_steps: int) -> np.ndarray:
+    """Build binary label: 1 if system failure occurs within horizon."""
+    if "time_to_failure" not in df.columns:
+        raise ValueError("time_to_failure is required to derive imminent failure target.")
+    return (df["time_to_failure"].values <= float(horizon_steps)).astype(np.float32)
 
 
 # ------------------------------------------------------------------ #
@@ -169,12 +143,14 @@ def create_sequences(
 def preprocess_pipeline(
     df: pd.DataFrame,
     lookback: int = 10,
+    horizon_hours: int = 24,
+    fault_only: bool = True,
     fit: bool = True,
 ) -> tuple:
     """
     Runs the full LSTM preprocessing pipeline:
       1. Scale features with MinMaxScaler
-      2. Scale target (time_to_failure) to [0, 1]
+      2. Build binary imminent-failure target from horizon
       3. Group by node and create sliding-window sequences
       4. Concatenate all node sequences
 
@@ -189,36 +165,52 @@ def preprocess_pipeline(
 
     Returns
     -------
-    tuple of (X, y)
+    tuple of (X, y, feature_scaler, horizon_steps)
         X: np.ndarray of shape (total_samples, lookback, n_features)
-        y: np.ndarray of shape (total_samples,) — normalized to [0, 1]
+        y: np.ndarray of shape (total_samples,) — binary labels {0, 1}
     """
     # Scale features
     scaled_data, feature_scaler = scale_features(df, fit=fit)
 
-    # Scale the target (time_to_failure) to [0, 1]
-    raw_target = df[LSTM_TARGET].values
-    scaled_target, target_scaler = scale_target(raw_target, fit=fit)
+    horizon_steps = derive_horizon_steps(df, horizon_hours=horizon_hours)
+    imminent_target = build_imminent_failure_target(df, horizon_steps=horizon_steps)
 
     # Build a temporary DataFrame with node_id for grouping
     df_scaled = pd.DataFrame(scaled_data, columns=LSTM_FEATURES)
     df_scaled["node_id"] = df["node_id"].values
-    df_scaled[LSTM_TARGET] = scaled_target
+    df_scaled["imminent_failure"] = imminent_target
+    df_scaled["mode"] = df["mode"].values if "mode" in df.columns else 0
 
     # Create sequences per node (to avoid cross-node contamination)
-    all_X, all_y = [], []
+    all_X, all_y, all_node_ids = [], [], []
 
     for node_id, group in df_scaled.groupby("node_id"):
         node_data = group[LSTM_FEATURES].values
-        node_target = group[LSTM_TARGET].values
+        node_target = group["imminent_failure"].values
+        node_mode = group["mode"].values
         if len(node_data) > lookback:
             X_node, y_node = create_sequences(node_data, node_target, lookback=lookback)
-            all_X.append(X_node)
-            all_y.append(y_node)
+            # Context alignment: keep only samples where current row is fault state
+            # so the classifier learns to predict failure progression after a fault trigger.
+            if fault_only:
+                mode_at_target = node_mode[lookback:]
+                keep = mode_at_target != 0
+                X_node = X_node[keep]
+                y_node = y_node[keep]
+            if len(X_node) > 0:
+                all_X.append(X_node)
+                all_y.append(y_node)
+                all_node_ids.append(np.full(len(y_node), int(node_id), dtype=np.int32))
 
     X = np.concatenate(all_X, axis=0)
     y = np.concatenate(all_y, axis=0)
+    node_ids = np.concatenate(all_node_ids, axis=0)
 
-    print(f"[lstm_preprocess] Sequences created: X={X.shape}, y={y.shape}")
-    print(f"[lstm_preprocess] Target (normalized) range: [{y.min():.4f}, {y.max():.4f}]")
-    return X, y, feature_scaler, target_scaler
+    positive_rate = float(y.mean()) if len(y) else 0.0
+    context_label = "fault-only" if fault_only else "all-context"
+    print(f"[lstm_preprocess] Sequences created ({context_label}): X={X.shape}, y={y.shape}")
+    print(
+        f"[lstm_preprocess] Horizon: {horizon_hours}h -> {horizon_steps} steps, "
+        f"positive rate={positive_rate:.4f}"
+    )
+    return X, y.astype(np.float32), node_ids, feature_scaler, horizon_steps

@@ -6,8 +6,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
-  Lightbulb,
-  LineChart,
   FileBarChart,
   Users,
   Settings,
@@ -38,12 +36,6 @@ const sidebarItems: SidebarItem[] = [
     allowedRoles: ["admin", "operator", "technician", "viewer"],
   },
   {
-    title: "Node Monitoring",
-    href: "/monitoring",
-    icon: Lightbulb,
-    allowedRoles: ["admin", "operator", "technician"],
-  },
-  {
     title: "Map View",
     href: "/map",
     icon: MapPin,
@@ -56,13 +48,7 @@ const sidebarItems: SidebarItem[] = [
     allowedRoles: ["admin", "operator", "technician"],
   },
   {
-    title: "Predictive Analytics",
-    href: "/analytics",
-    icon: LineChart,
-    allowedRoles: ["admin", "operator"],
-  },
-  {
-    title: "Predictive Maintenance",
+    title: "Predictive Intelligence",
     href: "/predictive-maintenance",
     icon: BrainCircuit,
     allowedRoles: ["admin", "operator"],
@@ -72,12 +58,6 @@ const sidebarItems: SidebarItem[] = [
     href: "/my-assigned-tasks",
     icon: ClipboardList,
     allowedRoles: ["technician"],
-  },
-  {
-    title: "Repair Tasks",
-    href: "/repair-tasks",
-    icon: ClipboardList,
-    allowedRoles: ["admin", "operator"],
   },
   {
     title: "Reports",

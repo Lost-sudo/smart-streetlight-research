@@ -9,6 +9,7 @@ class StreetlightStatus(str, PyEnum):
     inactive = "inactive"
     faulty = "faulty"
     maintenance = "maintenance"
+    offline = "offline"
 
 class Streetlight(Base):
     __tablename__ = "streetlights"

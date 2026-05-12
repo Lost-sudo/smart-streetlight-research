@@ -49,10 +49,14 @@ class StreetlightLogService:
         if not streetlight:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Streetlight with device_id {iot_log.device_id} not found")
         
-        # Auto-activate node if it was inactive but we just received telemetry
-        if streetlight.status == "inactive":
-            logger.info(f"Node {streetlight.name} ({streetlight.id}) received data. Reactivating from inactive status.")
+        # Auto-activate node if it was inactive/offline but we just received telemetry
+        if streetlight.status in ["inactive", "offline"]:
+            logger.info(f"Node {streetlight.name} ({streetlight.id}) received data. Reactivating from {streetlight.status} status.")
             self.streetlight_repo.update(streetlight.id, StreetlightUpdate(status="active"))
+            
+            # Also resolve any communication fault alerts
+            from app.services.heartbeat_monitor import resolve_communication_fault
+            resolve_communication_fault(self.streetlight_log_repo.db, streetlight.id)
 
         # ALWAYS update the last_updated timestamp in PM log for client-side tracking
         existing_pm = self.predictive_maintenance_repo.get_by_streetlight_id(streetlight.id)

@@ -75,8 +75,15 @@ class MLDataService:
         # Ensure timestamp is datetime
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         
-        # Map fault_type string to integer
-        df['mode'] = df['fault_type'].map(FAULT_TYPE_MAP).fillna(0).astype(int)
+        # Map fault_type string to integer (case/spacing tolerant)
+        fault_series = (
+            df["fault_type"]
+            .fillna("NORMAL")
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+        df['mode'] = fault_series.map(FAULT_TYPE_MAP).fillna(0).astype(int)
         
         return df
 

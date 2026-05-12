@@ -1,19 +1,7 @@
 """
 lstm_train.py
 =============
-Training pipeline for the LSTM Time-to-Failure Prediction model.
-
-Problem Type : Time-Series Regression
-Algorithm    : Long Short-Term Memory (LSTM) via PyTorch
-Target       : time_to_failure (number of timesteps until failure)
-
-Follows the ML Design Document:
-  7.3  - LSTM for degradation trend forecasting
-  8    - Model Training Strategy (70 / 15 / 15 split)
-  9    - Evaluation Metrics: MSE, MAE, R-squared
-
-Note: TensorFlow is not available for Python 3.14, so PyTorch is used instead.
-      The model is exported as a .pt file.
+Training pipeline for the LSTM imminent-failure classification model.
 """
 
 import copy
@@ -21,98 +9,97 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import average_precision_score, confusion_matrix, precision_recall_fscore_support, roc_auc_score
+from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 
-# Directory where model artifacts are persisted
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 
 
-# ------------------------------------------------------------------ #
-#  Data splitting (70 / 15 / 15)                                      #
-# ------------------------------------------------------------------ #
-
-def split_sequences(
+def split_sequences_chronological(
     X: np.ndarray,
     y: np.ndarray,
+    node_ids: np.ndarray | None = None,
     train_ratio: float = 0.70,
     val_ratio: float = 0.15,
     test_ratio: float = 0.15,
-    random_state: int = 42,
 ) -> tuple:
-    """
-    Splits sequence data into Training (70%), Validation (15%),
-    and Test (15%) sets.
-    """
+    """Time-safe split; if node_ids are provided, split chronologically per node."""
     assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6
+    if node_ids is not None:
+        train_parts_X, val_parts_X, test_parts_X = [], [], []
+        train_parts_y, val_parts_y, test_parts_y = [], [], []
+        for nid in np.unique(node_ids):
+            idx = np.where(node_ids == nid)[0]
+            Xn, yn = X[idx], y[idx]
+            n = len(Xn)
+            if n < 10:
+                continue
+            tr_end = int(n * train_ratio)
+            va_end = tr_end + int(n * val_ratio)
+            train_parts_X.append(Xn[:tr_end]); train_parts_y.append(yn[:tr_end])
+            val_parts_X.append(Xn[tr_end:va_end]); val_parts_y.append(yn[tr_end:va_end])
+            test_parts_X.append(Xn[va_end:]); test_parts_y.append(yn[va_end:])
+        X_train = np.concatenate(train_parts_X, axis=0)
+        y_train = np.concatenate(train_parts_y, axis=0)
+        X_val = np.concatenate(val_parts_X, axis=0)
+        y_val = np.concatenate(val_parts_y, axis=0)
+        X_test = np.concatenate(test_parts_X, axis=0)
+        y_test = np.concatenate(test_parts_y, axis=0)
+        print(f"[split] Per-node chronological split: Train={len(X_train)} | Val={len(X_val)} | Test={len(X_test)}")
+        return X_train, X_val, X_test, y_train, y_val, y_test
 
-    X_temp, X_test, y_temp, y_test = train_test_split(
-        X, y, test_size=test_ratio, random_state=random_state
-    )
+    n = len(X)
+    train_end = int(n * train_ratio)
+    val_end = train_end + int(n * val_ratio)
 
-    relative_val = val_ratio / (train_ratio + val_ratio)
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_temp, y_temp, test_size=relative_val, random_state=random_state
-    )
+    X_train, y_train = X[:train_end], y[:train_end]
+    X_val, y_val = X[train_end:val_end], y[train_end:val_end]
+    X_test, y_test = X[val_end:], y[val_end:]
 
-    print(f"[split] Train: {len(X_train)}  |  Val: {len(X_val)}  |  Test: {len(X_test)}")
+    print(f"[split] Train: {len(X_train)} | Val: {len(X_val)} | Test: {len(X_test)}")
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-# ------------------------------------------------------------------ #
-#  LSTM Model definition                                              #
-# ------------------------------------------------------------------ #
-
 class LSTMModel(nn.Module):
-    """
-    PyTorch LSTM model for time-series regression (time-to-failure).
-
-    Architecture:
-      LSTM (64 units) -> Dropout (0.2) -> Linear (32) -> ReLU -> Linear (1)
-    """
-
     def __init__(self, input_size: int, hidden_size: int = 64, dropout: float = 0.2):
         super(LSTMModel, self).__init__()
-        self.hidden_size = hidden_size
-
-        self.lstm = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            batch_first=True,
-        )
+        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
         self.dropout = nn.Dropout(dropout)
         self.fc1 = nn.Linear(hidden_size, 32)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(32, 1)
 
     def forward(self, x):
-        # x shape: (batch, lookback, features)
         lstm_out, _ = self.lstm(x)
-        # Take only the last time step's output
-        last_hidden = lstm_out[:, -1, :]    # (batch, hidden_size)
+        last_hidden = lstm_out[:, -1, :]
         out = self.dropout(last_hidden)
         out = self.relu(self.fc1(out))
-        out = self.fc2(out)                 # (batch, 1)
-        return out.squeeze(-1)              # (batch,)
+        out = self.fc2(out)
+        return out.squeeze(-1)
 
 
-def build_lstm_model(
-    input_size: int,
-    hidden_size: int = 64,
-    dropout: float = 0.2,
-) -> LSTMModel:
-    """Builds a PyTorch LSTM model for time-to-failure regression."""
+def build_lstm_model(input_size: int, hidden_size: int = 64, dropout: float = 0.2) -> LSTMModel:
     model = LSTMModel(input_size, hidden_size, dropout)
     print(f"[build] LSTM model built: input_size={input_size}, hidden={hidden_size}")
-    print(model)
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"[build] Total parameters: {total_params:,}")
     return model
 
 
-# ------------------------------------------------------------------ #
-#  Model training                                                     #
-# ------------------------------------------------------------------ #
+def _compute_pos_weight(y: np.ndarray) -> float:
+    pos = float(np.sum(y == 1))
+    neg = float(np.sum(y == 0))
+    if pos <= 0:
+        return 1.0
+    return max(1.0, neg / pos)
+
+
+def _build_sampler(y: np.ndarray) -> WeightedRandomSampler:
+    class_counts = np.bincount(y.astype(int), minlength=2)
+    weights = np.zeros(2, dtype=np.float32)
+    for c in [0, 1]:
+        weights[c] = 1.0 / class_counts[c] if class_counts[c] > 0 else 0.0
+    sample_weights = weights[y.astype(int)]
+    return WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
 
 def train_model(
     model: LSTMModel,
@@ -124,55 +111,43 @@ def train_model(
     batch_size: int = 32,
     learning_rate: float = 0.001,
     patience: int = 5,
-) -> dict:
-    """Trains the LSTM model with early stopping using MSE loss."""
-    # Convert numpy arrays to PyTorch tensors
+) -> LSTMModel:
     X_train_t = torch.FloatTensor(X_train)
     y_train_t = torch.FloatTensor(y_train)
     X_val_t = torch.FloatTensor(X_val)
     y_val_t = torch.FloatTensor(y_val)
 
-    # Create DataLoader for batching
     train_dataset = TensorDataset(X_train_t, y_train_t)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    sampler = _build_sampler(y_train)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler)
 
-    # MSE loss for regression (predicting continuous time-to-failure)
-    criterion = nn.MSELoss()
+    pos_weight = torch.tensor([_compute_pos_weight(y_train)], dtype=torch.float32)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Training loop with early stopping
-    history = {"train_loss": [], "val_loss": []}
     best_val_loss = float("inf")
     best_model_state = None
     epochs_without_improvement = 0
 
     for epoch in range(1, epochs + 1):
-        # --- Training phase ---
         model.train()
         train_losses = []
-
         for X_batch, y_batch in train_loader:
             optimizer.zero_grad()
-            predictions = model(X_batch)
-            loss = criterion(predictions, y_batch)
+            logits = model(X_batch)
+            loss = criterion(logits, y_batch)
             loss.backward()
             optimizer.step()
             train_losses.append(loss.item())
 
-        avg_train_loss = np.mean(train_losses)
-
-        # --- Validation phase ---
+        avg_train_loss = float(np.mean(train_losses))
         model.eval()
         with torch.no_grad():
-            val_predictions = model(X_val_t)
-            val_loss = criterion(val_predictions, y_val_t).item()
-
-        history["train_loss"].append(avg_train_loss)
-        history["val_loss"].append(val_loss)
+            val_logits = model(X_val_t)
+            val_loss = criterion(val_logits, y_val_t).item()
 
         print(f"  Epoch {epoch:3d}/{epochs} - Train Loss: {avg_train_loss:.4f} | Val Loss: {val_loss:.4f}")
 
-        # --- Early stopping check ---
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_model_state = copy.deepcopy(model.state_dict())
@@ -181,83 +156,70 @@ def train_model(
             epochs_without_improvement += 1
 
         if epochs_without_improvement >= patience:
-            print(f"\n[train] Early stopping triggered at epoch {epoch} (patience={patience})")
+            print(f"[train] Early stopping at epoch {epoch}")
             break
 
-    # Restore best weights
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
-        print(f"[train] Restored best model weights (val_loss={best_val_loss:.4f})")
+        print(f"[train] Restored best model (val_loss={best_val_loss:.4f})")
 
-    print(f"[train] LSTM training completed after {len(history['train_loss'])} epochs.")
     return model
 
 
-# ------------------------------------------------------------------ #
-#  Model evaluation                                                   #
-# ------------------------------------------------------------------ #
+def _metrics_at_threshold(y_true: np.ndarray, probs: np.ndarray, threshold: float) -> dict:
+    y_pred = (probs >= threshold).astype(int)
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        y_true, y_pred, average="binary", zero_division=0
+    )
+    return {
+        "threshold": threshold,
+        "precision": float(precision),
+        "recall": float(recall),
+        "f1": float(f1),
+    }
 
-def evaluate_model(
-    model: LSTMModel,
-    X: np.ndarray,
-    y: np.ndarray,
-    split_name: str = "Test",
-) -> dict:
-    """
-    Evaluates the LSTM model using MSE, MAE, and R-squared.
 
-    Parameters
-    ----------
-    model : LSTMModel
-        Trained LSTM model.
-    X : np.ndarray
-        Input sequences.
-    y : np.ndarray
-        True target values (time_to_failure).
-    split_name : str
-        Label for display.
+def select_threshold(y_true: np.ndarray, probs: np.ndarray, min_recall: float = 0.75) -> float:
+    candidates = np.linspace(0.1, 0.9, 17)
+    best = None
+    for t in candidates:
+        m = _metrics_at_threshold(y_true, probs, float(t))
+        y_pred = (probs >= float(t)).astype(int)
+        tn, fp, _, _ = confusion_matrix(y_true.astype(int), y_pred, labels=[0, 1]).ravel()
+        fpr = float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0
+        if m["recall"] >= min_recall and fpr <= 0.25:
+            if best is None or m["precision"] > best["precision"]:
+                best = m
+    if best is None:
+        all_metrics = [_metrics_at_threshold(y_true, probs, float(t)) for t in candidates]
+        best = max(all_metrics, key=lambda x: (x["recall"], x["f1"]))
+    return float(best["threshold"])
 
-    Returns
-    -------
-    dict
-        Dictionary with 'mse', 'mae', and 'r2' values.
-    """
+
+def evaluate_model(model: LSTMModel, X: np.ndarray, y: np.ndarray, threshold: float, split_name: str = "Test") -> dict:
     model.eval()
     X_t = torch.FloatTensor(X)
-    y_t = torch.FloatTensor(y)
-
     with torch.no_grad():
-        predictions = model(X_t)
-        mse = nn.MSELoss()(predictions, y_t).item()
-        mae = nn.L1Loss()(predictions, y_t).item()
+        logits = model(X_t).numpy()
+    probs = 1.0 / (1.0 + np.exp(-logits))
 
-        # R-squared
-        ss_res = ((predictions - y_t) ** 2).sum().item()
-        ss_tot = ((y_t - y_t.mean()) ** 2).sum().item()
-        r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+    metrics = _metrics_at_threshold(y.astype(int), probs, threshold)
+    metrics["mae"] = float(np.mean(np.abs(y - probs)))
+    metrics["pr_auc"] = float(average_precision_score(y, probs))
+    if len(np.unique(y)) > 1:
+        metrics["roc_auc"] = float(roc_auc_score(y, probs))
+    else:
+        metrics["roc_auc"] = 0.0
 
-    metrics = {"mse": mse, "mae": mae, "r2": r2}
-
-    print(f"\n{'=' * 55}")
-    print(f"  {split_name} Set Evaluation (LSTM Time-to-Failure)")
-    print(f"{'=' * 55}")
-    print(f"  MSE (Mean Squared Error)  : {mse:.4f}")
-    print(f"  MAE (Mean Absolute Error) : {mae:.4f}")
-    print(f"  R-squared                 : {r2:.4f}")
-    print(f"{'=' * 55}\n")
-
+    print(
+        f"\n[eval:{split_name}] threshold={threshold:.2f} mae={metrics['mae']:.4f} "
+        f"pr_auc={metrics['pr_auc']:.4f} roc_auc={metrics['roc_auc']:.4f} "
+        f"precision={metrics['precision']:.4f} recall={metrics['recall']:.4f} f1={metrics['f1']:.4f}"
+    )
     return metrics
 
 
-# ------------------------------------------------------------------ #
-#  Export model                                                       #
-# ------------------------------------------------------------------ #
-
-def save_model(
-    model: LSTMModel,
-    model_filename: str = "lstm_model.pt",
-) -> str:
-    """Saves the trained PyTorch LSTM model to disk."""
+def save_model(model: LSTMModel, model_filename: str = "lstm_model.pt") -> str:
     os.makedirs(MODELS_DIR, exist_ok=True)
     model_path = os.path.join(MODELS_DIR, model_filename)
     torch.save(model.state_dict(), model_path)

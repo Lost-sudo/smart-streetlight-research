@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BrainCircuit, Lightbulb } from "lucide-react";
+import { Lightbulb } from "lucide-react";
 
 import { urgencyConfig } from "@/components/predictive-maintenance/utils";
 
@@ -23,85 +23,77 @@ export function PredictionsTable({
   rows: PredictionRow[];
 }) {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 pl-1 border-b pb-2 border-border/50">
-        <BrainCircuit className="h-6 w-6 text-violet-500 p-1 bg-violet-500/10 rounded-md" />
-        <h3 className="text-xl font-bold tracking-tight text-foreground">Failure Predictions</h3>
-        <Badge variant="secondary" className="ml-auto bg-muted">
-          {rows.length}
-        </Badge>
-      </div>
+    <div className="rounded-2xl border-none shadow-2xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl overflow-hidden">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader className="bg-muted/50 border-none">
+            <TableRow className="hover:bg-transparent border-none">
+              <TableHead className="font-bold py-4">IoT Node</TableHead>
+              <TableHead className="font-bold py-4">Failure Risk</TableHead>
+              <TableHead className="font-bold py-4">Est. Failure Date</TableHead>
+              <TableHead className="font-bold py-4">Urgency Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length > 0 ? (
+              rows.map((node) => {
+                const config = urgencyConfig[node.urgency_level] || urgencyConfig.low;
+                const failureProb = Math.round(node.failure_probability * 100);
 
-      <div className="rounded-2xl border-none shadow-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table className="min-w-[700px]">
-            <TableHeader className="bg-muted/50">
+                return (
+                  <TableRow key={node.id} className="group transition-all duration-300 hover:bg-muted/30 border-muted/20">
+                    <TableCell className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2.5 rounded-xl ${config.bg} transition-transform group-hover:scale-110 shadow-inner`}>
+                          <Lightbulb className={`h-4 w-4 ${config.color}`} />
+                        </div>
+                        <div>
+                          <span className="font-bold text-sm text-foreground">{node.nodeName}</span>
+                          <p className="text-[10px] text-muted-foreground font-mono tracking-wider uppercase">{node.deviceId}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="space-y-1.5 w-36">
+                        <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                          <span className={config.color}>{failureProb}% Confidence</span>
+                        </div>
+                        <Progress value={failureProb} className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden [&>div]:transition-all [&>div]:duration-1000" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <span className="text-sm font-semibold text-foreground/80">
+                        {failureProb > 0
+                          ? new Date(node.predicted_failure_date).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : <span className="text-muted-foreground italic font-normal">System Stable</span>
+                        }
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <Badge variant="outline" className={`capitalize font-bold border-2 px-3 py-0.5 rounded-full shadow-sm ${config.color} ${config.border} ${config.bg}`}>
+                        {config.label}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            ) : (
               <TableRow>
-                <TableHead className="font-bold">Node</TableHead>
-                <TableHead className="font-bold">Failure Probability</TableHead>
-                <TableHead className="font-bold">Predicted Date</TableHead>
-                <TableHead className="font-bold">Urgency</TableHead>
+                <TableCell colSpan={4} className="h-32 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="h-12 w-12 rounded-full bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                    <p className="text-muted-foreground font-semibold">Awaiting Neural Insights...</p>
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length > 0 ? (
-                rows.map((node) => {
-                  const config = urgencyConfig[node.urgency_level] || urgencyConfig.low;
-                  const failureProb = Math.round(node.failure_probability * 100);
-
-                  return (
-                    <TableRow key={node.id} className="group transition-colors hover:bg-muted/30">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${config.bg}`}>
-                            <Lightbulb className={`h-4 w-4 ${config.color}`} />
-                          </div>
-                          <div>
-                            <span className="font-bold text-sm">{node.nodeName}</span>
-                            <p className="text-xs text-muted-foreground font-mono">{node.deviceId}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1 w-32">
-                          <div className="flex justify-between text-xs">
-                            <span className={`font-bold ${config.color}`}>{failureProb}%</span>
-                          </div>
-                          <Progress value={failureProb} className="h-1.5 bg-zinc-100 dark:bg-zinc-800" />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm font-medium">
-                          {failureProb > 0
-                            ? new Date(node.predicted_failure_date).toLocaleDateString("en-US", {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : <span className="text-muted-foreground italic">N/A — Device Off</span>
-                          }
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`capitalize ${config.color} ${config.border} ${config.bg}`}>
-                          {config.label}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground font-medium">
-                    No predictive maintenance data available. Waiting for LSTM analysis...
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
 }
-

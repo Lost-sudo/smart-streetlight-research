@@ -39,16 +39,46 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         DataFrame with added temporal features.
     """
-    # --- Delta features: change from previous reading ---
-    df["d_voltage"] = df["voltage"].diff().fillna(0)
-    df["d_current"] = df["current"].diff().fillna(0)
-    df["d_power"] = df["power"].diff().fillna(0)
+    # Compute temporal features per device to avoid cross-device contamination.
+    group_key = "device_id" if "device_id" in df.columns else None
+    if group_key:
+        g = df.groupby(group_key, sort=False)
+        df["d_voltage"] = g["voltage"].diff().fillna(0)
+        df["d_current"] = g["current"].diff().fillna(0)
+        df["d_power"] = g["power"].diff().fillna(0)
+        df["std_current_5"] = (
+            g["current"].rolling(5).std().reset_index(level=0, drop=True).fillna(0)
+        )
+        df["std_voltage_5"] = (
+            g["voltage"].rolling(5).std().reset_index(level=0, drop=True).fillna(0)
+        )
+        # --- New discriminative features ---
+        v_max5 = g["voltage"].rolling(5).max().reset_index(level=0, drop=True).fillna(df["voltage"])
+        v_min5 = g["voltage"].rolling(5).min().reset_index(level=0, drop=True).fillna(df["voltage"])
+        c_max5 = g["current"].rolling(5).max().reset_index(level=0, drop=True).fillna(df["current"])
+        c_min5 = g["current"].rolling(5).min().reset_index(level=0, drop=True).fillna(df["current"])
+        df["voltage_range_5"] = v_max5 - v_min5
+        df["current_range_5"] = c_max5 - c_min5
+    else:
+        df["d_voltage"] = df["voltage"].diff().fillna(0)
+        df["d_current"] = df["current"].diff().fillna(0)
+        df["d_power"] = df["power"].diff().fillna(0)
+        df["std_current_5"] = df["current"].rolling(5).std().fillna(0)
+        df["std_voltage_5"] = df["voltage"].rolling(5).std().fillna(0)
+        # --- New discriminative features ---
+        v_max5 = df["voltage"].rolling(5).max().fillna(df["voltage"])
+        v_min5 = df["voltage"].rolling(5).min().fillna(df["voltage"])
+        c_max5 = df["current"].rolling(5).max().fillna(df["current"])
+        c_min5 = df["current"].rolling(5).min().fillna(df["current"])
+        df["voltage_range_5"] = v_max5 - v_min5
+        df["current_range_5"] = c_max5 - c_min5
 
-    # --- Rolling statistics: variability over last 5 readings ---
-    df["std_current_5"] = df["current"].rolling(5).std().fillna(0)
-    df["std_voltage_5"] = df["voltage"].rolling(5).std().fillna(0)
+    # Absolute delta features (computed after diff, works for both branches)
+    df["abs_d_voltage"] = df["d_voltage"].abs()
+    df["abs_d_current"] = df["d_current"].abs()
 
     print(f"[rf_preprocess] Added temporal features: d_voltage, d_current, d_power, std_current_5, std_voltage_5")
+    print(f"[rf_preprocess] Added discriminative features: abs_d_voltage, abs_d_current, voltage_range_5, current_range_5")
     return df
 
 
@@ -75,8 +105,11 @@ def preprocess_pipeline(df: pd.DataFrame) -> tuple:
         y: np.ndarray of shape (n_samples,) — target labels
         df: pd.DataFrame with added temporal features
     """
-    # 1. Sort by timestep to ensure temporal features are correct
-    df = df.sort_values("timestep").reset_index(drop=True)
+    # 1. Sort by device + timestep to ensure temporal features are correct
+    if "device_id" in df.columns:
+        df = df.sort_values(["device_id", "timestep"]).reset_index(drop=True)
+    else:
+        df = df.sort_values("timestep").reset_index(drop=True)
 
     # 2. Add temporal features
     df = add_temporal_features(df)
@@ -86,7 +119,9 @@ def preprocess_pipeline(df: pd.DataFrame) -> tuple:
     y = df[RF_TARGET].values
 
     print(f"[rf_preprocess] X shape: {X.shape}, y shape: {y.shape}")
-    print(f"[rf_preprocess] Class balance: 0={int((y==0).sum())}, 1={int((y==1).sum())}")
+    classes, counts = np.unique(y, return_counts=True)
+    class_report = ", ".join(f"{int(k)}={int(v)}" for k, v in zip(classes, counts))
+    print(f"[rf_preprocess] Class balance: {class_report}")
     print(f"[rf_preprocess] Features: {RF_FEATURES}")
 
     return X, y, df

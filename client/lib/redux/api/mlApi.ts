@@ -4,7 +4,17 @@ import { baseQueryWithReauth } from './baseQuery';
 export interface MLVersionInfo {
   version: number;
   file_name: string;
-  metrics: Record<string, any>;
+  metrics: {
+    accuracy?: number;
+    f1?: number;
+    precision?: number;
+    recall?: number;
+    pr_auc?: number;
+    roc_auc?: number;
+    threshold?: number;
+    mae?: number;
+    [key: string]: unknown;
+  };
   created_at: string | null;
 }
 

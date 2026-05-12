@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -12,13 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -49,19 +41,19 @@ import {
 import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { parsePossiblyNaiveUtc } from "@/components/analytics/predictive-analytics/utils";
 
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/redux/store";
 
 export default function SettingsPage() {
-  const { data: mlVersions, isLoading: isLoadingVersions, refetch: refetchVersions } = useGetMLVersionsQuery();
+  const { data: mlVersions, refetch: refetchVersions } = useGetMLVersionsQuery();
   const { data: dataStats } = useGetMLDataStatsQuery();
   const { data: datasets } = useGetMLDatasetsQuery();
   const { data: mlStatus } = useGetMLStatusQuery(undefined, {
     pollingInterval: 2000, // Poll every 2 seconds
   });
   const [triggerRetrain, { isLoading: isRetrainingRequest }] = useTriggerRetrainingMutation();
-  const [activeModel, setActiveModel] = useState("random-forest");
   const accessToken = useSelector((state: RootState) => state.auth.accessToken);
 
   // Handle Export
@@ -103,12 +95,12 @@ export default function SettingsPage() {
     }
   };
 
-  const currentModelData = activeModel === "random-forest" ? mlVersions?.random_forest : mlVersions?.lstm;
-  const accuracy = currentModelData?.metrics?.accuracy 
-    ? (currentModelData.metrics.accuracy * 100).toFixed(1) + "%" 
-    : currentModelData?.metrics?.mae 
-      ? "MAE: " + currentModelData.metrics.mae.toFixed(4)
-      : "N/A";
+  const formatVersionTimestamp = (createdAt: string | null | undefined) => {
+    const ts = parsePossiblyNaiveUtc(createdAt);
+    if (!ts) return "Never";
+    const d = new Date(ts);
+    return `${format(d, "MMM dd, yyyy HH:mm:ss")} (${formatDistanceToNow(d)} ago)`;
+  };
 
   return (
     <div className="flex-1 space-y-8 p-8 pt-6">
@@ -146,37 +138,27 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-sm font-semibold">Active Prediction Model</Label>
-                    {currentModelData && (
-                      <Badge variant="secondary" className="text-[10px] h-5">
-                        Version {currentModelData.version}
-                      </Badge>
-                    )}
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="p-4 rounded-2xl bg-muted/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Random Forest</span>
+                      <Badge variant="secondary" className="text-[10px] h-5">V{mlVersions?.random_forest?.version || "?"}</Badge>
+                    </div>
+                    <p className="text-xs">Accuracy: <span className="font-semibold">{mlVersions?.random_forest?.metrics?.accuracy ? `${(mlVersions.random_forest.metrics.accuracy * 100).toFixed(2)}%` : "N/A"}</span></p>
+                    <p className="text-xs">F1: <span className="font-semibold">{mlVersions?.random_forest?.metrics?.f1 ? mlVersions.random_forest.metrics.f1.toFixed(4) : "N/A"}</span></p>
+                    <p className="text-xs">Precision / Recall: <span className="font-semibold">{mlVersions?.random_forest?.metrics?.precision ? mlVersions.random_forest.metrics.precision.toFixed(4) : "N/A"} / {mlVersions?.random_forest?.metrics?.recall ? mlVersions.random_forest.metrics.recall.toFixed(4) : "N/A"}</span></p>
+                    <p className="text-xs">Last Trained: <span className="font-semibold">{formatVersionTimestamp(mlVersions?.random_forest?.created_at)}</span></p>
                   </div>
-                  <Select value={activeModel} onValueChange={setActiveModel}>
-                    <SelectTrigger className="bg-muted/50 border-none h-11">
-                      <SelectValue placeholder="Select model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="random-forest">Random Forest Classifier (V{mlVersions?.random_forest?.version || '?'})</SelectItem>
-                      <SelectItem value="lstm">LSTM Neural Network (V{mlVersions?.lstm?.version || '?'})</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-2xl bg-muted/30 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Model Performance</span>
-                    <p className="text-2xl font-bold">{isLoadingVersions ? "..." : accuracy}</p>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-muted/30 space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Last Trained</span>
-                    <p className="text-sm font-semibold mt-2">
-                      {currentModelData?.created_at 
-                        ? formatDistanceToNow(new Date(currentModelData.created_at)) + " ago"
-                        : "Never"}
-                    </p>
+                  <div className="p-4 rounded-2xl bg-muted/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">LSTM</span>
+                      <Badge variant="secondary" className="text-[10px] h-5">V{mlVersions?.lstm?.version || "?"}</Badge>
+                    </div>
+                    <p className="text-xs">MAE: <span className="font-semibold">{mlVersions?.lstm?.metrics?.mae ? mlVersions.lstm.metrics.mae.toFixed(4) : "N/A"}</span></p>
+                    <p className="text-xs">PR-AUC / ROC-AUC: <span className="font-semibold">{mlVersions?.lstm?.metrics?.pr_auc ? mlVersions.lstm.metrics.pr_auc.toFixed(4) : "N/A"} / {mlVersions?.lstm?.metrics?.roc_auc ? mlVersions.lstm.metrics.roc_auc.toFixed(4) : "N/A"}</span></p>
+                    <p className="text-xs">F1 / Recall: <span className="font-semibold">{mlVersions?.lstm?.metrics?.f1 ? mlVersions.lstm.metrics.f1.toFixed(4) : "N/A"} / {mlVersions?.lstm?.metrics?.recall ? mlVersions.lstm.metrics.recall.toFixed(4) : "N/A"}</span></p>
+                    <p className="text-xs">Threshold: <span className="font-semibold">{mlVersions?.lstm?.metrics?.threshold ? mlVersions.lstm.metrics.threshold.toFixed(2) : "N/A"}</span></p>
+                    <p className="text-xs">Last Trained: <span className="font-semibold">{formatVersionTimestamp(mlVersions?.lstm?.created_at)}</span></p>
                   </div>
                 </div>
               </div>
