@@ -37,7 +37,11 @@ function isOnlineFromLastUpdated(lastUpdated: unknown, nowMs: number) {
   return nowMs - ts <= ONLINE_WINDOW_MS;
 }
 
-export function NodeMonitoringPage() {
+interface NodeMonitoringPageProps {
+  embedded?: boolean;
+}
+
+export function NodeMonitoringPage({ embedded = false }: NodeMonitoringPageProps) {
   const { data: streetlights = [], isLoading: isStreetlightsLoading } = useGetStreetlightsQuery(undefined, {
     pollingInterval: 15000,
   });
@@ -140,7 +144,7 @@ export function NodeMonitoringPage() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className={cn("space-y-6", embedded ? "mt-2" : "flex-1 p-8 pt-6")}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-foreground">Node Monitoring</h2>
@@ -294,4 +298,3 @@ export function NodeMonitoringPage() {
     </div>
   );
 }
-

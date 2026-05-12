@@ -17,7 +17,20 @@ const COLORS = {
   critical: "#ef4444", // red-500
 } as const;
 
-export function PredictiveAnalyticsPage() {
+interface PredictiveAnalyticsPageProps {
+  embedded?: boolean;
+  hideSummary?: boolean;
+  maintenanceSummary?: {
+    scheduledCount: number;
+    completedTasksCount: number;
+  };
+}
+
+export function PredictiveAnalyticsPage({ 
+  embedded = false, 
+  hideSummary = false, 
+  maintenanceSummary 
+}: PredictiveAnalyticsPageProps) {
   const { data: streetlights = [], isLoading: loadingLights } = useGetStreetlightsQuery(undefined, {
     pollingInterval: 15000,
   });
@@ -105,16 +118,29 @@ export function PredictiveAnalyticsPage() {
   }
 
   return (
-    <div className="flex-1 space-y-8 p-8 pt-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Predictive Analytics</h2>
-          <p className="text-muted-foreground">Live machine learning maintenance predictions for IoT Nodes.</p>
+    <div className={embedded ? "space-y-8" : "flex-1 space-y-8 p-8 pt-6"}>
+      {!embedded && (
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">
+              Predictive Analytics
+            </h2>
+            <p className="text-muted-foreground">Live machine learning maintenance predictions for IoT Nodes.</p>
+          </div>
+          <FilterChips filter={filter} onChange={setFilter} />
         </div>
-        <FilterChips filter={filter} onChange={setFilter} />
-      </div>
+      )}
 
-      <SummaryCards onlineCount={totalNodes - offlineC} normalCount={normalC} warningCount={warningC} criticalCount={criticalC} />
+      {!hideSummary && (
+        <SummaryCards
+          onlineCount={totalNodes - offlineC}
+          normalCount={normalC}
+          warningCount={warningC}
+          criticalCount={criticalC}
+          scheduledCount={maintenanceSummary?.scheduledCount}
+          completedTasksCount={maintenanceSummary?.completedTasksCount}
+        />
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         <NetworkHealthChart chartData={chartData} />
@@ -165,4 +191,3 @@ export function PredictiveAnalyticsPage() {
     </div>
   );
 }
-

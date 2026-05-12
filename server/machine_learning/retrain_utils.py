@@ -199,7 +199,7 @@ def upload_trained_model_to_hf(model_path: str, version_number: int, base_name: 
         db.close()
     return None
 
-def upload_lstm_artifacts(model_path: str, scaler_path: str, target_scaler_path: str, version_number: int, metrics: dict = None):
+def upload_lstm_artifacts(model_path: str, scaler_path: str, threshold_path: str, version_number: int, metrics: dict = None):
     """
     Handles LSTM artifact registration and physical versioning locally.
     """
@@ -207,14 +207,18 @@ def upload_lstm_artifacts(model_path: str, scaler_path: str, target_scaler_path:
     try:
         model_filename = f"lstm_model_V{version_number}.pt"
         scaler_filename = f"lstm_scaler_V{version_number}.joblib"
-        target_scaler_filename = f"lstm_target_scaler_V{version_number}.joblib"
+        threshold_filename = f"lstm_threshold_V{version_number}.joblib"
+        config_filename = f"lstm_inference_config_V{version_number}.joblib"
         
         # Physical Versioning locally
         import shutil
         MODELS_DIR = os.path.dirname(model_path)
         shutil.copy2(model_path, os.path.join(MODELS_DIR, model_filename))
         shutil.copy2(scaler_path, os.path.join(MODELS_DIR, scaler_filename))
-        shutil.copy2(target_scaler_path, os.path.join(MODELS_DIR, target_scaler_filename))
+        shutil.copy2(threshold_path, os.path.join(MODELS_DIR, threshold_filename))
+        inference_cfg_path = os.path.join(os.path.dirname(model_path), "lstm_inference_config.joblib")
+        if os.path.exists(inference_cfg_path):
+            shutil.copy2(inference_cfg_path, os.path.join(MODELS_DIR, config_filename))
         print(f"[retrain_utils] Versioned artifacts saved locally in {MODELS_DIR}")
 
         hf_url = None
@@ -225,7 +229,9 @@ def upload_lstm_artifacts(model_path: str, scaler_path: str, target_scaler_path:
             # Upload versioned files
             hf.upload_model(os.path.join(MODELS_DIR, model_filename), path_in_repo=model_filename)
             hf.upload_model(os.path.join(MODELS_DIR, scaler_filename), path_in_repo=scaler_filename)
-            hf.upload_model(os.path.join(MODELS_DIR, target_scaler_filename), path_in_repo=target_scaler_filename)
+            hf.upload_model(os.path.join(MODELS_DIR, threshold_filename), path_in_repo=threshold_filename)
+            if os.path.exists(os.path.join(MODELS_DIR, config_filename)):
+                hf.upload_model(os.path.join(MODELS_DIR, config_filename), path_in_repo=config_filename)
             
             hf_url = f"https://huggingface.co/{settings.HF_MODEL_REPO}/resolve/main/{model_filename}"
         

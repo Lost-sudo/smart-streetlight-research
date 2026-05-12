@@ -8,19 +8,38 @@ from app.repositories.streetlight_log import StreetlightLogRepository
 from app.services.ml_prediction import MLPredictionService
 from fastapi import HTTPException, status
 import logging
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 class PredictiveMaintenanceService:
+    ALERT_COOLDOWN_MINUTES = 30
+
     def __init__(self, db: Session):
         self.db = db
         self.log_repo = PredictiveMaintenanceRepository(db)
         self.alert_service = PredictiveAlertService(db)
         self.streetlight_log_repo = StreetlightLogRepository(db)
         self.ml_service = MLPredictionService()
+        self._last_alert_trigger_by_node: dict[int, datetime] = {}
 
     def _check_and_trigger_alert(self, streetlight_id: int, failure_probability: float, urgency_level: str):
         """Helper to trigger an alert if the urgency is HIGH/MEDIUM or resolve if LOW."""
+        threshold = float(getattr(self.ml_service, "lstm_threshold", 0.65))
+        if failure_probability < threshold:
+            logger.info(
+                "Predictive alert suppressed for streetlight %s: prob %.2f below threshold %.2f",
+                streetlight_id, failure_probability, threshold
+            )
+            return
+        now = datetime.utcnow()
+        last_trigger = self._last_alert_trigger_by_node.get(streetlight_id)
+        if last_trigger and (now - last_trigger) < timedelta(minutes=self.ALERT_COOLDOWN_MINUTES):
+            logger.info(
+                "Predictive alert cooldown active for streetlight %s (%s min window).",
+                streetlight_id, self.ALERT_COOLDOWN_MINUTES
+            )
+            return
         if urgency_level in [UrgencyLevel.critical, UrgencyLevel.high, UrgencyLevel.medium] or failure_probability >= 0.7:
             # We trigger or update an alert
             message = f"AI Prediction: High risk of hardware failure detected. Probability: {failure_probability*100:.0f}%."
@@ -31,6 +50,7 @@ class PredictiveMaintenanceService:
                 is_resolved=False
             )
             self.alert_service.create_alert(alert_in)
+            self._last_alert_trigger_by_node[streetlight_id] = now
         elif urgency_level == UrgencyLevel.low and failure_probability < 0.3:
             # AUTO-RECOVERY: If probability drops significantly, resolve any existing predictive alert
             existing_alert = self.alert_service.alert_repo.get_active_by_streetlight(streetlight_id)
@@ -60,7 +80,8 @@ class PredictiveMaintenanceService:
             historical_logs = recent_logs[1:10]
             historical_logs.reverse() # chronological order for LSTM
             
-            prediction_result = self.ml_service.predict_failure(iot_log, historical_logs)
+            fault_context = self.ml_service.detect_fault(iot_log, historical_logs)
+            prediction_result = self.ml_service.predict_failure(iot_log, historical_logs, fault_context=fault_context)
             if not prediction_result:
                 # No prediction available (e.g. device off, not enough history).
                 # Reset any existing PM record to low probability so stale

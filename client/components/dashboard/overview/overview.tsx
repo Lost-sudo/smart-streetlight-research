@@ -7,7 +7,7 @@ import { useGetStreetlightsQuery, type Streetlight } from "@/lib/redux/api/stree
 import { useGetPredictiveMaintenanceLogsQuery, type PredictiveMaintenanceLog } from "@/lib/redux/api/predictiveMaintenanceApi";
 import { DashboardHeader } from "@/components/dashboard/overview/parts/dashboard-header";
 import { SummaryCards } from "@/components/dashboard/overview/parts/summary-cards";
-import { NodeStatusGrid } from "@/components/dashboard/overview/parts/node-status-grid";
+import { NodeMonitoringPage } from "@/components/monitoring/node-monitoring";
 
 const ONLINE_WINDOW_MS = 300_000; // 5 minutes window
 
@@ -89,8 +89,7 @@ export function DashboardOverview() {
     <div className="flex-1 space-y-8 p-8 pt-6">
       <DashboardHeader today={today} />
       <SummaryCards {...metrics} />
-      <NodeStatusGrid streetlights={streetlights as Streetlight[]} pmByStreetlightId={pmByStreetlightId} nowTick={nowTick} />
+      <NodeMonitoringPage embedded />
     </div>
   );
 }
-

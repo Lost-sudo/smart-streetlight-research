@@ -24,8 +24,21 @@ RF_FEATURES = [
     "voltage", "current", "power", "ldr",
     "d_voltage", "d_current", "d_power",
     "std_current_5", "std_voltage_5",
+    # Discriminative features for multi-class fault separation
+    "abs_d_voltage", "abs_d_current",       # Magnitude of change (high for VOLTAGE_FLUCTUATION)
+    "voltage_range_5", "current_range_5",   # Swing amplitude (separates VOLT_FLUCT vs INTERMITTENT)
 ]
 RF_TARGET = "fault_type"
+
+FAULT_TYPE_MAP = {
+    0: "NORMAL",
+    1: "VOLTAGE_FLUCTUATION",
+    2: "OVERCURRENT",
+    3: "SENSOR_DEGRADATION",
+    4: "LAMP_DEGRADATION",
+    5: "SYSTEM_FAILURE",
+    6: "INTERMITTENT_FAULT",
+}
 
 
 from typing import Optional
@@ -56,6 +69,20 @@ def load_real_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] =
     if "mode" in df.columns:
         df["fault_type"] = df["mode"].astype(int)
 
+    # --- Validate mode/fault_name consistency (strict label hygiene) ---
+    if "mode" in df.columns and "fault_name" in df.columns:
+        expected = df["mode"].astype(int).map(FAULT_TYPE_MAP)
+        actual = df["fault_name"].astype(str).str.strip().str.upper()
+        mismatch_mask = expected != actual
+        mismatch_count = int(mismatch_mask.sum())
+        if mismatch_count > 0:
+            sample = df.loc[mismatch_mask, ["mode", "fault_name"]].head(10)
+            raise ValueError(
+                f"[rf_data] Found {mismatch_count} mode/fault_name mismatches. "
+                f"Sample:\n{sample.to_string(index=False)}"
+            )
+        print("[rf_data] Label mapping check passed: mode matches fault_name for all rows.")
+
     # For backward compatibility or binary needs, we can still see normal vs faulty
     normal_count = (df["fault_type"] == 0).sum()
     faulty_count = (df["fault_type"] > 0).sum()
@@ -75,6 +102,6 @@ def load_real_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] =
 if __name__ == "__main__":
     df = load_real_dataset()
     print(f"\nDataset shape: {df.shape}")
-    print(f"\nClass distribution:\n{df['failure_status'].value_counts()}")
+    print(f"\nClass distribution:\n{df['fault_type'].value_counts().sort_index()}")
     print(f"\nSample rows:\n{df.head(10).to_string()}")
     print(f"\nDescriptive statistics:\n{df[['voltage','current','power','ldr','pwm']].describe().to_string()}")

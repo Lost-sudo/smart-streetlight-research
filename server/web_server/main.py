@@ -80,10 +80,29 @@ def startup_event():
     else:
         logger.info("ML features are DISABLED.")
 
+    # Start the background heartbeat monitor for communication fault detection
+    import asyncio
+    from app.services.heartbeat_monitor import heartbeat_monitor_loop
+    asyncio.ensure_future(heartbeat_monitor_loop())
+    logger.info("Node heartbeat monitor scheduled.")
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True
+        reload=True,
+        reload_dirs=["/home/johnpatrickparaon/Desktop/Projects/smart-streetlight-research/server/web_server/app"],
+        reload_excludes=[
+            "*.pyc",
+            "__pycache__",
+            ".git",
+            ".venv",
+            "venv",
+            "node_modules",
+            ".mypy_cache",
+            ".pytest_cache",
+            "server/machine_learning/models",
+            "server/machine_learning/datasets",
+        ],
     )
