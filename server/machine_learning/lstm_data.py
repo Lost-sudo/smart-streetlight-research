@@ -25,7 +25,7 @@ import pandas as pd
 # Features the LSTM will use (real IoT sensor data + derived features)
 # We now include 'elapsed_time' derived from timesteps to help the model 
 # understand where it is in the lifecycle.
-LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time", "fault_code"]
+LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time", "fault_code", "confidence"]
 LSTM_TARGET = "imminent_failure"
 
 
@@ -118,6 +118,46 @@ def load_lstm_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] =
         device_ids = df["device_id"].unique()
         device_map = {did: i for i, did in enumerate(device_ids)}
         df["node_id"] = df["device_id"].map(device_map)
+
+    # --- Generate confidence from Random Forest model ---
+    # If a trained RF model exists, use it to compute confidence scores
+    # for each row. This mirrors what happens at inference time.
+    try:
+        from retrain_utils import get_latest_model_path
+        rf_path = get_latest_model_path("random_forest_model")
+        if rf_path and os.path.exists(rf_path):
+            import joblib
+            rf_model = joblib.load(rf_path)
+
+            # Compute temporal features needed by the RF model
+            g = df.groupby("device_id", sort=False)
+            temp_df = df.copy()
+            temp_df["d_voltage"] = g["voltage"].diff().fillna(0)
+            temp_df["d_current"] = g["current"].diff().fillna(0)
+            temp_df["d_power"] = g["power"].diff().fillna(0)
+            temp_df["std_voltage_5"] = g["voltage"].rolling(5).std().reset_index(level=0, drop=True).fillna(0)
+            temp_df["std_current_5"] = g["current"].rolling(5).std().reset_index(level=0, drop=True).fillna(0)
+            v_max5 = g["voltage"].rolling(5).max().reset_index(level=0, drop=True).fillna(temp_df["voltage"])
+            v_min5 = g["voltage"].rolling(5).min().reset_index(level=0, drop=True).fillna(temp_df["voltage"])
+            c_max5 = g["current"].rolling(5).max().reset_index(level=0, drop=True).fillna(temp_df["current"])
+            c_min5 = g["current"].rolling(5).min().reset_index(level=0, drop=True).fillna(temp_df["current"])
+            temp_df["abs_d_voltage"] = temp_df["d_voltage"].abs()
+            temp_df["abs_d_current"] = temp_df["d_current"].abs()
+            temp_df["voltage_range_5"] = v_max5 - v_min5
+            temp_df["current_range_5"] = c_max5 - c_min5
+
+            from random_forest_data import RF_FEATURES
+            X_rf = temp_df[RF_FEATURES].values
+            probas = rf_model.predict_proba(X_rf)
+            confidence = np.max(probas, axis=1)
+            df["confidence"] = confidence
+            print(f"[lstm_data] RF confidence scores injected: mean={confidence.mean():.4f}, min={confidence.min():.4f}, max={confidence.max():.4f}")
+        else:
+            df["confidence"] = 0.5
+            print("[lstm_data] No RF model found. Using default confidence=0.5")
+    except Exception as e:
+        df["confidence"] = 0.5
+        print(f"[lstm_data] Failed to compute RF confidence ({e}). Using default confidence=0.5")
 
     normal_count = (df["failure_status"] == 0).sum() if "failure_status" in df.columns else 0
     faulty_count = (df["failure_status"] == 1).sum() if "failure_status" in df.columns else 0

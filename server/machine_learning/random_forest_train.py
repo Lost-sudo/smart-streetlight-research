@@ -31,7 +31,7 @@ from sklearn.metrics import (
     confusion_matrix,
 )
 
-from random_forest_data import RF_FEATURES
+from random_forest_data import RF_FEATURES, FAULT_TYPE_MAP
 
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 DATASETS_DIR = os.path.join(os.path.dirname(__file__), "datasets")
@@ -122,42 +122,147 @@ def evaluate_model(
     y: np.ndarray,
     split_name: str = "Test",
 ) -> dict:
-    """Evaluates the multi-class RF model."""
+    """Evaluates the multi-class RF model and prints Chapter 4 formatted output.
+    
+    Outputs:
+      1. Per-class Precision, Recall, F1-Score table
+      2. Full multi-class confusion matrix (raw counts + row-normalized %)
+      3. Macro-averaged metrics
+    """
     y_pred = model.predict(X)
     
+    # --- Dynamically detect all classes present ---
+    all_classes = sorted(set(np.unique(y)) | set(np.unique(y_pred)))
+    labels = [int(c) for c in all_classes]
+    
+    # Short abbreviation mapping for confusion matrix headers
+    ABBREV_MAP = {
+        0: "N", 1: "VF", 2: "OC", 3: "SD", 4: "LD",
+        5: "SF", 6: "IF", 7: "DS",
+    }
+    SHORT_NAME_MAP = {
+        0: "Normal", 1: "VolFluc", 2: "OverCur", 3: "SensDeg", 4: "LampDeg",
+        5: "SysFail", 6: "IntFail", 7: "DayStand",
+    }
+    
+    target_names = [FAULT_TYPE_MAP.get(i, f"CLASS_{i}") for i in labels]
+    
     accuracy = accuracy_score(y, y_pred)
-    # Using weighted average for multi-class precision/recall/f1
-    precision = precision_score(y, y_pred, average='weighted', zero_division=0)
-    recall = recall_score(y, y_pred, average='weighted', zero_division=0)
-    f1 = f1_score(y, y_pred, average='weighted', zero_division=0)
+    precision_w = precision_score(y, y_pred, average='weighted', zero_division=0)
+    recall_w = recall_score(y, y_pred, average='weighted', zero_division=0)
+    f1_w = f1_score(y, y_pred, average='weighted', zero_division=0)
+    
+    # Macro averages (used in Chapter 4 table)
+    precision_m = precision_score(y, y_pred, average='macro', zero_division=0, labels=labels)
+    recall_m = recall_score(y, y_pred, average='macro', zero_division=0, labels=labels)
+    f1_m = f1_score(y, y_pred, average='macro', zero_division=0, labels=labels)
 
     metrics = {
         "accuracy": accuracy,
-        "precision": precision,
-        "recall": recall,
-        "f1": f1,
+        "precision": precision_w,
+        "recall": recall_w,
+        "f1": f1_w,
+        "precision_macro": precision_m,
+        "recall_macro": recall_m,
+        "f1_macro": f1_m,
     }
 
-    print(f"\n{'=' * 55}")
-    print(f"  {split_name} Set Evaluation (Multi-Class Fault Detection)")
-    print(f"{'=' * 55}")
-    print(f"  Accuracy  : {accuracy * 100:.2f}%")
-    print(f"  Weighted F1: {f1:.4f}")
+    # ============================================================== #
+    #  CHAPTER 4 OUTPUT: Classification Report                        #
+    # ============================================================== #
+    print(f"\n{'=' * 70}")
+    print(f"  {split_name} Set Evaluation — Multi-Class Fault Detection")
+    print(f"{'=' * 70}")
+    print(f"  Overall Accuracy : {accuracy * 100:.2f}%")
+    print(f"  Weighted F1      : {f1_w:.4f}")
+    print(f"  Macro F1         : {f1_m:.4f}")
     
-    # --- Classification Report ---
-    labels = [0, 1, 2, 3, 4, 5, 6]
-    target_names = [
-        "NORMAL", 
-        "VOLTAGE_FLUCTUATION", 
-        "OVERCURRENT", 
-        "SENSOR_DEGRADATION", 
-        "LAMP_DEGRADATION", 
-        "SYSTEM_FAILURE", 
-        "INTERMITTENT_FAULT"
-    ]
+    # --- Per-class metrics (scikit-learn classification report) ---
     print(f"\n  Classification Report:")
-    print(classification_report(y, y_pred, labels=labels, target_names=target_names, zero_division=0))
-    print(f"{'=' * 55}\n")
+    report = classification_report(
+        y, y_pred, labels=labels, target_names=target_names,
+        zero_division=0, digits=4
+    )
+    print(report)
+    
+    # --- Chapter 4 formatted table ---
+    print(f"\n  {'─' * 70}")
+    print(f"  CHAPTER 4 TABLE: Per-Class Precision / Recall / F1-Score")
+    print(f"  {'─' * 70}")
+    report_dict = classification_report(
+        y, y_pred, labels=labels, target_names=target_names,
+        zero_division=0, output_dict=True
+    )
+    print(f"  {'Diagnostic Condition':<28s} {'Precision':>10s} {'Recall':>10s} {'F1-Score':>10s}")
+    print(f"  {'─' * 58}")
+    
+    ch4_names = {
+        "NORMAL": "Normal Operation",
+        "VOLTAGE_FLUCTUATION": "Voltage Fluctuation",
+        "OVERCURRENT": "Overcurrent",
+        "SENSOR_DEGRADATION": "Sensor Degradation",
+        "LAMP_DEGRADATION": "Lamp Degradation",
+        "SYSTEM_FAILURE": "System Failure",
+        "INTERMITTENT_FAULT": "Intermittent Failure",
+        "DAYTIME_STANDBY": "Daytime Standby Mode",
+    }
+    
+    for name in target_names:
+        m = report_dict[name]
+        display = ch4_names.get(name, name)
+        print(f"  {display:<28s} {m['precision']:>10.2f} {m['recall']:>10.2f} {m['f1-score']:>10.2f}")
+    
+    print(f"  {'─' * 58}")
+    print(f"  {'Macro Average':<28s} {precision_m:>10.2f} {recall_m:>10.2f} {f1_m:>10.2f}")
+    print(f"  {'Weighted Average':<28s} {precision_w:>10.2f} {recall_w:>10.2f} {f1_w:>10.2f}")
+    
+    # ============================================================== #
+    #  CHAPTER 4 OUTPUT: Confusion Matrix                             #
+    # ============================================================== #
+    cm = confusion_matrix(y, y_pred, labels=labels)
+    
+    # Row-normalized confusion matrix (percentages)
+    cm_norm = np.zeros_like(cm, dtype=float)
+    for i in range(cm.shape[0]):
+        row_sum = cm[i].sum()
+        if row_sum > 0:
+            cm_norm[i] = cm[i] / row_sum * 100
+    
+    abbrevs = [ABBREV_MAP.get(i, f"C{i}") for i in labels]
+    short_names = [SHORT_NAME_MAP.get(i, f"Class{i}") for i in labels]
+    
+    print(f"\n  {'─' * 70}")
+    print(f"  CHAPTER 4 FIGURE: Multi-Class Confusion Matrix (Raw Counts)")
+    print(f"  {'─' * 70}")
+    
+    # Header row
+    header = f"  {'Actual':<18s}" + "".join(f"[{a:^5s}]" for a in abbrevs)
+    print(f"\n  {'':18s}" + "[ PREDICTED OPERATIONAL DIAGNOSTIC CONDITIONS ]")
+    print(header)
+    
+    for i, label_i in enumerate(labels):
+        row_abbrev = f"[{abbrevs[i]}] {short_names[i]}"
+        row_str = f"  {row_abbrev:<18s}"
+        for j in range(len(labels)):
+            row_str += f"{cm[i, j]:^7d}"
+        print(row_str)
+    
+    print(f"\n  {'─' * 70}")
+    print(f"  CHAPTER 4 FIGURE: Confusion Matrix (Row-Normalized %)")
+    print(f"  {'─' * 70}")
+    
+    header2 = f"  {'Actual':<18s}" + "".join(f"[{a:^5s}]" for a in abbrevs)
+    print(f"\n  {'':18s}" + "[ PREDICTED OPERATIONAL DIAGNOSTIC CONDITIONS ]")
+    print(header2)
+    
+    for i, label_i in enumerate(labels):
+        row_abbrev = f"[{abbrevs[i]}] {short_names[i]}"
+        row_str = f"  {row_abbrev:<18s}"
+        for j in range(len(labels)):
+            row_str += f"{cm_norm[i, j]:^7.1f}"
+        print(row_str)
+    
+    print(f"\n{'=' * 70}\n")
 
     return metrics
 

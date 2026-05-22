@@ -63,6 +63,7 @@ class IoTNodeLogCreate(BaseModel):
     std_voltage_5: Optional[float] = None
     std_current_5: Optional[float] = None
     fault_type: Optional[str] = None
+    confidence: Optional[float] = None
 
 class StreetlightLogRead(BaseModel):
     id: int
@@ -87,6 +88,7 @@ class StreetlightLogRead(BaseModel):
     std_voltage_5: Optional[float] = None
     std_current_5: Optional[float] = None
     fault_type: Optional[str] = None
+    confidence: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
 

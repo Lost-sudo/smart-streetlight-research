@@ -29,5 +29,6 @@ class StreetlightLog(Base):
     std_voltage_5 = Column(Float, nullable=True)
     std_current_5 = Column(Float, nullable=True)
     fault_type = Column(String, nullable=True)
+    confidence = Column(Float, nullable=True, default=0.5)
 
     streetlight = relationship("Streetlight", back_populates="logs")

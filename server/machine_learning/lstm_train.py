@@ -111,7 +111,16 @@ def train_model(
     batch_size: int = 32,
     learning_rate: float = 0.001,
     patience: int = 5,
-) -> LSTMModel:
+) -> tuple:
+    """Trains the LSTM model and returns (model, history).
+    
+    Returns
+    -------
+    tuple of (LSTMModel, dict)
+        model: the trained model with best weights restored
+        history: dict with keys 'train_loss' and 'val_loss', each a list
+                 of per-epoch loss values (for Chapter 4 Figure 4.3)
+    """
     X_train_t = torch.FloatTensor(X_train)
     y_train_t = torch.FloatTensor(y_train)
     X_val_t = torch.FloatTensor(X_val)
@@ -128,6 +137,9 @@ def train_model(
     best_val_loss = float("inf")
     best_model_state = None
     epochs_without_improvement = 0
+
+    # ── History tracking for Chapter 4 Figure 4.3 ──
+    history = {"train_loss": [], "val_loss": []}
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -146,6 +158,10 @@ def train_model(
             val_logits = model(X_val_t)
             val_loss = criterion(val_logits, y_val_t).item()
 
+        # Record history
+        history["train_loss"].append(avg_train_loss)
+        history["val_loss"].append(val_loss)
+
         print(f"  Epoch {epoch:3d}/{epochs} - Train Loss: {avg_train_loss:.4f} | Val Loss: {val_loss:.4f}")
 
         if val_loss < best_val_loss:
@@ -163,7 +179,7 @@ def train_model(
         model.load_state_dict(best_model_state)
         print(f"[train] Restored best model (val_loss={best_val_loss:.4f})")
 
-    return model
+    return model, history
 
 
 def _metrics_at_threshold(y_true: np.ndarray, probs: np.ndarray, threshold: float) -> dict:

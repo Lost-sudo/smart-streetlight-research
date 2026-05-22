@@ -56,7 +56,7 @@ export function PredictionsTable({
                     <TableCell className="py-4">
                       <div className="space-y-1.5 w-36">
                         <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
-                          <span className={config.color}>{failureProb}% Confidence</span>
+                          <span className={config.color}>{failureProb}% Risk</span>
                         </div>
                         <Progress value={failureProb} className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden [&>div]:transition-all [&>div]:duration-1000" />
                       </div>

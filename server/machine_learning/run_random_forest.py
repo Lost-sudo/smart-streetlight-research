@@ -101,13 +101,28 @@ def main(csv_path: str = None):
     upload_trained_model_to_hf(model_path, next_m_version, base_name="random_forest_model", metrics=test_metrics)
 
     # ---------------------------------------------------------- #
-    # Step 9: Feature Importance                                  #
+    # Step 9: Feature Importance (Chapter 4 formatted)             #
     # ---------------------------------------------------------- #
+    from random_forest_data import RF_FEATURE_DISPLAY_NAMES
+    
     print("\n[Step 9] Feature Importance:")
     importances = model.feature_importances_
-    for fname, imp in sorted(zip(RF_FEATURES, importances), key=lambda x: -x[1]):
-        bar = "#" * int(imp * 50)
-        print(f"  {fname:25s} : {imp:.4f} {bar}")
+    sorted_features = sorted(zip(RF_FEATURES, importances), key=lambda x: -x[1])
+    
+    print(f"\n  {'─' * 65}")
+    print(f"  CHAPTER 4 FIGURE: Random Forest Feature Importance (Relative Weight)")
+    print(f"  {'─' * 65}")
+    
+    max_bar_len = 40
+    max_imp = sorted_features[0][1] if sorted_features else 1.0
+    
+    for fname, imp in sorted_features:
+        display_name = RF_FEATURE_DISPLAY_NAMES.get(fname, fname)
+        bar_len = int((imp / max_imp) * max_bar_len)
+        bar = "█" * bar_len
+        print(f"    {display_name:<28s} {bar} {imp:.4f}")
+    
+    print(f"  {'─' * 65}")
 
     # ---------------------------------------------------------- #
     # Summary                                                     #

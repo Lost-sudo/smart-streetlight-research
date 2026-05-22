@@ -46,6 +46,7 @@ export interface StreetlightLog {
   light_intensity: number;
   timestamp: string;
   fault_type?: string;
+  confidence?: number;
 }
 
 export const streetlightApi = createApi({

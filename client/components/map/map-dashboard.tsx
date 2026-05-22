@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -38,7 +38,7 @@ const createStatusIcon = (status: string) => {
   } else if (status === "maintenance") {
     color = "#f59e0b"; // amber-500
     animationClass = "animate-pulse-amber";
-  } else if (status === "inactive") {
+  } else if (status === "inactive" || status === "offline") {
     color = "#71717a"; // zinc-500
     animationClass = "";
   }
@@ -69,19 +69,23 @@ const statusColors: Record<string, { bg: string; text: string; badge: "default" 
   inactive: { bg: "bg-zinc-100 dark:bg-zinc-800/60", text: "text-zinc-500 dark:text-zinc-400", badge: "secondary" },
   faulty: { bg: "bg-red-100 dark:bg-red-900/40", text: "text-red-600 dark:text-red-400", badge: "destructive" },
   maintenance: { bg: "bg-amber-100 dark:bg-amber-900/40", text: "text-amber-600 dark:text-amber-400", badge: "outline" },
+  offline: { bg: "bg-zinc-100 dark:bg-zinc-800/60", text: "text-zinc-500 dark:text-zinc-400", badge: "secondary" },
 };
 
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
   const map = useMap();
-  const [hasInitialSet, setHasInitialSet] = useState(false);
 
   useEffect(() => {
-    if (!hasInitialSet && center[0] !== 0) {
-      map.setView(center, zoom);
-      setHasInitialSet(true);
+    if (center[0] !== 0) {
+      map.flyTo(center, zoom, { duration: 0.8 });
     }
-  }, [center, zoom, map, hasInitialSet]);
+  }, [center, zoom, map]);
 
+  return null;
+}
+
+function MapClickHandler({ onDeselect }: { onDeselect: () => void }) {
+  useMapEvents({ click: () => onDeselect() });
   return null;
 }
 
@@ -103,13 +107,21 @@ export default function MapDashboard() {
   }, []);
 
   // Center the map on the first streetlight or Cantilan center
-  const center = useMemo<[number, number]>(() => {
+  const defaultCenter = useMemo<[number, number]>(() => {
     return streetlights.length > 0 
       ? [streetlights[0].latitude, streetlights[0].longitude] 
       : [9.335583, 125.976972];
   }, [streetlights.length === 0]); // Only re-calculate when transitioning from empty to loaded
 
-  const zoom = 15;
+  const mapCenter = useMemo<[number, number]>(() => {
+    return selectedNode 
+      ? [selectedNode.latitude, selectedNode.longitude] 
+      : defaultCenter;
+  }, [selectedNode, defaultCenter]);
+
+  const mapZoom = useMemo(() => {
+    return selectedNode ? 18 : 15;
+  }, [selectedNode]);
 
   if (isLoadingStreetlights) {
     return (
@@ -215,8 +227,8 @@ export default function MapDashboard() {
       </div>
 
       <MapContainer
-        center={center}
-        zoom={zoom}
+        center={defaultCenter}
+        zoom={15}
         style={{ height: "100%", width: "100%" }}
         zoomControl={false}
       >
@@ -244,7 +256,8 @@ export default function MapDashboard() {
             </Popup>
           </Marker>
         ))}
-        <ChangeView center={center} zoom={zoom} />
+        <ChangeView center={mapCenter} zoom={mapZoom} />
+        <MapClickHandler onDeselect={() => setSelectedNode(null)} />
       </MapContainer>
 
       {/* Floating Detail Panel */}
@@ -276,8 +289,8 @@ export default function MapDashboard() {
             {selectedNode ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
-                  <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", statusColors[selectedNode.status].bg)}>
-                    <Lightbulb className={cn("h-5 w-5", statusColors[selectedNode.status].text)} />
+                  <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", statusColors[selectedNode.status]?.bg)}>
+                    <Lightbulb className={cn("h-5 w-5", statusColors[selectedNode.status]?.text)} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm truncate">{selectedNode.name}</p>
@@ -290,7 +303,7 @@ export default function MapDashboard() {
                     <p className="text-[9px] text-muted-foreground flex items-center gap-1 mb-1 uppercase font-bold">
                       <Zap className="h-3 w-3" /> Status
                     </p>
-                    <Badge variant={statusColors[selectedNode.status].badge} className="text-[9px] capitalize py-0 h-4">
+                    <Badge variant={statusColors[selectedNode.status]?.badge || "default"} className="text-[9px] capitalize py-0 h-4">
                       {selectedNode.status}
                     </Badge>
                   </div>

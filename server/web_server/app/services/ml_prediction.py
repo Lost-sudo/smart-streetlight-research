@@ -26,7 +26,8 @@ RF_FEATURES = [
 ]
 
 # LSTM features — including 'elapsed_time' derived from timesteps
-LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time", "fault_code"]
+# and 'confidence' from the RF fault detection model
+LSTM_FEATURES = ["voltage", "current", "power", "ldr", "elapsed_time", "fault_code", "confidence"]
 
 FAULT_TYPE_MAP = {
     0: "NORMAL",
@@ -358,6 +359,7 @@ class MLPredictionService:
         logger.info("LSTM running due to RF fault trigger: %s", fault_type)
         fault_code_map = {v: k for k, v in FAULT_TYPE_MAP.items()}
         current_fault_code = float(fault_code_map.get(fault_type, 1))
+        current_confidence = float(fault_context.get("confidence", 0.5))
             
         latest_history = historical_logs[-9:]
         
@@ -365,13 +367,16 @@ class MLPredictionService:
         for log in latest_history:
             hist_ft = getattr(log, "fault_type", None)
             hist_fault_code = float(fault_code_map.get(str(hist_ft), current_fault_code))
+            # Use stored confidence from historical log if available, else 0.5
+            hist_confidence = float(getattr(log, "confidence", 0.5)) if hasattr(log, "confidence") else 0.5
             sequence_data.append([
                 getattr(log, "voltage", 11.0),
                 getattr(log, "current", 0.6),
                 abs(getattr(log, "power_consumption", 7.0)),
                 getattr(log, "light_intensity", 200.0),
                 float(getattr(log, "timestep", 0)), # Using timestep as elapsed_time
-                hist_fault_code
+                hist_fault_code,
+                hist_confidence
             ])
             
         sequence_data.append([
@@ -380,8 +385,18 @@ class MLPredictionService:
             abs(iot_log.power_consumption),
             iot_log.light_intensity,
             float(getattr(iot_log, "timestep", 0)),
-            current_fault_code
+            current_fault_code,
+            current_confidence
         ])
+
+        # Validate sequence dimension matches LSTM_FEATURES count
+        expected_features = len(LSTM_FEATURES)
+        actual_features = len(sequence_data[0])
+        if actual_features != expected_features:
+            logger.error(
+                "LSTM feature dimension mismatch: expected %d, got %d. Features: %s",
+                expected_features, actual_features, LSTM_FEATURES
+            )
         
         df = pd.DataFrame(sequence_data, columns=LSTM_FEATURES)
         scaled_data = self.lstm_scaler.transform(df.values)

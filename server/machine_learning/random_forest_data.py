@@ -38,6 +38,24 @@ FAULT_TYPE_MAP = {
     4: "LAMP_DEGRADATION",
     5: "SYSTEM_FAILURE",
     6: "INTERMITTENT_FAULT",
+    7: "DAYTIME_STANDBY",
+}
+
+# Human-readable feature names for Chapter 4 reporting
+RF_FEATURE_DISPLAY_NAMES = {
+    "voltage": "Raw Voltage (V)",
+    "current": "Raw Current (A)",
+    "power": "Computed Power (W)",
+    "ldr": "LDR Intensity (Lux)",
+    "d_voltage": "Delta Voltage (V)",
+    "d_current": "Delta Current (A)",
+    "d_power": "Delta Power (W)",
+    "std_current_5": "Rolling Std Dev (A)",
+    "std_voltage_5": "Rolling Std Dev (V)",
+    "abs_d_voltage": "Abs Delta Voltage (V)",
+    "abs_d_current": "Abs Delta Current (A)",
+    "voltage_range_5": "Voltage Range 5-step (V)",
+    "current_range_5": "Current Range 5-step (A)",
 }
 
 

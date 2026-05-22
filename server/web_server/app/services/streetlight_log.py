@@ -119,6 +119,7 @@ class StreetlightLogService:
                 fault_result = self.ml_service.detect_fault(iot_log, historical_logs, streetlight)
                 if fault_result:
                     iot_log.fault_type = fault_result.get("fault_type", "UNKNOWN_FAULT")
+                    iot_log.confidence = fault_result.get("confidence", 0.5)
             except Exception as e:
                 logger.exception("Error during ML fault detection")
 

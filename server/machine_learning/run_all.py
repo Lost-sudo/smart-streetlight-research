@@ -24,13 +24,14 @@ def main():
     from retrain_utils import update_dataset_from_db
     shared_csv_path = update_dataset_from_db("streetlight_dataset_augmented")
     
-    # --- Step 1: LSTM Training ---
-    print("\n>>> Training LSTM (Time-to-Failure) <<<")
-    lstm_metrics = run_lstm(csv_path=shared_csv_path)
-
-    # --- Step 2: Random Forest Training ---
+    # --- Step 1: Random Forest Training ---
+    # RF must be trained first so the LSTM can use RF confidence scores as a feature
     print("\n>>> Training Random Forest (Fault Detection) <<<")
     rf_metrics = run_rf(csv_path=shared_csv_path)
+
+    # --- Step 2: LSTM Training ---
+    print("\n>>> Training LSTM (Time-to-Failure) <<<")
+    lstm_metrics = run_lstm(csv_path=shared_csv_path)
 
     print("\n" + "#" * 60)
     print("#  All Models Trained Successfully!")
