@@ -7,6 +7,8 @@ from app.schemas.repair_task import RepairTaskCreate, RepairTaskUpdate
 from app.repositories.repair_task import RepairTaskRepository
 from app.services.predictive_maintenance_log import PredictiveMaintenanceService
 from app.services.ml_prediction import MLPredictionService
+from app.models.repair_task import RepairTaskStatus
+from app.models.user import User, TechnicianAvailability
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class StreetlightLogService:
     def __init__(self, db: Session):
+        self.db = db
         self.streetlight_log_repo = StreetlightLogRepository(db)
         self.streetlight_repo = StreetlightRepository(db)
         self.predictive_maintenance_repo = PredictiveMaintenanceRepository(db)
@@ -202,10 +205,18 @@ class StreetlightLogService:
                         if active_alert:
                             self.alert_repo.update(active_alert.id, AlertUpdate(is_resolved=True))
                             
-                            # Remove the repair task if it exists and is still pending
-                            if active_alert.repair_task and active_alert.repair_task.status == "pending":
-                                logger.info(f"Removing pending repair task {active_alert.repair_task.id} due to auto-recovery.")
-                                self.repair_task_repo.delete(active_alert.repair_task.id)
+                            # Handle the associated repair task
+                            if active_alert.repair_task:
+                                task = active_alert.repair_task
+                                if task.status == "pending":
+                                    logger.info(f"Removing pending repair task {task.id} due to auto-recovery.")
+                                    self.repair_task_repo.delete(task.id)
+                                elif task.status in ("assigned", "in_progress") and task.technician_id:
+                                    logger.info(f"Unassigning technician {task.technician_id} from repair task {task.id} due to auto-recovery.")
+                                    self.repair_task_repo.update(task.id, RepairTaskUpdate(technician_id=None, status="pending"))
+                                    technician = self.db.query(User).filter(User.id == task.technician_id).first()
+                                    if technician:
+                                        technician.availability = TechnicianAvailability.available
 
                 # 5. PREDICTIVE MAINTENANCE (LSTM)
                 self.pm_service.analyze_node(streetlight.id)
