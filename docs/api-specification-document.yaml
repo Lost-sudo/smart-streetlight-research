@@ -1464,8 +1464,8 @@ components:
         d_voltage: { type: number, nullable: true }
         d_current: { type: number, nullable: true }
         d_power: { type: number, nullable: true }
-        std_voltage_5: { type: number, nullable: true }
-        std_current_5: { type: number, nullable: true }
+        std_voltage_10: { type: number, nullable: true }
+        std_current_10: { type: number, nullable: true }
         fault_type: { type: string, nullable: true }
 
     StreetlightLogRead:
@@ -1488,8 +1488,8 @@ components:
         d_voltage: { type: number, nullable: true }
         d_current: { type: number, nullable: true }
         d_power: { type: number, nullable: true }
-        std_voltage_5: { type: number, nullable: true }
-        std_current_5: { type: number, nullable: true }
+        std_voltage_10: { type: number, nullable: true }
+        std_current_10: { type: number, nullable: true }
         fault_type: { type: string, nullable: true }
 
     AlertCreate:

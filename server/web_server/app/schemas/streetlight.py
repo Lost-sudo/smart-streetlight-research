@@ -60,8 +60,8 @@ class IoTNodeLogCreate(BaseModel):
     d_voltage: Optional[float] = None
     d_current: Optional[float] = None
     d_power: Optional[float] = None
-    std_voltage_5: Optional[float] = None
-    std_current_5: Optional[float] = None
+    std_voltage_10: Optional[float] = None
+    std_current_10: Optional[float] = None
     fault_type: Optional[str] = None
     confidence: Optional[float] = None
 
@@ -85,8 +85,8 @@ class StreetlightLogRead(BaseModel):
     d_voltage: Optional[float] = None
     d_current: Optional[float] = None
     d_power: Optional[float] = None
-    std_voltage_5: Optional[float] = None
-    std_current_5: Optional[float] = None
+    std_voltage_10: Optional[float] = None
+    std_current_10: Optional[float] = None
     fault_type: Optional[str] = None
     confidence: Optional[float] = None
 

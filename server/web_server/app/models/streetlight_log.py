@@ -26,8 +26,8 @@ class StreetlightLog(Base):
     d_voltage = Column(Float, nullable=True)
     d_current = Column(Float, nullable=True)
     d_power = Column(Float, nullable=True)
-    std_voltage_5 = Column(Float, nullable=True)
-    std_current_5 = Column(Float, nullable=True)
+    std_voltage_10 = Column(Float, nullable=True)
+    std_current_10 = Column(Float, nullable=True)
     fault_type = Column(String, nullable=True)
     confidence = Column(Float, nullable=True, default=0.5)
 

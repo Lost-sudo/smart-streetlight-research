@@ -46,39 +46,39 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
         df["d_voltage"] = g["voltage"].diff().fillna(0)
         df["d_current"] = g["current"].diff().fillna(0)
         df["d_power"] = g["power"].diff().fillna(0)
-        df["std_current_5"] = (
-            g["current"].rolling(5).std().reset_index(level=0, drop=True).fillna(0)
+        df["std_current_10"] = (
+            g["current"].rolling(10).std().reset_index(level=0, drop=True).fillna(0)
         )
-        df["std_voltage_5"] = (
-            g["voltage"].rolling(5).std().reset_index(level=0, drop=True).fillna(0)
+        df["std_voltage_10"] = (
+            g["voltage"].rolling(10).std().reset_index(level=0, drop=True).fillna(0)
         )
         # --- New discriminative features ---
-        v_max5 = g["voltage"].rolling(5).max().reset_index(level=0, drop=True).fillna(df["voltage"])
-        v_min5 = g["voltage"].rolling(5).min().reset_index(level=0, drop=True).fillna(df["voltage"])
-        c_max5 = g["current"].rolling(5).max().reset_index(level=0, drop=True).fillna(df["current"])
-        c_min5 = g["current"].rolling(5).min().reset_index(level=0, drop=True).fillna(df["current"])
-        df["voltage_range_5"] = v_max5 - v_min5
-        df["current_range_5"] = c_max5 - c_min5
+        v_max10 = g["voltage"].rolling(10).max().reset_index(level=0, drop=True).fillna(df["voltage"])
+        v_min10 = g["voltage"].rolling(10).min().reset_index(level=0, drop=True).fillna(df["voltage"])
+        c_max10 = g["current"].rolling(10).max().reset_index(level=0, drop=True).fillna(df["current"])
+        c_min10 = g["current"].rolling(10).min().reset_index(level=0, drop=True).fillna(df["current"])
+        df["voltage_range_10"] = v_max10 - v_min10
+        df["current_range_10"] = c_max10 - c_min10
     else:
         df["d_voltage"] = df["voltage"].diff().fillna(0)
         df["d_current"] = df["current"].diff().fillna(0)
         df["d_power"] = df["power"].diff().fillna(0)
-        df["std_current_5"] = df["current"].rolling(5).std().fillna(0)
-        df["std_voltage_5"] = df["voltage"].rolling(5).std().fillna(0)
+        df["std_current_10"] = df["current"].rolling(10).std().fillna(0)
+        df["std_voltage_10"] = df["voltage"].rolling(10).std().fillna(0)
         # --- New discriminative features ---
-        v_max5 = df["voltage"].rolling(5).max().fillna(df["voltage"])
-        v_min5 = df["voltage"].rolling(5).min().fillna(df["voltage"])
-        c_max5 = df["current"].rolling(5).max().fillna(df["current"])
-        c_min5 = df["current"].rolling(5).min().fillna(df["current"])
-        df["voltage_range_5"] = v_max5 - v_min5
-        df["current_range_5"] = c_max5 - c_min5
+        v_max10 = df["voltage"].rolling(10).max().fillna(df["voltage"])
+        v_min10 = df["voltage"].rolling(10).min().fillna(df["voltage"])
+        c_max10 = df["current"].rolling(10).max().fillna(df["current"])
+        c_min10 = df["current"].rolling(10).min().fillna(df["current"])
+        df["voltage_range_10"] = v_max10 - v_min10
+        df["current_range_10"] = c_max10 - c_min10
 
     # Absolute delta features (computed after diff, works for both branches)
     df["abs_d_voltage"] = df["d_voltage"].abs()
     df["abs_d_current"] = df["d_current"].abs()
 
-    print(f"[rf_preprocess] Added temporal features: d_voltage, d_current, d_power, std_current_5, std_voltage_5")
-    print(f"[rf_preprocess] Added discriminative features: abs_d_voltage, abs_d_current, voltage_range_5, current_range_5")
+    print(f"[rf_preprocess] Added temporal features: d_voltage, d_current, d_power, std_current_10, std_voltage_10")
+    print(f"[rf_preprocess] Added discriminative features: abs_d_voltage, abs_d_current, voltage_range_10, current_range_10")
     return df
 
 

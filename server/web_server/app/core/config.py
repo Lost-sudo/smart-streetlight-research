@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     REFRESH_COOKIE_NAME: str = "refresh_token"
     REFRESH_COOKIE_SAMESITE: str = "strict"
     ENABLE_ML: bool = True
+
+    # Heartbeat / Communication-fault settings
+    HEARTBEAT_TIMEOUT_MINUTES: int = 1
+    HEARTBEAT_CHECK_INTERVAL_SECONDS: int = 60
     
     # Hugging Face Configuration
     HF_TOKEN: str = ""

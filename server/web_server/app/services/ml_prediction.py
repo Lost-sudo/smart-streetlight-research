@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 RF_FEATURES = [
     "voltage", "current", "power", "ldr",
     "d_voltage", "d_current", "d_power",
-    "std_current_5", "std_voltage_5",
+    "std_current_10", "std_voltage_10",
     # Discriminative features for multi-class fault separation
     "abs_d_voltage", "abs_d_current",
-    "voltage_range_5", "current_range_5",
+    "voltage_range_10", "current_range_10",
 ]
 
 # LSTM features — including 'elapsed_time' derived from timesteps
@@ -227,12 +227,12 @@ class MLPredictionService:
         d_voltage = getattr(iot_log, "d_voltage", None)
         d_current = getattr(iot_log, "d_current", None)
         d_power = getattr(iot_log, "d_power", None)
-        std_voltage_5 = getattr(iot_log, "std_voltage_5", None)
-        std_current_5 = getattr(iot_log, "std_current_5", None)
+        std_voltage_10 = getattr(iot_log, "std_voltage_10", None)
+        std_current_10 = getattr(iot_log, "std_current_10", None)
 
-        if any(v is None for v in [d_voltage, d_current, d_power, std_voltage_5, std_current_5]):
+        if any(v is None for v in [d_voltage, d_current, d_power, std_voltage_10, std_current_10]):
             d_voltage, d_current, d_power = 0.0, 0.0, 0.0
-            std_voltage_5, std_current_5 = 0.0, 0.0
+            std_voltage_10, std_current_10 = 0.0, 0.0
 
             if historical_logs and len(historical_logs) > 0:
                 prev = historical_logs[0]
@@ -241,28 +241,28 @@ class MLPredictionService:
                 prev_power = abs(float(getattr(prev, "power_consumption", power)))
                 d_power = power - prev_power
 
-            if historical_logs and len(historical_logs) >= 4:
-                recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:4]] + [voltage]
-                recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:4]] + [current]
-                std_voltage_5 = float(pd.Series(recent_voltages).std())
-                std_current_5 = float(pd.Series(recent_currents).std())
+            if historical_logs and len(historical_logs) >= 9:
+                recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:9]] + [voltage]
+                recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:9]] + [current]
+                std_voltage_10 = float(pd.Series(recent_voltages).std())
+                std_current_10 = float(pd.Series(recent_currents).std())
 
         # --- NEW DISCRIMINATIVE FEATURES ---
         abs_d_voltage = abs(d_voltage)
         abs_d_current = abs(d_current)
 
-        voltage_range_5 = 0.0
-        current_range_5 = 0.0
-        if historical_logs and len(historical_logs) >= 4:
-            recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:4]] + [voltage]
-            recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:4]] + [current]
-            voltage_range_5 = max(recent_voltages) - min(recent_voltages)
-            current_range_5 = max(recent_currents) - min(recent_currents)
+        voltage_range_10 = 0.0
+        current_range_10 = 0.0
+        if historical_logs and len(historical_logs) >= 9:
+            recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs[:9]] + [voltage]
+            recent_currents = [float(getattr(l, "current", current)) for l in historical_logs[:9]] + [current]
+            voltage_range_10 = max(recent_voltages) - min(recent_voltages)
+            current_range_10 = max(recent_currents) - min(recent_currents)
         elif historical_logs and len(historical_logs) > 0:
             recent_voltages = [float(getattr(l, "voltage", voltage)) for l in historical_logs] + [voltage]
             recent_currents = [float(getattr(l, "current", current)) for l in historical_logs] + [current]
-            voltage_range_5 = max(recent_voltages) - min(recent_voltages)
-            current_range_5 = max(recent_currents) - min(recent_currents)
+            voltage_range_10 = max(recent_voltages) - min(recent_voltages)
+            current_range_10 = max(recent_currents) - min(recent_currents)
 
         df = pd.DataFrame([{
             "voltage": voltage,
@@ -273,12 +273,12 @@ class MLPredictionService:
             "d_voltage": d_voltage,
             "d_current": d_current,
             "d_power": d_power,
-            "std_current_5": std_current_5,
-            "std_voltage_5": std_voltage_5,
+            "std_current_10": std_current_10,
+            "std_voltage_10": std_voltage_10,
             "abs_d_voltage": abs_d_voltage,
             "abs_d_current": abs_d_current,
-            "voltage_range_5": voltage_range_5,
-            "current_range_5": current_range_5,
+            "voltage_range_10": voltage_range_10,
+            "current_range_10": current_range_10,
         }])
 
         try:

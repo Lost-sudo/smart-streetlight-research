@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # --- Configuration ---
 # How long a node can be silent before it's considered offline
-HEARTBEAT_TIMEOUT_MINUTES = int(getattr(settings, "HEARTBEAT_TIMEOUT_MINUTES", 5))
+HEARTBEAT_TIMEOUT_MINUTES = int(getattr(settings, "HEARTBEAT_TIMEOUT_MINUTES", 1))
 # How often the monitor checks all nodes
 CHECK_INTERVAL_SECONDS = int(getattr(settings, "HEARTBEAT_CHECK_INTERVAL_SECONDS", 60))
 

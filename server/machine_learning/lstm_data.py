@@ -135,16 +135,16 @@ def load_lstm_dataset(csv_path: str = DATASET_PATH, df: Optional[pd.DataFrame] =
             temp_df["d_voltage"] = g["voltage"].diff().fillna(0)
             temp_df["d_current"] = g["current"].diff().fillna(0)
             temp_df["d_power"] = g["power"].diff().fillna(0)
-            temp_df["std_voltage_5"] = g["voltage"].rolling(5).std().reset_index(level=0, drop=True).fillna(0)
-            temp_df["std_current_5"] = g["current"].rolling(5).std().reset_index(level=0, drop=True).fillna(0)
-            v_max5 = g["voltage"].rolling(5).max().reset_index(level=0, drop=True).fillna(temp_df["voltage"])
-            v_min5 = g["voltage"].rolling(5).min().reset_index(level=0, drop=True).fillna(temp_df["voltage"])
-            c_max5 = g["current"].rolling(5).max().reset_index(level=0, drop=True).fillna(temp_df["current"])
-            c_min5 = g["current"].rolling(5).min().reset_index(level=0, drop=True).fillna(temp_df["current"])
+            temp_df["std_voltage_10"] = g["voltage"].rolling(10).std().reset_index(level=0, drop=True).fillna(0)
+            temp_df["std_current_10"] = g["current"].rolling(10).std().reset_index(level=0, drop=True).fillna(0)
+            v_max10 = g["voltage"].rolling(10).max().reset_index(level=0, drop=True).fillna(temp_df["voltage"])
+            v_min10 = g["voltage"].rolling(10).min().reset_index(level=0, drop=True).fillna(temp_df["voltage"])
+            c_max10 = g["current"].rolling(10).max().reset_index(level=0, drop=True).fillna(temp_df["current"])
+            c_min10 = g["current"].rolling(10).min().reset_index(level=0, drop=True).fillna(temp_df["current"])
             temp_df["abs_d_voltage"] = temp_df["d_voltage"].abs()
             temp_df["abs_d_current"] = temp_df["d_current"].abs()
-            temp_df["voltage_range_5"] = v_max5 - v_min5
-            temp_df["current_range_5"] = c_max5 - c_min5
+            temp_df["voltage_range_10"] = v_max10 - v_min10
+            temp_df["current_range_10"] = c_max10 - c_min10
 
             from random_forest_data import RF_FEATURES
             X_rf = temp_df[RF_FEATURES].values

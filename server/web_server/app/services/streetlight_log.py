@@ -88,20 +88,20 @@ class StreetlightLogService:
             iot_log.d_current = 0.0
             iot_log.d_power = 0.0
 
-        if historical_logs and len(historical_logs) >= 4:
-            recent_voltages = [float(l.voltage) for l in historical_logs[:4]] + [iot_log.voltage]
-            recent_currents = [float(l.current) for l in historical_logs[:4]] + [iot_log.current]
+        if historical_logs and len(historical_logs) >= 9:
+            recent_voltages = [float(l.voltage) for l in historical_logs[:9]] + [iot_log.voltage]
+            recent_currents = [float(l.current) for l in historical_logs[:9]] + [iot_log.current]
             
             # Using ddof=1 for sample standard deviation (matches Pandas training default)
-            iot_log.std_voltage_5 = float(np.std(recent_voltages, ddof=1))
-            iot_log.std_current_5 = float(np.std(recent_currents, ddof=1))
+            iot_log.std_voltage_10 = float(np.std(recent_voltages, ddof=1))
+            iot_log.std_current_10 = float(np.std(recent_currents, ddof=1))
         else:
-            iot_log.std_voltage_5 = 0.0
-            iot_log.std_current_5 = 0.0
+            iot_log.std_voltage_10 = 0.0
+            iot_log.std_current_10 = 0.0
 
         # Map to legacy fields for backward compatibility/UI
         iot_log.power_trend = iot_log.d_power
-        iot_log.voltage_fluctuation = iot_log.std_voltage_5
+        iot_log.voltage_fluctuation = iot_log.std_voltage_10
         
         if iot_log.current_deviation is None:
             if historical_logs:

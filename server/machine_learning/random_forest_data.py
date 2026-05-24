@@ -23,10 +23,10 @@ from lstm_data import DATASET_PATH
 RF_FEATURES = [
     "voltage", "current", "power", "ldr",
     "d_voltage", "d_current", "d_power",
-    "std_current_5", "std_voltage_5",
+    "std_current_10", "std_voltage_10",
     # Discriminative features for multi-class fault separation
     "abs_d_voltage", "abs_d_current",       # Magnitude of change (high for VOLTAGE_FLUCTUATION)
-    "voltage_range_5", "current_range_5",   # Swing amplitude (separates VOLT_FLUCT vs INTERMITTENT)
+    "voltage_range_10", "current_range_10",   # Swing amplitude (separates VOLT_FLUCT vs INTERMITTENT)
 ]
 RF_TARGET = "fault_type"
 
@@ -50,12 +50,12 @@ RF_FEATURE_DISPLAY_NAMES = {
     "d_voltage": "Delta Voltage (V)",
     "d_current": "Delta Current (A)",
     "d_power": "Delta Power (W)",
-    "std_current_5": "Rolling Std Dev (A)",
-    "std_voltage_5": "Rolling Std Dev (V)",
+    "std_current_10": "Rolling Std Dev 10-step (A)",
+    "std_voltage_10": "Rolling Std Dev 10-step (V)",
     "abs_d_voltage": "Abs Delta Voltage (V)",
     "abs_d_current": "Abs Delta Current (A)",
-    "voltage_range_5": "Voltage Range 5-step (V)",
-    "current_range_5": "Current Range 5-step (A)",
+    "voltage_range_10": "Voltage Range 10-step (V)",
+    "current_range_10": "Current Range 10-step (A)",
 }
 
 
