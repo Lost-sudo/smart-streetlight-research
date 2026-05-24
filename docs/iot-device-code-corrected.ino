@@ -1,31 +1,3 @@
-/*
- * ============================================================
- *  CORRECTED IoT DEVICE CODE — Smart Streetlight Node
- *  ============================================================
- *  FIXES:
- *    1. Mode-specific current values instead of forcing 0.75A
- *       — NORMAL:        ~0.35A (was ~0.75A → model saw OVCURRENT)
- *       — VOLT_FLUCT:    ~0.33A (was ~0.75A → model saw SENSOR_DEG)
- *       — SENSOR_DEG:    ~0.16A  consistently LOW (was 0/0.75A alternating)
- *       — OUTCURRENT:    ~0.79A (unchanged — OK)
- *       — LAMP_DEG:      ~0.96A (was ~0.75A)
- *       — INTERMITTENT:  ~0.26A (often 0)
- *
- *    2. Voltage per fault mode matches training data distribution
- *       — LAMP_DEGRADATION: voltage drops to ~8.9V (was normal ~11V)
- *       — VOLTAGE_FLUCTUATION: voltage swings large enough for
- *         std_voltage_10 ≈ 1.7V (was ±3V — borderline)
- *
- *    3. Sensor degradation produces CONSISTENTLY low current
- *       (not intermittent 0 / 0.75A) to match training data.
- *
- *  Model: Random Forest (multi-class, trained on streetlight_dataset_V*.csv)
- *  Voltage range in training data: 0–14.8V (scaled, represents 220V mains
- *  through voltage divider with factor ~5.0).
- *  Current range: 0–2.7A
- * ============================================================
- */
-
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -325,7 +297,7 @@ float getModeVoltage() {
   }
 
   float v = p.baseVoltage + random(-100, 100) / 100.0 * p.voltageNoise;
-  return max(v, 0.0);
+  return max(v, 0.0f);
 }
 
 float getModeCurrent() {
@@ -343,7 +315,7 @@ float getModeCurrent() {
   }
 
   float c = p.baseCurrent + random(-100, 100) / 100.0 * p.currentNoise;
-  return max(c, 0.0);
+  return max(c, 0.0f);
 }
 
 // ======================================================
@@ -693,9 +665,6 @@ void loop() {
   // ======================================================
 
   int ldrValue = analogRead(LDR_PIN);
-
-  // Override LDR with mode-specific value for simulation
-  ldrValue = (int)(p.ldrCenter + random(-100, 100) / 100.0 * p.ldrNoise);
   ldrValue = constrain(ldrValue, 0, 4095);
 
   bool isNight = (ldrValue < DARK_THRESHOLD);
